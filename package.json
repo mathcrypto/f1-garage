@@ -1,0 +1,25 @@
+{
+  "name": "f1-garage",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Interactive F1 car explorer with a Claude race-engineer agent for upgrades and FIA regulations.",
+  "scripts": {
+    "dev": "next dev -p 3002",
+    "build": "next build",
+    "start": "next start -p 3002",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "exa-js": "2.26.0",
+    "next": "16.3.5",
+    "openai": "7.39.0",
+    "react": "19.3.0",
+    "react-dom": "19.3.0"
+  },
+  "devDependencies": {
+    "@types/node": "22.20.2",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "typescript": "5.9.3"
+  }
+}
