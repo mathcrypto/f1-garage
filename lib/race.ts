@@ -22,15 +22,21 @@ export function drive(c: Driven, dt: number, pace = 1, cap = Infinity) {
   fillMotion(c, prev, dt, target >= track.vmax * 0.95 * pace)
 }
 
+// Signals are smoothed so the brakes, wings and wheels never flicker from
+// one frame to the next.
 function fillMotion(c: Driven, prev: number, dt: number, straight: boolean, steerInput = 0) {
   const m = c.motion
+  const ease = (from: number, to: number, rate: number) => from + (to - from) * (1 - Math.exp(-rate * dt))
   const accelerating = c.v > prev + 0.01
   m.speed = c.v * 3.6
-  m.braking = clamp((prev - c.v) / dt / track.brake, 0, 1)
-  m.steer = clamp(-track.curvature(c.s) * 2.6 + steerInput * 0.12, -0.32, 0.32)
-  m.aero = straight && m.braking < 0.05 ? "straight" : "corner"
-  m.ers = accelerating ? 0.55 + 0.45 * (c.v / track.vmax) : 0
-  m.throttle = m.braking > 0.05 ? 0 : accelerating ? 1 : 0.3
+  m.braking = ease(m.braking, clamp((prev - c.v) / dt / track.brake, 0, 1), 8)
+  m.steer = ease(m.steer, clamp(-track.curvature(c.s) * 2.6 + steerInput * 0.12, -0.32, 0.32), 6)
+  // Wings open on a clear straight and close the moment braking starts, with
+  // hysteresis so they don't flap.
+  if (m.aero === "corner" && straight && m.braking < 0.05) m.aero = "straight"
+  else if (m.aero === "straight" && (!straight || m.braking > 0.25)) m.aero = "corner"
+  m.ers = ease(m.ers, accelerating ? 0.55 + 0.45 * (c.v / track.vmax) : 0, 6)
+  m.throttle = ease(m.throttle, m.braking > 0.15 ? 0 : accelerating ? 1 : 0.3, 10)
 }
 
 // ── Race state ──────────────────────────────────────────────────────────────
@@ -296,11 +302,11 @@ function drivePlayer(c: RaceCar, dt: number, cap: number) {
   const target = track.targetSpeed(c.s + c.v * 0.3)
   if (auto) {
     // Full assist: the car handles throttle and brakes; you choose the line and when to attack.
-    throttle = c.v < target ? 1 : 0
-    brake = c.v > target + 0.5 ? 1 : 0
+    throttle = clamp((target - c.v) / 2, 0, 1)
+    brake = clamp((c.v - target) / 2, 0, 1)
   } else if (race.assist === "braking" && c.v > target) {
-    // Braking assist: the car brakes for corners; the throttle is yours.
-    brake = 1
+    // Braking assist: the car brakes for corners (progressively); the throttle is yours.
+    brake = Math.max(brake, clamp((c.v - target) / 2, 0.3, 1))
     throttle = 0
   }
   c.boosting = input.overtake && c.battery > 0.02 && throttle > 0 && !c.finished
@@ -324,7 +330,8 @@ function drivePlayer(c: RaceCar, dt: number, cap: number) {
   else if (auto) c.latTarget = clamp(-Math.sign(k) * Math.min(4, Math.abs(k) * 700), -4, 4)
   c.s += c.v * dt
   fillMotion(c, prev, dt, c.v > track.vmax * 0.85 && throttle > 0, input.steer)
-  c.motion.throttle = brake > 0 ? 0 : throttle
+  // The engine note follows your foot, smoothed.
+  c.motion.throttle += ((brake > 0 ? 0 : throttle) - c.motion.throttle) * (1 - Math.exp(-14 * dt))
 
   // Overtake mode drains the battery; braking harvests energy back.
   c.battery = clamp(c.battery + (c.boosting ? -0.2 : brake > 0 ? 0.1 : 0.012) * dt, 0, 1)

@@ -156,9 +156,10 @@ export default function Scene() {
       </Environment>
 
       <Suspense fallback={null}>
+        {/* The circuit is built once and kept, so going out on track is instant. */}
+        <group visible={onTrack}><Circuit /></group>
         {onTrack ? (
           <>
-            <Circuit />
             {mode === "drive" ? <DriveSession onTarget={setFollowed} /> : <RaceSession key={raceId} onTarget={setFollowed} />}
             <TrackCamera target={getFollowed} overview={mode === "race" ? gridView : undefined} />
           </>

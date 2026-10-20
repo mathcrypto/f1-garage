@@ -40,7 +40,8 @@ function useLessonRunner() {
     if (!data || !step) return
     applyStep(step)
     const st = useEngineerState.getState()
-    st.setCaption(step.say)
+    // With her voice on, the caption appears when she starts saying it.
+    if (!(voice.enabled && voice.supported) || !lesson.playing) st.setCaption(step.say)
     if (!lesson.playing) { voice.stop(); return }
 
     const next = () => {
@@ -50,7 +51,9 @@ function useLessonRunner() {
       else useEngineerState.getState().setLesson({ ...cur, playing: false })
     }
     if (voice.enabled && voice.supported) {
-      voice.say(step.say, () => { timer.current = setTimeout(next, 700) })
+      // Have the next steps ready before they're needed.
+      voice.prefetch(data.steps.slice(lesson.step + 1, lesson.step + 3).map((s) => s.say))
+      voice.say(step.say, () => { timer.current = setTimeout(next, 250) })
     } else {
       st.setStatus("talking")
       const words = step.say.split(/\s+/).length

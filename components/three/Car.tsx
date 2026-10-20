@@ -2,7 +2,7 @@
 
 import { Decal, Html } from "@react-three/drei"
 import { useFrame } from "@react-three/fiber"
-import { useEffect, useMemo, useRef } from "react"
+import { useMemo, useRef } from "react"
 import * as THREE from "three"
 import type { Team } from "@/lib/teams"
 import { liveryFor } from "@/lib/liveries"
@@ -34,11 +34,18 @@ function carbonTexture() {
   return t
 }
 
+const liveryCache = new Map<string, THREE.Texture>()
+function cachedLivery(id: string, design: ReturnType<typeof liveryFor>) {
+  let t = liveryCache.get(id)
+  if (!t) { t = paintLivery(design); liveryCache.set(id, t) }
+  return t
+}
+
 function useMaterials(team: Team) {
   const carbonMap = useMemo(() => (typeof document === "undefined" ? null : carbonTexture()), [])
   const design = liveryFor(team.id)
-  const liveryMap = useMemo(() => paintLivery(design), [design])
-  useEffect(() => () => liveryMap.dispose(), [liveryMap])
+  // Painted once per team and kept, so switching teams or modes is instant.
+  const liveryMap = useMemo(() => cachedLivery(team.id, design), [team.id, design])
   return useMemo(() => {
     const paint = (color: string) =>
       new THREE.MeshPhysicalMaterial({ color, metalness: 0.35, roughness: 0.32, clearcoat: 1, clearcoatRoughness: 0.06 })
@@ -179,10 +186,12 @@ function Wheel({ geo, m, side, front }: { geo: Geo; m: Mats; side: 1 | -1; front
     const m = motion ?? IDLE
     const driving = motion !== null
     const speed = m.speed / 3.6
-    // Rear tyres spin far faster than the car moves during the burnout.
+    // Rear tyres spin far faster than the car moves during the burnout. On
+    // screen the spin is capped: above that a real wheel just looks blurred,
+    // and faster rotation strobes (the wheels seem to shake or run backwards).
     const spinBoost = !front ? m.wheelspin * 70 : 0
-    spin.current.rotation.x += (speed / 0.36 + spinBoost) * dt
-    if (front) steer.current.rotation.y = THREE.MathUtils.damp(steer.current.rotation.y, m.steer, 6, dt)
+    spin.current.rotation.x += Math.min(speed / 0.36 + spinBoost, 14) * dt
+    if (front) steer.current.rotation.y = THREE.MathUtils.damp(steer.current.rotation.y, m.steer, 4, dt)
     const mat = brake.current.material as THREE.MeshStandardMaterial
     mat.emissiveIntensity = THREE.MathUtils.damp(mat.emissiveIntensity, driving ? m.braking * 6 : 0, 4, dt)
   })
@@ -306,19 +315,6 @@ export function Car({ team }: { team: Team }) {
   const brand = useTeamLogos(team.id)
   const body = useRef<THREE.Group>(null!)
   const motion = useMotion()
-
-  // Ride the bumps, pitch under braking, roll into the corner.
-  useFrame((state, dt) => {
-    const driving = motion !== null && motion.speed + motion.wheelspin > 0
-    const m = motion ?? IDLE
-    const t = state.clock.elapsedTime
-    const b = body.current
-    b.position.y = THREE.MathUtils.damp(b.position.y, driving ? Math.sin(t * 23) * 0.0008 * Math.min(1, m.speed / 200) : 0, 8, dt)
-    b.rotation.z = THREE.MathUtils.damp(b.rotation.z, driving ? -m.steer * 0.12 + Math.sin(t * 17) * 0.004 * m.wheelspin : 0, 4, dt)
-    // Squat onto the rear under wheelspin, with a little fishtail.
-    b.rotation.x = THREE.MathUtils.damp(b.rotation.x, driving ? m.braking * 0.012 - m.wheelspin * 0.012 : 0, 5, dt)
-    b.rotation.y = THREE.MathUtils.damp(b.rotation.y, driving ? Math.sin(t * 6.5) * 0.012 * m.wheelspin : 0, 6, dt)
-  })
 
   return (
     <group ref={body}>

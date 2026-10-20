@@ -65,17 +65,23 @@ Set it as `NEBIUS_MODEL`. For the best explanations and tool use, pick the large
 
 ## Lena's voice
 
-Lena speaks with a natural neural voice, no key needed: by default the server runs **[Kokoro-82M](https://huggingface.co/hexgrad/Kokoro-82M)** (Apache-2.0) through [kokoro-js](https://www.npmjs.com/package/kokoro-js) with its British female voice **Emma** (`bf_emma`). The model (about 90 MB) downloads from Hugging Face the first time she speaks and is cached after that; on a laptop CPU a sentence takes roughly as long to generate as to say, and the next sentence is generated while the current one plays.
+Lena speaks with a natural neural voice, no key needed: by default the server runs **[Kokoro-82M](https://huggingface.co/hexgrad/Kokoro-82M)** (Apache-2.0) through [kokoro-js](https://www.npmjs.com/package/kokoro-js) with its British female voice **Emma** (`bf_emma`), in a worker thread so the server stays responsive. The full-precision model (about 330 MB) downloads from Hugging Face the first time and is cached; on a laptop CPU it speaks about 2.5 times faster than real time (`KOKORO_DTYPE=q8` uses the smaller, slower quantized model).
 
-For an even more natural voice, set a key for **Azure Speech** (`en-GB-SoniaNeural` by default; free tier 500,000 characters a month) or **ElevenLabs** in `.env.local` (see `.env.example`); either takes priority over Kokoro. `KOKORO=off` falls back to the browser's own speech.
+How she stays in sync with no waiting:
+- Every fixed line (greetings, the showcase, all lessons, race radio calls) is generated in the background as soon as the server starts and cached on disk in `.cache/voice`, so those play within milliseconds.
+- When you ask a question, "Copy." plays at once, and "Stand by, checking that." if she needs to look something up, while the model writes the answer.
+- The first sentence of anything she says is generated on its own so it's heard quickly; after that sentences are grouped into fuller chunks so explanations flow naturally, and the next chunk is generated while the current one plays.
+- Lessons and the showcase fetch their next lines ahead. Her caption, mouth and the engine ducking start exactly when the sound does.
 
-Audio is generated per sentence and played strictly in order (she always finishes a line). Very short sentences ("Copy.") are joined to the next one so her delivery flows. Her answers to questions open with "Copy." and never with filler like "Right" or "So". Her mouth follows the audio's loudness, and the engine ducks while she talks. Sentences are generated ahead and played back to back through Web Audio, so there are no gaps, and a line that's already playing is never restarted. Race radio calls queue after what she's saying instead of cutting her off.
+For an even more natural voice, set a key for **Azure Speech** (`en-GB-SoniaNeural`; free tier 500,000 characters a month) or **ElevenLabs** in `.env.local` (see `.env.example`); either takes priority over Kokoro. `KOKORO=off` falls back to the browser's own speech. Kokoro needs a Node server with native onnxruntime (`npm run dev` or `npm start`); serverless hosts with small bundle limits should use Azure or ElevenLabs.
 
-Kokoro needs a Node server with native onnxruntime (`npm run dev` or `npm start`); serverless hosts with small bundle limits should use Azure or ElevenLabs instead.
+On track she talks like a race engineer: a radio check once the engine's running, a call before each braking zone, lap times with the delta to your best, gaps to the cars ahead and behind, warnings when someone's within a second, Overtake and battery advice, track limits and penalties, position changes, the final lap and the flag. Leaving the garage ends any explanation she was giving.
 
 ## Engine sound
 
 The engine is only heard on track (Drive and Race), never in the garage. It's a physically informed model of the 1.6-litre V6 turbo hybrid running in an AudioWorklet (`lib/engineWorklet.ts`): six cylinders fire 120° apart, every combustion varies a little, and each pressure pulse travels through modelled exhaust primaries, a tail pipe and the airbox intake, after the approach in Baldan et al., *Physically informed car engine sound synthesis for virtual and augmented environments* (2015). The revs come from the car's speed through an 8-speed gearbox (up at about 11,900 rpm, landing near 10,300), with ignition-cut upshifts, downshift blips, overrun pops, the turbo whistle and the MGU-K whine. Onboard is loud and raw; the TV and helicopter cameras hear a distant car.
+
+Every time a car rolls out on track the engine is started first: the starter motor turns it over, it catches, flares and settles to idle. A recording of a real start-up at `public/audio/engine-start.mp3` replaces the synthesized one; Freesound has a pack of real F1 start-ups recorded at the Brazilian GP ([rfhache, "Formula1 StartingEngines"](https://freesound.org/people/rfhache/packs/2834/)), free with an account; check each file's licence and credit the recordist as it requires.
 
 Real recordings sound best, and none ships with the site because recordings of real F1 and Ferrari cars are copyrighted. Two ways to add one you're allowed to use:
 

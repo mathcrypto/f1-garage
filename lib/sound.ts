@@ -13,6 +13,8 @@ import { useEngineerState, useGarage } from "./store"
 //   public/audio/engine/engine.json  a set of loops recorded at several rpm,
 //   on and off throttle: { "layers": [{ "file": "on_high.mp3", "rpm": 11000, "load": "on" }, ...] }
 // Without recordings a physical model of the V6 runs in an AudioWorklet.
+// Start-up (optional): public/audio/engine-start.mp3, a recording of the car
+// being fired up; otherwise the starter, catch and flare are synthesized.
 // Music (optional): public/audio/theme.mp3, a track you have the rights to.
 
 type Layer = { rpm: number; on: boolean; src: AudioBufferSourceNode; gain: GainNode }
@@ -92,6 +94,10 @@ class SoundEngine {
   private turbo: OscillatorNode | null = null
   private lastGear = 0
   private shiftUntil = 0
+  private startClip: AudioBuffer | null = null
+  private startAt = -Infinity
+  private startLen = 2.4
+  private wasOnTrack = false
 
   private async startEngine() {
     const ctx = this.ctx!
@@ -111,6 +117,7 @@ class SoundEngine {
     turbo.start()
     Object.assign(this, { distance, turbo, turboGain })
 
+    this.startClip = await fetchAudio(ctx, "/audio/engine-start.mp3")
     const loaded = await this.loadRecordings(ctx, body)
     if (loaded || !ctx.audioWorklet) return
     const url = URL.createObjectURL(new Blob([ENGINE_WORKLET], { type: "application/javascript" }))
@@ -154,6 +161,52 @@ class SoundEngine {
       if (single) add(single, 10500, true)
     }
     return this.layers.length > 0
+  }
+
+  // Fire the engine up: the starter motor turns it over, it catches, flares
+  // and settles to idle. Played whenever a car rolls out on track.
+  private engineStart(t: number) {
+    const ctx = this.ctx!
+    this.startAt = t
+    if (this.startClip) {
+      const src = ctx.createBufferSource()
+      src.buffer = this.startClip
+      const g = ctx.createGain()
+      g.gain.value = 0.9
+      src.connect(g).connect(this.master)
+      src.start(t)
+      this.startLen = this.startClip.duration
+      return
+    }
+    this.startLen = 2.4
+    // Starter motor: a geared electric whine with the engine's compression pulses.
+    const o = ctx.createOscillator()
+    o.type = "sawtooth"
+    o.frequency.setValueAtTime(70, t)
+    o.frequency.linearRampToValueAtTime(150, t + 0.35)
+    o.frequency.setValueAtTime(150, t + 0.95)
+    const lfo = ctx.createOscillator()
+    lfo.frequency.value = 9
+    const lfoGain = ctx.createGain()
+    lfoGain.gain.value = 0.35
+    const f = ctx.createBiquadFilter()
+    f.type = "bandpass"; f.frequency.value = 900; f.Q.value = 0.9
+    const g = ctx.createGain()
+    g.gain.setValueAtTime(0.0001, t)
+    g.gain.exponentialRampToValueAtTime(0.09, t + 0.08)
+    g.gain.setValueAtTime(0.09, t + 0.95)
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 1.1)
+    lfo.connect(lfoGain).connect(g.gain)
+    o.connect(f).connect(g).connect(this.engine)
+    o.start(t); lfo.start(t)
+    o.stop(t + 1.15); lfo.stop(t + 1.15)
+  }
+
+  // Revs during the synthesized start: cranking, catch, flare, idle.
+  private startRpm(e: number) {
+    const pts: [number, number][] = [[0, 0], [0.95, 0], [1.05, 1500], [1.3, 9200], [1.6, 7000], [2.4, 4300]]
+    for (let i = 1; i < pts.length; i++) if (e <= pts[i][0]) { const [t0, r0] = pts[i - 1], [t1, r1] = pts[i]; return r0 + ((r1 - r0) * (e - t0)) / (t1 - t0) }
+    return null
   }
 
   private pop(t: number, peak: number) {
@@ -209,10 +262,21 @@ class SoundEngine {
       if (!want && !this.theme.paused && this.music.gain.value < 0.01) this.theme.pause()
     }
 
+    if (onTrack && !this.wasOnTrack) this.engineStart(t)
+    this.wasOnTrack = onTrack
+
     let throttle = telemetry.throttle
     const box = gearbox(v, telemetry.wheelspin, telemetry.throttle, t)
-    const rpm = box.rpm, gear = box.index
+    let rpm = box.rpm
+    const gear = box.index
     if (box.idle) throttle = 0.2 + telemetry.throttle * 0.8
+    // While the engine is being started, the start-up sets the revs.
+    const sinceStart = t - this.startAt
+    const starting = onTrack && sinceStart < this.startLen && box.idle
+    if (starting) {
+      const scripted = this.startClip ? 0 : this.startRpm(sinceStart)
+      if (scripted !== null) { rpm = scripted; throttle = sinceStart > 1.05 && sinceStart < 1.4 ? 1 : 0.25 }
+    }
 
     if (onTrack && gear > this.lastGear) { this.shiftUntil = t + 0.03; this.pop(t, 0.05) }
     if (onTrack && gear < this.lastGear) this.pop(t + 0.03, 0.035)
@@ -233,7 +297,9 @@ class SoundEngine {
     this.turbo!.frequency.setTargetAtTime(2800 + rpm * 0.4, t, 0.1)
     this.turboGain!.gain.setTargetAtTime(onTrack ? 0.003 * throttle : 0, t, 0.15)
     // Lena stays clear over the engine.
-    const level = onTrack ? 0.22 * near * (talking ? 0.35 : 1) * (0.6 + 0.4 * throttle) : 0
+    // A recorded start-up plays on its own; the running engine fades in after it.
+    const recordingStart = starting && this.startClip !== null && sinceStart < this.startLen - 0.3
+    const level = onTrack && !recordingStart ? 0.22 * near * (talking ? 0.35 : 1) * (0.6 + 0.4 * throttle) : 0
     this.engine.gain.setTargetAtTime(level, t, 0.08)
   }
 }

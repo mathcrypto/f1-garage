@@ -3,7 +3,7 @@
 import { useFrame } from "@react-three/fiber"
 import { useEffect, useMemo, useRef } from "react"
 import * as THREE from "three"
-import { BURNOUT, telemetry } from "@/lib/drive"
+import { BURNOUT, driveLaps, ENGINE_START, telemetry } from "@/lib/drive"
 import { newMotion, type Motion } from "@/lib/motion"
 import { drive, race, stepRace, type Driven } from "@/lib/race"
 import { useGarage, type TrackCam } from "@/lib/store"
@@ -76,19 +76,37 @@ const copyToTelemetry = (m: Motion) => {
 export function DriveSession({ onTarget }: { onTarget: (t: { s: number; lat: number }) => void }) {
   const teamId = useGarage((s) => s.teamId)
   const car = useMemo(() => ({ s: -8, v: 0, lat: 0, motion: newMotion(), t: 0 }), [])
+  useEffect(() => { Object.assign(driveLaps, { lap: 0, last: null, best: null, start: null, s: -8 }) }, [car])
   useEffect(() => onTarget(car), [car, onTarget])
   useFrame((_, raw) => {
     const dt = step(raw)
     car.t += dt
-    if (car.t < BURNOUT) {
-      car.motion.wheelspin = Math.min(1, car.t / 0.3)
+    if (car.t < ENGINE_START) {
+      // Standing still while the engine is fired up.
+      car.motion.wheelspin = 0
       car.motion.speed = 0
+      car.motion.throttle = 0
+    } else if (car.t < ENGINE_START + BURNOUT) {
+      car.motion.wheelspin = Math.min(1, (car.t - ENGINE_START) / 0.3)
+      car.motion.speed = 0
+      car.motion.throttle = 1
       car.motion.aero = "straight"
     } else {
+      const before = car.s
       drive(car, dt)
-      const launch = car.t - BURNOUT
+      const launch = car.t - ENGINE_START - BURNOUT
       car.motion.wheelspin = launch < 1.3 ? 1 - launch / 1.3 : 0
+      // Lap timing for the engineer's radio calls.
+      if (driveLaps.start === null) driveLaps.start = car.t
+      if (Math.floor(car.s / track.length) > Math.floor(before / track.length) && car.s > 0) {
+        const time = car.t - driveLaps.start
+        driveLaps.start = car.t
+        driveLaps.lap++
+        driveLaps.last = time
+        driveLaps.best = driveLaps.best === null ? time : Math.min(driveLaps.best, time)
+      }
     }
+    driveLaps.s = car.s
     copyToTelemetry(car.motion)
   }, SIMULATE)
   return <TrackCar teamId={teamId} car={car} />
@@ -160,6 +178,9 @@ export function TrackCamera({ target, overview }: { target: () => { s: number; l
   const look = useRef(new THREE.Vector3())
   const tmp = useMemo(() => ({ p: new THREE.Vector3(), t: new THREE.Vector3(), l: new THREE.Vector3(), d: new THREE.Vector3(), a: new THREE.Vector3() }), [])
   const first = useRef(true)
+  // The camera turns with a smoothed heading, so it glides through corners
+  // instead of picking up every small change in the car's direction.
+  const heading = useRef(new THREE.Vector3(0, 0, 1))
 
   useFrame((state, raw) => {
     const dt = Math.min(raw, 0.05)
@@ -173,6 +194,8 @@ export function TrackCamera({ target, overview }: { target: () => { s: number; l
     track.tangent(tg.s, t)
     track.left(tg.s, l)
     p.addScaledVector(l, tg.lat)
+    heading.current.lerp(t, first.current ? 1 : 1 - Math.exp(-dt * 7)).normalize()
+    const h = heading.current
 
     let snap = false
     if (mode === "grid") {
@@ -183,15 +206,15 @@ export function TrackCamera({ target, overview }: { target: () => { s: number; l
       a.y = 2
     } else if (mode === "chase") {
       // Rigid T-cam behind the car, as in the F1 games.
-      d.copy(p).addScaledVector(t, -7.2).setY(2.5)
-      a.copy(p).addScaledVector(t, 12).setY(0.8)
+      d.copy(p).addScaledVector(h, -7.2).setY(2.5)
+      a.copy(p).addScaledVector(h, 12).setY(0.8)
       snap = true
     } else if (mode === "heli") {
-      d.copy(p).addScaledVector(t, -26).addScaledVector(l, 20).setY(32)
+      d.copy(p).addScaledVector(h, -26).addScaledVector(l, 20).setY(32)
       a.copy(p)
     } else if (mode === "onboard") {
-      d.copy(p).addScaledVector(t, -0.4).setY(1.22)
-      a.copy(p).addScaledVector(t, 40).setY(0.7)
+      d.copy(p).addScaledVector(h, -0.4).setY(1.22)
+      a.copy(p).addScaledVector(h, 40).setY(0.7)
       snap = true
     } else {
       // Fixed trackside TV camera: the next one down the road pans with the car.

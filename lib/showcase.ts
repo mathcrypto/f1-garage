@@ -5,7 +5,9 @@ import { PART_IDS } from "./parts"
 import { sound } from "./sound"
 import { useEngineerState, useGarage, type CameraPreset } from "./store"
 import { teamById } from "./teams"
+import { ENGINE_START } from "./drive"
 import { voice } from "./voice"
+import { lines } from "./voiceLines"
 
 // A scripted reveal: the car comes apart piece by piece, goes back together,
 // fires up, and drives off with camera cuts, narrated by Lena.
@@ -35,6 +37,9 @@ export async function startShowcase() {
     return alive()
   }
   const cut = (preset: CameraPreset) => g().setCamera(preset)
+  const L = lines.showcase(team.car)
+  // Generate every line now, so each one plays the moment its shot comes up.
+  voice.prefetch(L)
 
   g().select(null)
   g().setHighlights([])
@@ -45,31 +50,33 @@ export async function startShowcase() {
   cut("hero")
   sound.unlock()
 
-  if (!(await say(`Radio check. This is the ${team.car}. Let's take her apart.`, 2500))) return
+  if (!(await say(L[0], 2500))) return
 
   g().setExploded(true, true)
-  if (!(await say("Front wing, nose, suspension. Bodywork, floor, power unit. All off, all accounted for.", STAGGER_MS + 1500))) return
+  if (!(await say(L[1], STAGGER_MS + 1500))) return
 
   g().setTechnical(true)
-  if (!(await say("X-ray. Wheelbase thirty-four hundred, width nineteen hundred. Bang on the limits.", 3500))) return
+  if (!(await say(L[2], 3500))) return
 
   g().setTechnical(false)
   g().setExploded(false, true)
-  if (!(await say("Putting her back together.", STAGGER_MS + 800))) return
+  if (!(await say(L[3], STAGGER_MS + 800))) return
 
-  if (!(await say("Car's ready. Out on track."))) return
+  if (!(await say(L[4]))) return
 
   g().setTrackCam("chase")
   g().setMode("drive")
-  if (!(await say("Burnout. Get some heat in those rears.", 1800))) return
-  if (!(await say("Launch, launch! Good start.", 2500))) return
+  // Let the engine fire up before the burnout call.
+  if (!(await wait(ENGINE_START * 1000 - 300))) return
+  if (!(await say(L[5], 1800))) return
+  if (!(await say(L[6], 2500))) return
   g().setTrackCam("tv")
-  if (!(await say("Straight-line mode. Wings open, full deployment.", 3500))) return
+  if (!(await say(L[7], 3500))) return
   g().setTrackCam("onboard")
-  if (!(await say("Corner mode. Wings closed. Hit your marks.", 3500))) return
+  if (!(await say(L[8], 3500))) return
   g().setTrackCam("heli")
   if (!(await wait(3500))) return
   g().setTrackCam("chase")
-  await say("Good job. That's the car. Over to you.", 2500)
+  await say(L[9], 2500)
   if (alive()) useShowcase.setState({ running: false })
 }

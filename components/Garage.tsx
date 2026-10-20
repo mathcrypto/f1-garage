@@ -11,6 +11,8 @@ import { SoundMenu } from "./SoundMenu"
 import { TeamPicker } from "./TeamPicker"
 import { useShowcase } from "@/lib/showcase"
 import { voice } from "@/lib/voice"
+import { lines } from "@/lib/voiceLines"
+import { useEngineerRadio } from "@/lib/engineerRadio"
 import { PaddockPanel } from "./Paddock"
 import { telemetry } from "@/lib/drive"
 import { PARTS } from "@/lib/parts"
@@ -71,6 +73,7 @@ export function Garage() {
   const [webgl, setWebgl] = useState(true)
   const [firstVisit, setFirstVisit] = useState(false)
   const engineer = useEngineer()
+  useEngineerRadio()
   const team = teamById(teamId)
 
   useEffect(() => {
@@ -106,12 +109,11 @@ export function Garage() {
     if (id !== teamId) {
       // Lena changes into the new team's kit and says hello.
       const next = teamById(id)
-      const line = `${next.name} pit wall, radio check. Let's have a look at the ${next.car}.`
+      const line = lines.greeting(next.name, next.car)
       const lena = useEngineerState.getState()
       if (!lena.lesson && !showcase) {
-        lena.setCaption(line)
-        if (voice.enabled && voice.supported) voice.say(line)
-        else { lena.setStatus("talking"); setTimeout(() => useEngineerState.getState().setStatus("idle"), 3500) }
+        // voice.say shows the caption itself, in sync with her voice.
+        voice.say(line)
       }
     }
     setTeam(id)

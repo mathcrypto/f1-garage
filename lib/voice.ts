@@ -1,5 +1,6 @@
 "use client"
 
+import { cleanSpeech, endSentence, GROUP_WORDS, MAX_WORDS, speechChunks, splitLong, wordCount } from "./speech"
 import { useEngineerState } from "./store"
 
 // Lena's voice: natural neural speech from /api/voice (Kokoro on the server,
@@ -13,23 +14,7 @@ import { useEngineerState } from "./store"
 const PREFERRED = ["Microsoft Sonia Online", "Microsoft Libby Online", "Microsoft Maisie Online", "Google UK English Female", "Microsoft Libby", "Microsoft Sonia", "Microsoft Hazel", "Microsoft Susan", "Serena", "Kate", "Stephanie", "Martha"]
 const MALE = /\b(Daniel|Arthur|Oliver|George|Ryan|Thomas|Male|Google UK English Male)\b/i
 
-const clean = (text: string) =>
-  text
-    .replace(/\*\*|__|`/g, "")
-    .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
-    .replace(/^#+\s*/gm, "")
-    .replace(/^[-*•]\s+/gm, "")
-    .replace(/km\/h/g, "kilometres per hour")
-    .replace(/\bkW\b/g, "kilowatts")
-    .replace(/\bMJ\b/g, "megajoules")
-    .replace(/\bmm\b/g, "millimetres")
-    .replace(/\bERS\b/g, "E R S")
-    .replace(/\bMGU-K\b/g, "M G U K")
-    .replace(/\bFIA\b/g, "F I A")
-    .replace(/\s+/g, " ")
-    .trim()
-
-const sentences = (text: string) => text.match(/[^.!?]+[.!?]+["')\]]*|[^.!?]+$/g)?.map((s) => s.trim()).filter(Boolean) ?? []
+const clean = cleanSpeech
 
 type Line = { text: string; audio: Promise<AudioBuffer | null> }
 
@@ -47,6 +32,9 @@ class Voice {
   private source: AudioBufferSourceNode | null = null
   private raf = 0
   private current = { text: "", at: 0 }
+  private streaming = false
+  private fresh = true // the next chunk starts a new message
+  private prefetched = new Map<string, Promise<AudioBuffer | null>>()
 
   get supported() {
     return typeof window !== "undefined" && (typeof AudioContext !== "undefined" || "speechSynthesis" in window)
@@ -85,18 +73,26 @@ class Voice {
     }
     this.stop()
     this.current = { text: line, at: performance.now() }
-    const st = useEngineerState.getState()
-    st.setCaption(line)
-    st.setStatus("talking")
     if (!this.enabled || !this.supported) {
+      // No voice: show the line as a caption for a reading-time pause.
+      const st = useEngineerState.getState()
+      st.setCaption(line)
+      st.setStatus("talking")
       const g = this.gen
       const t = setTimeout(() => { if (g === this.gen) { useEngineerState.getState().setStatus("idle"); done?.() } }, 1200 + line.split(/\s+/).length * 300)
       this.waiters.push(() => clearTimeout(t))
       return
     }
-    for (const s of sentences(text)) this.enqueue(s)
-    this.enqueue("", true)
+    this.fresh = false
+    for (const chunk of speechChunks(text)) this.push(chunk)
     this.whenIdle(done)
+  }
+
+  // Generate lines ahead (the next steps of a lesson or the showcase), so
+  // each plays the moment it's needed.
+  prefetch(texts: string[]) {
+    if (!this.enabled || !this.supported) return
+    for (const t of texts) for (const chunk of speechChunks(t)) void this.audioFor(chunk)
   }
 
   speak(text: string) {
@@ -106,15 +102,17 @@ class Voice {
   // Add a line after whatever she's saying, without interrupting (race radio).
   add(text: string) {
     if (!this.enabled || !this.supported) { useEngineerState.getState().setCaption(clean(text)); return }
-    for (const s of sentences(text)) this.enqueue(s)
-    this.enqueue("", true)
+    for (const chunk of speechChunks(text)) this.push(chunk)
   }
 
-  // Streaming: feed answer text as it arrives; complete sentences are queued.
+  // Streaming: feed answer text as it arrives. The first sentence is spoken
+  // straight away; after that complete sentences are grouped into fuller
+  // chunks, released early whenever she'd otherwise fall silent.
   feed(delta: string) {
     if (!this.enabled || !this.supported) return
+    this.streaming = true
     this.buffer += delta
-    const re = /^([\s\S]*?[.!?:])(\s+|\n)/
+    const re = /^([\s\S]*?(?:[.!?:](?=\s)|\n))\s*/
     let m: RegExpExecArray | null
     while ((m = re.exec(this.buffer))) {
       this.enqueue(m[1])
@@ -123,8 +121,10 @@ class Voice {
   }
 
   flush() {
-    this.enqueue(this.buffer, true)
+    this.enqueue(this.buffer)
+    this.release()
     this.buffer = ""
+    this.streaming = false
   }
 
   stop() {
@@ -133,6 +133,8 @@ class Voice {
     this.pending = ""
     this.queue = []
     this.playing = false
+    this.streaming = false
+    this.fresh = true
     this.current = { text: "", at: 0 }
     const w = this.waiters
     this.waiters = []
@@ -161,10 +163,22 @@ class Voice {
     return this.ctx
   }
 
-  // Generate one sentence; one retry if the server hiccups.
-  private async synth(text: string, g: number): Promise<AudioBuffer | null> {
+  // Audio for one chunk, shared by prefetching and playback.
+  private audioFor(text: string) {
+    let p = this.prefetched.get(text)
+    if (!p) {
+      p = this.synth(text)
+      this.prefetched.set(text, p)
+      void p.then((a) => { if (!a) this.prefetched.delete(text) })
+      if (this.prefetched.size > 150) this.prefetched.delete(this.prefetched.keys().next().value!)
+    }
+    return p
+  }
+
+  // Generate one chunk; one retry if the server hiccups.
+  private async synth(text: string): Promise<AudioBuffer | null> {
     if (!(await this.hasNeural())) return null
-    for (let attempt = 0; attempt < 2 && g === this.gen; attempt++) {
+    for (let attempt = 0; attempt < 2; attempt++) {
       try {
         const r = await fetch("/api/voice", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text }) })
         if (r.ok) return await this.context().decodeAudioData(await r.arrayBuffer())
@@ -173,34 +187,54 @@ class Voice {
     return null
   }
 
-  // Very short sentences ("Copy.") ride along with the next one, so the
-  // voice keeps its natural flow instead of stopping after every word.
-  private enqueue(raw: string, last = false) {
-    let text = clean(raw)
-    if (this.pending) { text = `${this.pending} ${text}`.trim(); this.pending = "" }
+  private enqueue(raw: string) {
+    const text = endSentence(clean(raw))
     if (!text) return
-    if (!last && text.split(/\s+/).length < 4) { this.pending = text; return }
-    const g = this.gen
-    // Request audio straight away so the next sentence is ready when this one ends.
-    this.queue.push({ text, audio: this.synth(text, g) })
-    if (!this.playing) void this.pump(g)
+    if (this.fresh) {
+      this.fresh = false
+      const [first, ...rest] = splitLong(text, 12)
+      this.push(first)
+      this.pending = rest.join(" ")
+      return
+    }
+    this.pending = this.pending ? `${this.pending} ${text}` : text
+    if (wordCount(this.pending) >= GROUP_WORDS || !this.busy) this.release()
+  }
+
+  private release() {
+    if (this.pending) for (const chunk of splitLong(this.pending, MAX_WORDS)) this.push(chunk)
+    this.pending = ""
+  }
+
+
+
+  // Request audio straight away so the next chunk is ready when this one ends.
+  private push(chunk: string) {
+    this.queue.push({ text: chunk, audio: this.audioFor(chunk) })
+    if (!this.playing) void this.pump(this.gen)
   }
 
   private async pump(g: number): Promise<void> {
     this.playing = true
     while (this.queue.length && g === this.gen) {
       const line = this.queue.shift()!
+      // Start generating what's gathered while this chunk plays.
+      if (!this.queue.length) this.release()
+      const audio = await line.audio
+      if (g !== this.gen) return
+      // Caption, mouth and engine ducking start with the sound, not before it.
       const st = useEngineerState.getState()
       st.setStatus("talking")
       st.setCaption(line.text)
-      const audio = await line.audio
-      if (g !== this.gen) return
       if (audio) await this.play(audio, g)
       else if (this.neural === false) await this.speakBrowser(line.text)
       // Neural voice failed twice for this sentence: leave it as a caption only.
       else await new Promise((r) => setTimeout(r, 400 + line.text.split(/\s+/).length * 250))
+      // About to go quiet mid-answer: speak what's gathered so far.
+      if (!this.queue.length) this.release()
       // A streamed answer may still be producing its next sentence.
-      if (!this.queue.length && g === this.gen) await new Promise((r) => setTimeout(r, 350))
+      if (!this.queue.length && this.streaming && g === this.gen) await new Promise((r) => setTimeout(r, 300))
+      if (!this.queue.length) this.release()
     }
     if (g !== this.gen) return
     this.playing = false

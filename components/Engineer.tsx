@@ -8,6 +8,7 @@ import type { AgentEvent, ChatTurn, UiCommand } from "@/lib/agent"
 import { partById } from "@/lib/parts"
 import { useEngineerState, useGarage } from "@/lib/store"
 import { voice } from "@/lib/voice"
+import { lines as said } from "@/lib/voiceLines"
 import { teamById } from "@/lib/teams"
 
 type Message = ChatTurn & {
@@ -56,7 +57,11 @@ export function useEngineer() {
     lena.setLesson(null)
     lena.setStatus("thinking")
     lena.setCaption("")
+    // The acknowledgement plays the moment you ask (it's pre-generated), so
+    // there's no silence while the model starts thinking.
+    if (voice.enabled && voice.supported) voice.say(said.copy)
     let answer = ""
+    let standingBy = false
 
     const update = (fn: (m: Message) => Message) => setMessages((all) => [...all.slice(0, -1), fn(all[all.length - 1])])
 
@@ -86,8 +91,10 @@ export function useEngineer() {
           const e = JSON.parse(line) as AgentEvent
           if (e.type === "text") {
             update((m) => ({ ...m, content: m.content + e.text }))
+            // "Copy." was already spoken when you asked.
+            const spoken = answer ? e.text : e.text.replace(/^\s*Copy\.\s*/, "")
             answer += e.text
-            if (voice.enabled && voice.supported) voice.feed(e.text)
+            if (voice.enabled && voice.supported) voice.feed(spoken)
             else {
               // No voice: show the sentence being written as her caption.
               lena.setStatus("talking")
@@ -96,7 +103,10 @@ export function useEngineer() {
             }
           }
           else if (e.type === "reasoning") update((m) => ({ ...m, reasoning: (m.reasoning ?? "") + e.text }))
-          else if (e.type === "tool") update((m) => ({ ...m, steps: [...(m.steps ?? []), e.label] }))
+          else if (e.type === "tool") {
+            update((m) => ({ ...m, steps: [...(m.steps ?? []), e.label] }))
+            if (!answer && !standingBy && voice.enabled && voice.supported) { standingBy = true; voice.add(said.checking) }
+          }
           else if (e.type === "sources")
             update((m) => {
               const seen = new Map((m.sources ?? []).map((x) => [x.url, x]))

@@ -10,6 +10,8 @@ import { useEngineerState, useGarage, type TrackCam } from "@/lib/store"
 import { TEAMS, teamById } from "@/lib/teams"
 import { track } from "@/lib/track"
 import { voice } from "@/lib/voice"
+import { lines } from "@/lib/voiceLines"
+import { radio } from "@/lib/engineerRadio"
 
 export const useRaceSetup = create<{ open: boolean; last: RaceOptions | null }>(() => ({ open: false, last: null }))
 export const openRaceSetup = () => useRaceSetup.setState({ open: true })
@@ -23,16 +25,6 @@ function message(text: string, tone: Tone = "info") {
   setTimeout(() => useMessages.setState((s) => ({ items: s.items.filter((m) => m.id !== id) })), 3200)
 }
 
-// Lena on the radio: calls queue after whatever she's saying, never cutting
-// her off; minor ones are dropped when she's busy.
-let lastCall = 0
-function radio(text: string, important = false) {
-  const now = performance.now()
-  if (!important && (useEngineerState.getState().status === "talking" || now - lastCall < 5000)) return
-  lastCall = now
-  voice.add(text)
-}
-
 const P = (n: number) => `P${n}`
 
 export function startRace(o: RaceOptions) {
@@ -41,24 +33,29 @@ export function startRace(o: RaceOptions) {
   useMessages.setState({ items: [] })
   voice.stop()
   setupRace(o, {
-    lightsOut: () => radio(o.player ? "Lights out. Go, go, go!" : "Lights out and away we go!", true),
+    lightsOut: () => radio(lines.lightsOut(Boolean(o.player)), true),
     position: (teamId, from, to) => {
       if (teamId !== race.follow || from === to) return
-      if (to < from) radio(to === 1 ? "P1. You're leading the race." : `Good move. ${P(to)}.`)
-      else radio(`${P(to)}. Stay calm, we go again.`)
+      radio(to < from ? lines.gained(to) : lines.lost(to))
     },
-    finalLap: () => { message("Final lap", "info"); radio("Final lap. Bring it home.", true) },
+    finalLap: () => { message("Final lap", "info"); radio(lines.finalLap, true) },
     finish: (teamId, pos) => {
       if (teamId !== race.follow) return
-      radio(pos === 1 ? "Chequered flag. P1! Get in there!" : pos <= 3 ? `${P(pos)}. That's a podium. Great job.` : `${P(pos)}. Good effort. We go again.`, true)
+      radio(lines.finish(pos), true)
     },
-    message: (text, tone) => message(text, tone),
+    message: (text, tone) => {
+      message(text, tone)
+      if (!race.player) return
+      if (text.startsWith("Track limits")) radio(lines.trackLimits, true)
+      else if (text.startsWith("5 second")) radio(lines.penalty, true)
+      else if (tone === "purple" && text.includes(teamById(race.player).code)) radio(lines.fastest, true)
+    },
   })
   g.setTrackCam("chase")
   g.setMode("race")
   sound.unlock()
   const slot = o.order.indexOf(o.player ?? o.order[0]) + 1
-  setTimeout(() => radio(o.player ? `Radio check. ${P(slot)} on the grid. Wait for the lights, then go.` : `Radio check. ${o.order.length} cars on the grid.`, true), 400)
+  setTimeout(() => radio(o.player ? lines.gridCheck(slot) : lines.gridWatch(o.order.length), true), 400)
 }
 
 export function endRace() {
