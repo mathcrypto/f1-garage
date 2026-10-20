@@ -100,7 +100,7 @@ export function Garage() {
     if (id !== teamId) {
       // Lena changes into the new team's kit and says hello.
       const next = teamById(id)
-      const line = `Right, I'm on the ${next.name} pit wall now. Let's have a look at the ${next.car}.`
+      const line = `${next.name} pit wall, radio check. Let's have a look at the ${next.car}.`
       const lena = useEngineerState.getState()
       if (!lena.lesson && !showcase) {
         lena.setCaption(line)

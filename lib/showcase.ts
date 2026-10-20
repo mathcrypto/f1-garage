@@ -17,7 +17,6 @@ const STAGGER_MS = PART_IDS.length * 200
 export function stopShowcase() {
   run++
   useShowcase.setState({ running: false })
-  sound.engineStop()
   voice.stop()
 }
 
@@ -44,7 +43,8 @@ export async function startShowcase() {
   g().setExploded(false)
   if (g().mode !== "studio") g().setMode("studio")
   cut("hero")
-  // Engine sound is part of the show; this click is the user gesture browsers need.
+  // Unlock audio now (this click is the user gesture browsers need); the
+  // engine itself is only heard once the car is out on track.
   await sound.setEngine(true)
 
   if (!(await say(`Radio check. This is the ${team.car}. Let's take her apart.`, 2500))) return
@@ -53,19 +53,13 @@ export async function startShowcase() {
   if (!(await say("Front wing, nose, suspension. Bodywork, floor, power unit. All off, all accounted for.", STAGGER_MS + 1500))) return
 
   g().setTechnical(true)
-  if (!(await say("X-ray. Wheelbase thirty-four hundred, width nineteen hundred. Right on the limits.", 3500))) return
+  if (!(await say("X-ray. Wheelbase thirty-four hundred, width nineteen hundred. Bang on the limits.", 3500))) return
 
   g().setTechnical(false)
   g().setExploded(false, true)
   if (!(await say("Putting her back together.", STAGGER_MS + 800))) return
 
-  if (!(await say("Engine fire-up in three, two, one."))) return
-  await sound.engineStart()
-  if (!(await wait(2300))) return
-  sound.revBlip()
-  if (!(await wait(1300))) return
-  sound.revBlip(12200)
-  if (!(await wait(1500))) return
+  if (!(await say("Car's ready. Out on track."))) return
 
   g().setTrackCam("chase")
   g().setMode("drive")

@@ -1,6 +1,8 @@
-// Natural text-to-speech for Lena. Azure Neural TTS (en-GB-SoniaNeural by
-// default) or ElevenLabs, whichever has a key; the browser's own voice is the
-// fallback when neither is configured.
+import { kokoro, loadKokoro } from "@/lib/kokoro"
+
+// Natural text-to-speech for Lena. Azure Neural TTS (en-GB-SoniaNeural) or
+// ElevenLabs when a key is set; otherwise the free Kokoro model runs on this
+// server (set KOKORO=off to use the browser's own voice instead).
 export const runtime = "nodejs"
 
 const AZURE_KEY = process.env.AZURE_SPEECH_KEY
@@ -9,7 +11,8 @@ const AZURE_VOICE = process.env.AZURE_SPEECH_VOICE ?? "en-GB-SoniaNeural"
 const ELEVEN_KEY = process.env.ELEVENLABS_API_KEY
 const ELEVEN_VOICE = process.env.ELEVENLABS_VOICE_ID
 
-const provider = AZURE_KEY ? "azure" : ELEVEN_KEY && ELEVEN_VOICE ? "elevenlabs" : null
+const provider = AZURE_KEY ? "azure" : ELEVEN_KEY && ELEVEN_VOICE ? "elevenlabs" : process.env.KOKORO !== "off" ? "kokoro" : null
+const TYPE = provider === "kokoro" ? "audio/wav" : "audio/mpeg"
 
 // Lessons and the showcase repeat the same lines, so keep recent audio.
 const cache = new Map<string, ArrayBuffer>()
@@ -49,6 +52,8 @@ async function elevenlabs(text: string) {
 }
 
 export async function GET() {
+  // Start loading the local model as soon as the page asks, so the first line is quick.
+  if (provider === "kokoro") loadKokoro().catch((error) => console.warn("Kokoro voice unavailable:", error instanceof Error ? error.message : error))
   return Response.json({ provider })
 }
 
@@ -58,9 +63,9 @@ export async function POST(req: Request) {
   const clean = (text ?? "").trim().slice(0, 600)
   if (!clean) return Response.json({ error: "Empty text" }, { status: 400 })
   try {
-    const audio = cache.get(clean) ?? (await (provider === "azure" ? azure(clean) : elevenlabs(clean)))
+    const audio = cache.get(clean) ?? (await (provider === "azure" ? azure(clean) : provider === "elevenlabs" ? elevenlabs(clean) : kokoro(clean)))
     remember(clean, audio)
-    return new Response(audio, { headers: { "Content-Type": "audio/mpeg", "Cache-Control": "public, max-age=86400" } })
+    return new Response(audio, { headers: { "Content-Type": TYPE, "Cache-Control": "public, max-age=86400" } })
   } catch (error) {
     return Response.json({ error: error instanceof Error ? error.message : "TTS failed" }, { status: 502 })
   }

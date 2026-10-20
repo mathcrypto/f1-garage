@@ -34,11 +34,12 @@ type Line = { text: string; audio: Promise<Blob | null> | null }
 
 class Voice {
   enabled = false
-  radio = true
+  radio = false
   private neural: boolean | null = null
   private queue: Line[] = []
   private playing = false
   private buffer = ""
+  private pending = ""
   private gen = 0
   private waiters: (() => void)[] = []
   private ctx: AudioContext | null = null
@@ -89,6 +90,7 @@ class Voice {
       return
     }
     for (const s of sentences(text)) this.enqueue(s)
+    this.enqueue("", true)
     this.whenIdle(done)
   }
 
@@ -109,13 +111,14 @@ class Voice {
   }
 
   flush() {
-    if (this.buffer.trim()) this.enqueue(this.buffer)
+    this.enqueue(this.buffer, true)
     this.buffer = ""
   }
 
   stop() {
     this.gen++
     this.buffer = ""
+    this.pending = ""
     this.queue = []
     this.playing = false
     const w = this.waiters
@@ -134,9 +137,13 @@ class Voice {
     this.waiters.push(() => { if (g === this.gen) done() })
   }
 
-  private enqueue(raw: string) {
-    const text = clean(raw)
+  // Very short sentences ("Copy.") ride along with the next one, so the
+  // voice keeps its natural flow instead of stopping after every word.
+  private enqueue(raw: string, last = false) {
+    let text = clean(raw)
+    if (this.pending) { text = `${this.pending} ${text}`.trim(); this.pending = "" }
     if (!text) return
+    if (!last && text.split(/\s+/).length < 4) { this.pending = text; return }
     const g = this.gen
     const line: Line = { text, audio: null }
     // Request audio straight away so the next sentence is ready when this one ends.

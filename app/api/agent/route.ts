@@ -93,6 +93,30 @@ async function runTool(name: string, args: Record<string, unknown>, send: Send):
 
 // Streams newline-delimited AgentEvent JSON. All tools run here on the server;
 // the UI tools just forward a command to the browser's 3D view.
+const FILLER = /^(?:right|okay|ok|alright|all right|so|well|now|sure|great|good question|nice one|copy(?: that)?)\b[\s,.!:;—–-]*/i
+
+// Holds back the first few words of the answer to replace filler openers
+// ("Right, ...", "So, ...") with the radio acknowledgement.
+function opener() {
+  let buffer = ""
+  let done = false
+  const finish = () => {
+    done = true
+    let text = buffer.replace(/^\s+/, "")
+    for (let i = 0; i < 3 && FILLER.test(text); i++) text = text.replace(FILLER, "")
+    if (!text) return ""
+    return `Copy. ${text.charAt(0).toUpperCase()}${text.slice(1)}`
+  }
+  return {
+    push(text: string) {
+      if (done) return text
+      buffer += text
+      return buffer.trim().length >= 24 ? finish() : ""
+    },
+    flush: () => (done ? "" : finish()),
+  }
+}
+
 export async function POST(req: Request) {
   const { turns, deep } = (await req.json()) as { turns: ChatTurn[]; deep?: boolean }
 
@@ -139,6 +163,10 @@ export async function POST(req: Request) {
       const encoder = new TextEncoder()
       const send: Send = (event) => controller.enqueue(encoder.encode(JSON.stringify(event) + "\n"))
 
+      // Lena acknowledges a question with "Copy." and goes straight into the answer.
+      const opening = opener()
+      const say = (text: string) => { const out = opening.push(text); if (out) send({ type: "text", text: out }) }
+
       try {
         for (let i = 0; i < MAX_ITERATIONS; i++) {
           const stream = await create()
@@ -154,7 +182,7 @@ export async function POST(req: Request) {
             if (delta.content) {
               const { answer, reasoning } = split(delta.content)
               if (reasoning) send({ type: "reasoning", text: reasoning })
-              if (answer) { content += answer; send({ type: "text", text: answer }) }
+              if (answer) { content += answer; say(answer) }
             }
             for (const tc of delta.tool_calls ?? []) {
               const call = (calls[tc.index] ??= { id: "", name: "", args: "" })
@@ -191,8 +219,10 @@ export async function POST(req: Request) {
             }),
           )
           for (const r of results) messages.push({ role: "tool", tool_call_id: r.id, content: r.content })
-          if (content) send({ type: "text", text: "\n\n" })
+          if (content) say("\n\n")
         }
+        const rest = opening.flush()
+        if (rest) send({ type: "text", text: rest })
       } catch (error) {
         const text =
           error instanceof OpenAI.AuthenticationError

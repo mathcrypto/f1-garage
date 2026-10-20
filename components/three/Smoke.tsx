@@ -1,9 +1,10 @@
 "use client"
 
 import { useFrame } from "@react-three/fiber"
-import { useMemo, useRef } from "react"
+import { useEffect, useMemo, useRef } from "react"
 import * as THREE from "three"
 import type { Motion } from "@/lib/motion"
+import { useGarage } from "@/lib/store"
 
 // Tyre smoke: soft, lit billboards that pour off the rear tyres while they
 // spin (burnouts and launches), then rise, swell, curl and hang in the air.
@@ -118,6 +119,10 @@ export function Smoke() {
       }),
     [],
   )
+
+  // Smoke stays on the track: the garage starts clear.
+  const mode = useGarage((s) => s.mode)
+  useEffect(() => { state.age.fill(Infinity) }, [mode, state])
 
   useFrame((_, rawDt) => {
     const dt = Math.min(rawDt, 0.05)

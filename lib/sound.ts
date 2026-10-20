@@ -1,7 +1,8 @@
 "use client"
 
 import { telemetry } from "./drive"
-import { useGarage } from "./store"
+import { ENGINE_PROCESSOR, ENGINE_WORKLET } from "./engineWorklet"
+import { useEngineerState, useGarage } from "./store"
 
 // The garage soundtrack and engine note are synthesized in the browser, so no
 // audio files ship with the site. The anthem is an original composition; a
@@ -50,7 +51,6 @@ class SoundEngine {
   private step = 0
   private nextTime = 0
   private track: HTMLAudioElement | null = null
-  private eng: { osc: OscillatorNode[]; filter: BiquadFilterNode } | null = null
   enabled = false
 
   private init() {
@@ -114,7 +114,7 @@ class SoundEngine {
     if (!this.enabled) {
       this.enabled = true
       this.master.gain.setTargetAtTime(this.volume, ctx.currentTime, 0.1)
-      this.startEngine()
+      void this.startEngine()
       const tick = () => { this.updateEngine(); this.raf = requestAnimationFrame(tick) }
       this.raf = requestAnimationFrame(tick)
     }
@@ -436,97 +436,93 @@ class SoundEngine {
   }
 
   // ── Engine ────────────────────────────────────────────────────────────────
-  // Off, or running on the stand (idle and scripted revs). In drive mode the
-  // rpm comes from telemetry through an 8-speed gearbox.
-  private running = false
-  private script: { t0: number; points: [number, number][] } | null = null
+  // Only on track: the rpm comes from the car's speed through an 8-speed
+  // gearbox and drives a physical model of the V6 (lib/engineWorklet.ts). A
+  // licensed recording at public/audio/engine-loop.mp3 (a steady pass at about
+  // 10,500 rpm) is used instead when present, pitched with the revs.
   private lastGear = 0
+  private shiftUntil = 0
   private parts: {
-    osc: OscillatorNode[]
-    mults: number[]
+    model: AudioWorkletNode | null
+    loop: AudioBufferSourceNode | null
     body: GainNode
-    filter: BiquadFilterNode
-    exhaust: BiquadFilterNode
-    exhaustGain: GainNode
+    tone: BiquadFilterNode
+    rasp: BiquadFilterNode
+    distance: BiquadFilterNode
     turbo: OscillatorNode
     turboGain: GainNode
     ers: OscillatorNode
     ersGain: GainNode
   } | null = null
+  private starting = false
 
-  private startEngine() {
-    if (this.parts || !this.ctx) return
+  private async startEngine() {
+    if (this.parts || this.starting || !this.ctx) return
+    this.starting = true
     const ctx = this.ctx
-    // Firing-pulse waveform: strong low harmonics with a raspy top end.
-    const n = 40
-    const real = new Float32Array(n), imag = new Float32Array(n)
-    for (let k = 1; k < n; k++) imag[k] = ((k % 3 === 0 ? 1.6 : k % 2 ? 1 : 0.6) / k ** 0.85) * (k > 18 ? 0.5 : 1)
-    const wave = ctx.createPeriodicWave(real, imag)
-    const shaper = ctx.createWaveShaper()
-    const curve = new Float32Array(2048)
-    for (let i = 0; i < curve.length; i++) { const x = i / 1024 - 1; curve[i] = Math.tanh(x * 2.4) }
-    shaper.curve = curve
-    shaper.oversample = "2x"
-    const filter = ctx.createBiquadFilter()
-    filter.type = "lowpass"
-    filter.Q.value = 2.2
     const body = ctx.createGain()
-    const mults = [1, 1.004, 0.5, 2]
-    const levels = [0.55, 0.35, 0.45, 0.12]
-    const osc = mults.map((_, i) => {
-      const o = ctx.createOscillator()
-      if (i === 2) o.type = "sine"
-      else if (i === 3) o.type = "sawtooth"
-      else o.setPeriodicWave(wave)
-      const g = ctx.createGain()
-      g.gain.value = levels[i]
-      o.connect(g).connect(shaper)
-      o.start()
-      return o
-    })
-    shaper.connect(filter).connect(body).connect(this.engine)
+    body.gain.value = 1
+    // Tone shaping: some weight in the low mids, the rasp on top, and a
+    // low-pass that stands for distance from the car (camera dependent).
+    const tone = ctx.createBiquadFilter()
+    tone.type = "peaking"; tone.frequency.value = 420; tone.Q.value = 0.8; tone.gain.value = 3
+    const rasp = ctx.createBiquadFilter()
+    rasp.type = "highshelf"; rasp.frequency.value = 2400; rasp.gain.value = 5
+    const distance = ctx.createBiquadFilter()
+    distance.type = "lowpass"; distance.frequency.value = 9000; distance.Q.value = 0.5
+    body.connect(tone).connect(rasp).connect(distance).connect(this.engine)
 
-    // Exhaust and intake roar: noise shaped around the firing frequency.
-    const noise = ctx.createBufferSource()
-    noise.buffer = this.noise
-    noise.loop = true
-    const exhaust = ctx.createBiquadFilter()
-    exhaust.type = "bandpass"
-    exhaust.Q.value = 1.4
-    const exhaustGain = ctx.createGain()
-    exhaustGain.gain.value = 0
-    noise.connect(exhaust).connect(exhaustGain).connect(this.engine)
-    noise.start()
+    let loop: AudioBufferSourceNode | null = null
+    let model: AudioWorkletNode | null = null
+    const recording = await fetch("/audio/engine-loop.mp3")
+      .then((r) => (r.ok && (r.headers.get("content-type") ?? "").startsWith("audio") ? r.arrayBuffer() : null))
+      .then((b) => (b ? ctx.decodeAudioData(b) : null))
+      .catch(() => null)
+    if (recording) {
+      loop = ctx.createBufferSource()
+      loop.buffer = recording
+      loop.loop = true
+      loop.connect(body)
+      loop.start()
+    } else if (ctx.audioWorklet) {
+      const url = URL.createObjectURL(new Blob([ENGINE_WORKLET], { type: "application/javascript" }))
+      try {
+        await ctx.audioWorklet.addModule(url)
+        model = new AudioWorkletNode(ctx, ENGINE_PROCESSOR, { numberOfInputs: 0, outputChannelCount: [1] })
+        const gain = ctx.createGain()
+        gain.gain.value = 2.2
+        model.connect(gain).connect(body)
+      } catch {
+        model = null
+      } finally {
+        URL.revokeObjectURL(url)
+      }
+    }
 
     // Turbo whistle and the 2026 hybrid's electric-motor whine.
-    const tone = (gainNode: GainNode) => {
+    const tone2 = (gainNode: GainNode) => {
       const o = ctx.createOscillator()
       o.type = "sine"
       gainNode.gain.value = 0
-      o.connect(gainNode).connect(this.engine)
+      o.connect(gainNode).connect(distance)
       o.start()
       return o
     }
     const turboGain = ctx.createGain(), ersGain = ctx.createGain()
-    const turbo = tone(turboGain), ers = tone(ersGain)
-    this.parts = { osc, mults, body, filter, exhaust, exhaustGain, turbo, turboGain, ers, ersGain }
-  }
-
-  // Starter motor, catch, a flare of revs, then a lumpy idle.
-  async engineStart() {
-    await this.setEngine(true)
-    this.running = true
-    this.script = { t0: this.ctx!.currentTime, points: [[0, 0], [0.15, 900], [0.8, 1400], [0.95, 7600], [1.35, 5200], [2.0, 4300]] }
-  }
-
-  revBlip(peak = 11500) {
-    if (!this.ctx || !this.running) return
-    this.script = { t0: this.ctx.currentTime, points: [[0, 4300], [0.22, peak], [0.45, peak - 600], [1.1, 4300]] }
+    const turbo = tone2(turboGain), ers = tone2(ersGain)
+    this.parts = { model, loop, body, tone, rasp, distance, turbo, turboGain, ers, ersGain }
+    this.starting = false
   }
 
   engineStop() {
-    this.running = false
-    this.script = null
+    this.engineOn = false
+    if (this.ctx) {
+      const t = this.ctx.currentTime
+      this.engine.gain.cancelScheduledValues(t)
+      this.engine.gain.setTargetAtTime(0, t, 0.05)
+      this.parts?.model?.parameters.get("rpm")!.setTargetAtTime(0, t, 0.1)
+    }
+    this.maybeSuspend()
   }
 
   // Start-light tone: one short beep per light.
@@ -570,20 +566,6 @@ class SoundEngine {
     src.stop(t + 0.08)
   }
 
-  private scriptedRpm(now: number) {
-    if (!this.script) return null
-    const e = now - this.script.t0
-    const pts = this.script.points
-    if (e >= pts[pts.length - 1][0]) { this.script = null; return null }
-    for (let i = 1; i < pts.length; i++) {
-      if (e <= pts[i][0]) {
-        const [t0, r0] = pts[i - 1], [t1, r1] = pts[i]
-        return r0 + (r1 - r0) * ((e - t0) / (t1 - t0))
-      }
-    }
-    return null
-  }
-
   private pop(t: number, peak: number) {
     const ctx = this.ctx!
     const src = ctx.createBufferSource()
@@ -602,50 +584,58 @@ class SoundEngine {
     if (!this.ctx || !this.parts) return
     const p = this.parts
     const t = this.ctx.currentTime
-    const driving = useGarage.getState().mode !== "studio"
-    const on = this.engineOn && (driving || this.running)
-    let rpm = 0
-    let throttle = 0.35
+    const garage = useGarage.getState()
+    // The engine is only heard out on track, never in the garage.
+    const on = this.engineOn && garage.mode !== "studio"
     const v = telemetry.speed
+    let throttle = telemetry.braking > 0.2 ? 0.08 : 1
 
-    if (driving) {
-      const tops = [95, 135, 170, 205, 240, 272, 302, 340]
-      let gear = tops.findIndex((top) => v < top)
-      if (gear < 0) gear = 7
-      const lo = gear === 0 ? 0 : tops[gear - 1]
-      const k = Math.min(1, Math.max(0, (v - lo) / (tops[gear] - lo)))
-      rpm = (gear === 0 ? 6000 : 7600) + k * (gear === 0 ? 5600 : 4300)
-      throttle = telemetry.braking > 0.2 ? 0.15 : 1
-      // Burnout: bouncing off the limiter with the rears spinning.
-      if (telemetry.wheelspin > 0.5 && v < 60) rpm = 11400 + Math.sin(t * 31) * 350
-      // Upshift: a 40 ms ignition cut and a crack from the exhaust.
-      if (on && gear > this.lastGear) {
-        p.body.gain.cancelScheduledValues(t)
-        p.body.gain.setValueAtTime(0.25, t)
-        p.body.gain.linearRampToValueAtTime(1, t + 0.06)
-        this.pop(t, 0.12)
-      }
-      this.lastGear = gear
-      // Overrun crackle while braking.
-      if (on && telemetry.braking > 0.3 && Math.random() < 0.18) this.pop(t + Math.random() * 0.02, 0.05 + Math.random() * 0.05)
-    } else {
-      this.lastGear = 0
-      const scripted = this.scriptedRpm(t)
-      rpm = scripted ?? 4300 + Math.sin(t * 9) * 120 + Math.sin(t * 23) * 60
-      throttle = scripted && scripted > 6000 ? 1 : 0.35
+    // Shift points of a 2026 car: up at about 11,900 rpm, landing near 10,300.
+    const tops = [95, 135, 170, 205, 240, 272, 302, 340]
+    let gear = tops.findIndex((top) => v < top)
+    if (gear < 0) gear = 7
+    const lo = gear === 0 ? 0 : tops[gear - 1]
+    const k = Math.min(1, Math.max(0, (v - lo) / (tops[gear] - lo)))
+    let rpm = gear === 0 ? 4200 + k * 7700 : 10300 + k * 1600
+    if (v < 2 && telemetry.wheelspin < 0.1) { rpm = 4200 + Math.sin(t * 9) * 90; throttle = 0.25 }
+    // Burnout and launch: bouncing off the limiter with the rears spinning.
+    if (telemetry.wheelspin > 0.5 && v < 80) rpm = 11600 + Math.sin(t * 29) * 300
+    let cut = 0
+    if (on && gear > this.lastGear) {
+      // Upshift: a 30 ms ignition cut, the revs drop, a crack from the exhaust.
+      this.shiftUntil = t + 0.03
+      this.pop(t, 0.1)
     }
+    if (on && gear < this.lastGear) {
+      // Downshift: a throttle blip and overrun pops.
+      this.pop(t + 0.02, 0.07)
+      this.pop(t + 0.09, 0.05)
+    }
+    if (t < this.shiftUntil) cut = 1
+    this.lastGear = gear
+    if (on && telemetry.braking > 0.3 && Math.random() < 0.12) this.pop(t + Math.random() * 0.02, 0.03 + Math.random() * 0.04)
 
-    const f = (rpm / 60) * 1.5 // V6: three firing pulses per revolution, voiced an octave down
-    p.osc.forEach((o, i) => o.frequency.setTargetAtTime(Math.max(20, f * p.mults[i]), t, 0.02))
-    p.filter.frequency.setTargetAtTime(350 + rpm * 0.3 * (0.45 + throttle * 0.55), t, 0.04)
-    p.exhaust.frequency.setTargetAtTime(250 + rpm * 0.14, t, 0.04)
-    p.exhaustGain.gain.setTargetAtTime(on ? 0.05 * (0.3 + throttle * 0.7) : 0, t, 0.06)
-    p.turbo.frequency.setTargetAtTime(2200 + rpm * 0.42, t, 0.1)
-    p.turboGain.gain.setTargetAtTime(on ? 0.007 * throttle * (rpm / 12000) : 0, t, 0.15)
+    if (p.model) {
+      p.model.parameters.get("rpm")!.setTargetAtTime(on ? rpm : 0, t, 0.015)
+      p.model.parameters.get("load")!.setTargetAtTime(throttle, t, 0.03)
+      p.model.parameters.get("cut")!.setValueAtTime(cut, t)
+    }
+    if (p.loop) p.loop.playbackRate.setTargetAtTime(Math.max(0.3, rpm / 10500), t, 0.03)
+
+    // Where we hear it from: onboard is loud and raw, the TV and helicopter
+    // cameras hear a distant, duller car.
+    const cam = garage.trackCam
+    const near = cam === "onboard" ? 1 : cam === "chase" ? 0.9 : cam === "tv" ? 0.55 : 0.4
+    p.distance.frequency.setTargetAtTime(cam === "onboard" ? 7000 : cam === "chase" ? 9000 : cam === "tv" ? 3200 : 2200, t, 0.2)
+    p.rasp.gain.setTargetAtTime(2 + throttle * 4, t, 0.05)
+    p.turbo.frequency.setTargetAtTime(2600 + rpm * 0.45, t, 0.1)
+    p.turboGain.gain.setTargetAtTime(on ? 0.006 * throttle * (rpm / 12000) : 0, t, 0.15)
     p.ers.frequency.setTargetAtTime(500 + v * 8.5, t, 0.08)
-    p.ersGain.gain.setTargetAtTime(on && driving ? 0.006 + 0.01 * telemetry.ers : 0, t, 0.15)
-    const level = on ? (driving ? (telemetry.braking > 0.2 ? 0.07 : 0.13) : 0.1) : 0
-    this.engine.gain.setTargetAtTime(level, t, 0.1)
+    p.ersGain.gain.setTargetAtTime(on ? 0.004 + 0.008 * telemetry.ers : 0, t, 0.15)
+    // Lena stays clear over the engine.
+    const talking = useEngineerState.getState().status === "talking"
+    const level = on ? (telemetry.braking > 0.2 ? 0.1 : 0.16) * near * (talking ? 0.4 : 1) : 0
+    this.engine.gain.setTargetAtTime(level, t, 0.08)
     // Duck the music under the engine.
     this.music.gain.setTargetAtTime(on ? 0.4 : 1, t, 0.4)
   }

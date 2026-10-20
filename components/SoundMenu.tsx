@@ -26,7 +26,7 @@ export function SoundMenu() {
   const [engine, setEngine] = useState(false)
   const [lena, setLena] = useState(true)
   const [volume, setVolume] = useState(0.7)
-  const [radio, setRadio] = useState(true)
+  const [radio, setRadio] = useState(false)
   const [natural, setNatural] = useState<boolean | null>(null)
   const ref = useRef<HTMLDivElement>(null)
 
@@ -34,7 +34,7 @@ export function SoundMenu() {
     const v = load("f1-garage:voice", "on") === "on"
     setLena(v)
     voice.setEnabled(v)
-    const r = load("f1-garage:radio", "on") === "on"
+    const r = load("f1-garage:radio", "off") === "on"
     setRadio(r)
     voice.setRadio(r)
     void voice.provider().then((p) => setNatural(Boolean(p)))
@@ -71,7 +71,7 @@ export function SoundMenu() {
         <div className="sm-panel" role="dialog" aria-label="Sound settings">
           <p className="eyebrow">Sound</p>
           <Switch label="F1 Garage anthem" hint="Original soundtrack made for this site" on={music} onChange={(v) => { setMusic(v); sound.setMusic(v) }} />
-          <Switch label="Engine sound" hint="V6 hybrid in Drive mode" on={engine} onChange={(v) => { setEngine(v); sound.setEngine(v) }} />
+          <Switch label="Engine sound" hint="V6 turbo hybrid, only on track" on={engine} onChange={(v) => { setEngine(v); sound.setEngine(v) }} />
           <Switch
             label="Lena's voice"
             hint={natural ? "Natural British voice" : natural === false ? "Browser voice · add a TTS key for a natural one" : "British English"}
