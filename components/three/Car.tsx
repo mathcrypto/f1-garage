@@ -1,6 +1,6 @@
 "use client"
 
-import { Decal } from "@react-three/drei"
+import { Decal, Html } from "@react-three/drei"
 import { useFrame } from "@react-three/fiber"
 import { useEffect, useMemo, useRef } from "react"
 import * as THREE from "three"
@@ -155,6 +155,9 @@ function useGeometry() {
       rearRodsL: rearRods(1), rearRodsR: rearRods(-1),
       exhaust: tube([[0, 0.55, -1.42], [0, 0.56, -1.9], [0, 0.5, -2.36]], 0.04, 24),
       ersCable: tube([[0.12, 0.3, -0.55], [0.22, 0.34, -0.7], [0.2, 0.3, -0.62]], 0.012, 16),
+      fwFlap3: airfoil(1.24, 0.12, 0.12),
+      haloFin: airfoil(0.2, 0.07, 0.12),
+      pitot: rod([0, 0.235, 2.56], [0, 0.24, 2.86], 0.006),
       tyreFront: tyre(0.36, 0.23, 0.3),
       tyreRear: tyre(0.36, 0.23, 0.38),
     }
@@ -181,7 +184,7 @@ function Wheel({ geo, m, side, front }: { geo: Geo; m: Mats; side: 1 | -1; front
   })
 
   return (
-    <group position={[(front ? 0.8 : 0.78) * side, 0.36, front ? 1.75 : -1.65]}>
+    <group position={[(front ? 0.8 : 0.76) * side, 0.36, front ? 1.75 : -1.65]}>
       <group ref={steer}>
         <group ref={spin}>
           <mesh geometry={front ? geo.tyreFront : geo.tyreRear} material={m.rubber} />
@@ -209,6 +212,10 @@ function Wheel({ geo, m, side, front }: { geo: Geo; m: Mats; side: 1 | -1; front
         <mesh material={m.carbon} rotation={[0, 0, Math.PI / 2]} position={[-side * (half + 0.04), 0, 0]}>
           <cylinderGeometry args={[0.19, 0.17, 0.08, 32]} />
         </mesh>
+        {/* Brake duct: cooling scoop and the little winglets mounted on the drum */}
+        <mesh material={m.inlet} position={[-side * (half + 0.07), -0.1, front ? 0.17 : 0.16]}><boxGeometry args={[0.06, 0.07, 0.03]} /></mesh>
+        <mesh material={m.carbon} position={[-side * (half + 0.11), 0.2, 0.06]} rotation={[0.15, 0, 0]}><boxGeometry args={[0.1, 0.007, 0.16]} /></mesh>
+        <mesh material={m.carbon} position={[-side * (half + 0.11), 0.26, -0.04]} rotation={[0.25, 0, 0]}><boxGeometry args={[0.09, 0.007, 0.12]} /></mesh>
       </group>
     </group>
   )
@@ -241,6 +248,37 @@ function PowerUnit({ geo, m }: { geo: Geo; m: Mats }) {
       <mesh material={m.titanium} position={[0.2, 0.3, -0.62]} rotation={[0, 0, Math.PI / 2]}><cylinderGeometry args={[0.07, 0.07, 0.16, 24]} /></mesh>
       <mesh ref={battery} material={m.ers} position={[0, 0.3, -0.55]} userData={{ keepEmissive: true }}><boxGeometry args={[0.42, 0.1, 0.3]} /></mesh>
       <mesh material={m.ers} geometry={geo.ersCable} userData={{ keepEmissive: true }} />
+      {/* Compressor and intercooler feed */}
+      <mesh material={m.brass} position={[0, 0.52, -0.6]} rotation={[Math.PI / 2, 0, 0]}><cylinderGeometry args={[0.07, 0.06, 0.1, 24]} /></mesh>
+      <mesh material={m.metal} position={[0, 0.52, -1.0]} rotation={[Math.PI / 2, 0, 0]}><cylinderGeometry args={[0.018, 0.018, 0.78, 12]} /></mesh>
+      {/* Control electronics */}
+      <mesh material={m.matte} position={[-0.17, 0.3, -1.2]}><boxGeometry args={[0.1, 0.08, 0.2]} /></mesh>
+      <PuLabels />
+    </>
+  )
+}
+
+const PU_LABELS: [string, THREE.Vector3Tuple][] = [
+  ["ICE · 1.6 L V6", [0, 0.7, -0.95]],
+  ["Turbocharger", [0, 0.62, -1.42]],
+  ["Compressor", [0, 0.62, -0.6]],
+  ["MGU-K · up to 350 kW", [0.32, 0.3, -0.62]],
+  ["Energy store", [-0.3, 0.26, -0.5]],
+  ["Control electronics", [-0.32, 0.36, -1.2]],
+  ["Exhaust", [0, 0.6, -2.2]],
+]
+
+// Labels the power unit's internals when it's selected or in blueprint view.
+function PuLabels() {
+  const show = useGarage((s) => s.selected === "power-unit" || (s.technical && s.exploded))
+  if (!show) return null
+  return (
+    <>
+      {PU_LABELS.map(([text, pos]) => (
+        <Html key={text} position={pos} center zIndexRange={[18, 0]} className="spec-tag-wrap">
+          <div className="pu-tag">{text}</div>
+        </Html>
+      ))}
     </>
   )
 }
@@ -281,6 +319,7 @@ export function Car({ team }: { team: Team }) {
         </mesh>
         <Flap geometry={geo.fwFlap1} material={m.accent} position={[0, 0.13, 2.42]} corner={0.38} straight={0.12} />
         <Flap geometry={geo.fwFlap2} material={m.paint2} position={[0, 0.19, 2.26]} corner={0.6} straight={0.2} />
+        <Flap geometry={geo.fwFlap3} material={m.accent} position={[0, 0.26, 2.14]} corner={0.82} straight={0.32} />
         {[1, -1].map((s) => <mesh key={s} geometry={geo.fwEndplate} material={m.livery} position={[0.9 * s, 0, 0]} />)}
         {[1, -1].map((s) => (
           <mesh key={s} material={m.carbon} position={[0.06 * s, 0.15, 2.46]}><boxGeometry args={[0.012, 0.1, 0.12]} /></mesh>
@@ -291,6 +330,10 @@ export function Car({ team }: { team: Team }) {
         <mesh geometry={geo.nose} material={m.livery}>
           <Badge map={carName} position={[0, 0.5, 1.72]} rotation={[-Math.PI / 2, 0, 0]} scale={[0.26, 0.065, 0.3]} />
         </mesh>
+        <mesh geometry={geo.pitot} material={m.metal} />
+        {[1, -1].map((s) => (
+          <mesh key={s} material={m.matte} position={[0.13 * s, 0.43, 1.62]} rotation={[Math.PI / 2, 0, 0]}><capsuleGeometry args={[0.018, 0.07, 4, 10]} /></mesh>
+        ))}
       </Part>
 
       <Part id="front-suspension" explode={[0.65, 0.51, 0.29]}>
@@ -307,6 +350,7 @@ export function Car({ team }: { team: Team }) {
         <mesh material={m.visor} position={[0, 0.85, -0.13]} scale={[0.85, 0.35, 0.6]}><sphereGeometry args={[0.1, 24, 12]} /></mesh>
         <mesh geometry={geo.halo} material={m.titanium} />
         <mesh geometry={geo.haloPillar} material={m.titanium} />
+        <mesh geometry={geo.haloFin} material={m.carbon} position={[0, 0.995, 0.24]} rotation={[0.1, 0, 0]} />
         {[1, -1].map((s) => (
           <group key={s}>
             <mesh material={m.carbon} position={[0.37 * s, 0.8, 0.28]}><boxGeometry args={[0.13, 0.05, 0.03]} /></mesh>
@@ -334,6 +378,13 @@ export function Car({ team }: { team: Team }) {
         {[0.32, 0.45, 0.58].flatMap((x) => [x, -x]).map((x) => (
           <mesh key={x} material={m.carbon} position={[x, 0.04, 1.0]} rotation={[0, x * 0.25, 0]}><boxGeometry args={[0.01, 0.07, 0.42]} /></mesh>
         ))}
+        {[1, -1].map((s) => (
+          <group key={s}>
+            <mesh material={m.carbon} position={[0.97 * s, 0.11, -0.45]} rotation={[0, 0, -0.35 * s]}><boxGeometry args={[0.09, 0.006, 0.55]} /></mesh>
+            <mesh material={m.carbon} position={[0.93 * s, 0.055, -0.4]}><boxGeometry args={[0.006, 0.05, 1.25]} /></mesh>
+            <mesh material={m.inlet} position={[0.42 * s, 0.05, 1.18]}><boxGeometry args={[0.2, 0.045, 0.02]} /></mesh>
+          </group>
+        ))}
       </Part>
 
       <Part id="engine-cover" explode={[0, 1.52, -0.22]}>
@@ -345,6 +396,13 @@ export function Car({ team }: { team: Team }) {
           <Badge map={brand.main ?? carName} position={[-0.007, 0.76, -1.45]} rotation={[0, -Math.PI / 2, 0]} scale={[0.62, 0.15, 0.008]} />
         </mesh>
         <mesh material={m.inlet} position={[0, 0.44, -2.33]} scale={[0.05, 0.06, 0.01]}><sphereGeometry args={[1, 16, 8]} /></mesh>
+        {[1, -1].flatMap((s) => [0, 1, 2, 3, 4].map((i) => (
+          <mesh key={`${s}${i}`} material={m.inlet} position={[0.24 * s, 0.73 - i * 0.012, -0.98 - i * 0.07]} rotation={[0, 0, 0.55 * s]}><boxGeometry args={[0.12, 0.006, 0.014]} /></mesh>
+        )))}
+        <mesh material={m.matte} position={[0, 1.065, -0.36]}><boxGeometry args={[0.09, 0.035, 0.06]} /></mesh>
+        {[1, -1].map((s) => (
+          <mesh key={s} material={m.matte} position={[0.13 * s, 0.95, -0.45]} rotation={[Math.PI / 2, 0, 0]}><capsuleGeometry args={[0.016, 0.06, 4, 10]} /></mesh>
+        ))}
       </Part>
 
       <Part id="power-unit" explode={[0, 0.51, 0]}>
@@ -380,6 +438,10 @@ export function Car({ team }: { team: Team }) {
           </mesh>
         ))}
         <mesh geometry={geo.swanNeck} material={m.carbon} />
+        <mesh material={m.matte} position={[0, 0.93, -2.56]} rotation={[Math.PI / 2, 0, 0]}><capsuleGeometry args={[0.024, 0.18, 4, 12]} /></mesh>
+        {[1, -1].flatMap((s) => [0, 1, 2].map((i) => (
+          <mesh key={`${s}${i}`} material={m.inlet} position={[0.52 * s, 0.82 + i * 0.035, -2.5]}><boxGeometry args={[0.02, 0.008, 0.16]} /></mesh>
+        )))}
       </Part>
 
       <Part id="front-tyres" explode={[0.87, 0, 0.22]}>

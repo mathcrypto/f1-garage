@@ -1,10 +1,13 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
+import { LessonList, startLesson } from "./EngineerCam"
+import { ENGINEER, Lena } from "./Lena"
 import { Markdown } from "./Markdown"
 import type { AgentEvent, ChatTurn, UiCommand } from "@/lib/agent"
 import { partById } from "@/lib/parts"
-import { useGarage } from "@/lib/store"
+import { useEngineerState, useGarage } from "@/lib/store"
+import { voice } from "@/lib/voice"
 import { teamById } from "@/lib/teams"
 
 type Message = ChatTurn & {
@@ -16,12 +19,15 @@ type Message = ChatTurn & {
 
 function applyUi(c: UiCommand) {
   const s = useGarage.getState()
+  if (c.action === "lesson") { startLesson(c.id); return }
   if (c.action === "highlight") s.setHighlights(c.parts)
   else if (c.action === "focus") { if (s.exploded) s.setExploded(false); s.select(c.id) }
   else {
     if (c.mode) s.setMode(c.mode)
     if (c.exploded !== undefined) s.setExploded(c.exploded)
     if (c.camera) s.setCamera(c.camera)
+    if (c.technical !== undefined) s.setTechnical(c.technical)
+    if (c.airflow !== undefined) s.setFlow(c.airflow)
   }
 }
 
@@ -45,6 +51,12 @@ export function useEngineer() {
     const history: Message[] = [...messages, { role: "user", content: question.trim(), context }]
     setMessages([...history, { role: "assistant", content: "" }])
     setBusy(true)
+    const lena = useEngineerState.getState()
+    voice.stop()
+    lena.setLesson(null)
+    lena.setStatus("thinking")
+    lena.setCaption("")
+    let answer = ""
 
     const update = (fn: (m: Message) => Message) => setMessages((all) => [...all.slice(0, -1), fn(all[all.length - 1])])
 
@@ -72,7 +84,17 @@ export function useEngineer() {
         for (const line of lines) {
           if (!line) continue
           const e = JSON.parse(line) as AgentEvent
-          if (e.type === "text") update((m) => ({ ...m, content: m.content + e.text }))
+          if (e.type === "text") {
+            update((m) => ({ ...m, content: m.content + e.text }))
+            answer += e.text
+            if (voice.enabled && voice.supported) voice.feed(e.text)
+            else {
+              // No voice: show the sentence being written as her caption.
+              lena.setStatus("talking")
+              const sentences = answer.replace(/[*#`]/g, "").split(/(?<=[.!?])\s+/).filter(Boolean)
+              lena.setCaption(sentences.at(-1)?.slice(0, 220) ?? "")
+            }
+          }
           else if (e.type === "reasoning") update((m) => ({ ...m, reasoning: (m.reasoning ?? "") + e.text }))
           else if (e.type === "tool") update((m) => ({ ...m, steps: [...(m.steps ?? []), e.label] }))
           else if (e.type === "sources")
@@ -90,6 +112,8 @@ export function useEngineer() {
     } finally {
       update((m) => ({ ...m, content: m.content.trim() }))
       setBusy(false)
+      if (voice.enabled && voice.supported) voice.flush()
+      if (!(voice.enabled && voice.supported) || !answer) useEngineerState.getState().setStatus("idle")
     }
   }
 
@@ -118,6 +142,10 @@ export function EngineerPanel({ engineer }: { engineer: ReturnType<typeof useEng
 
   return (
     <div className="engineer">
+      <div className="engineer-id">
+        <Lena size={44} team={team.ui} team2={team.livery.secondary} />
+        <div><strong>{ENGINEER.name}</strong><small>{ENGINEER.role} · {team.name}</small></div>
+      </div>
       <div className="engineer-controls">
         <div className="seg" role="group" aria-label="Explanation depth">
           <button className={depth === "fan" ? "on" : ""} onClick={() => setDepth("fan")}>Fan</button>
@@ -133,8 +161,15 @@ export function EngineerPanel({ engineer }: { engineer: ReturnType<typeof useEng
       <div className="log" ref={logRef} aria-live="polite">
         {messages.length === 0 && (
           <div className="empty">
-            <p className="empty-title">Your race engineer</p>
-            <p>Ask about any part, upgrade or rule. The engineer checks fia.com, live timing and the latest news, then takes parts off your car to show you.</p>
+            <div className="empty-hero">
+              <Lena size={96} team={team.ui} team2={team.livery.secondary} />
+              <div>
+                <p className="empty-title">Hi, I'm Lena.</p>
+                <p>I'm your race engineer. Ask me about any part, upgrade or rule. I'll check fia.com, live timing and the news, and take parts off the car to show you.</p>
+              </div>
+            </div>
+            <p className="eyebrow" style={{ margin: "16px 0 8px" }}>Or let me walk you through</p>
+            <LessonList compact />
           </div>
         )}
         {messages.map((m, i) => {

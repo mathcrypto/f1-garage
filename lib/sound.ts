@@ -3,9 +3,10 @@
 import { telemetry } from "./drive"
 import { useGarage } from "./store"
 
-// All audio is synthesized in the browser, so no audio files ship with the
-// site. The anthem is an original composition; a licensed track placed at
-// public/audio/theme.mp3 replaces it automatically.
+// The garage soundtrack and engine note are synthesized in the browser, so no
+// audio files ship with the site. The anthem is an original composition; a
+// licensed track placed at public/audio/theme.mp3 replaces it automatically.
+// The official F1 theme plays through its official players (see SoundMenu).
 
 const BPM = 126
 const STEP = 60 / BPM / 4 // one 16th note, in seconds
@@ -71,13 +72,33 @@ class SoundEngine {
     for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1
   }
 
-  async start() {
+  musicOn = false
+  engineOn = false
+
+  // Opens the audio context; must be called from a click.
+  private async ensure() {
     this.init()
     const ctx = this.ctx!
     await ctx.resume()
-    this.enabled = true
-    this.master.gain.setTargetAtTime(0.7, ctx.currentTime, 0.1)
+    if (!this.enabled) {
+      this.enabled = true
+      this.master.gain.setTargetAtTime(this.volume, ctx.currentTime, 0.1)
+      this.startEngine()
+      const tick = () => { this.updateEngine(); this.raf = requestAnimationFrame(tick) }
+      this.raf = requestAnimationFrame(tick)
+    }
+  }
 
+  async setMusic(on: boolean) {
+    this.musicOn = on
+    if (!on) {
+      if (this.timer) { clearInterval(this.timer); this.timer = null }
+      this.track?.pause()
+      this.maybeSuspend()
+      return
+    }
+    await this.ensure()
+    const ctx = this.ctx!
     if (this.track === null) {
       const ok = await fetch("/audio/theme.mp3", { method: "HEAD" }).then((r) => r.ok && (r.headers.get("content-type") ?? "").startsWith("audio")).catch(() => false)
       if (ok) {
@@ -91,23 +112,34 @@ class SoundEngine {
       this.nextTime = ctx.currentTime + 0.05
       this.timer = setInterval(() => this.schedule(), 25)
     }
-    this.startEngine()
-    const tick = () => { this.updateEngine(); this.raf = requestAnimationFrame(tick) }
-    this.raf = requestAnimationFrame(tick)
   }
 
-  stop() {
-    if (!this.ctx) return
+  async setEngine(on: boolean) {
+    this.engineOn = on
+    if (on) await this.ensure()
+    else this.maybeSuspend()
+  }
+
+  private maybeSuspend() {
+    if (this.musicOn || this.engineOn || !this.ctx) return
     this.enabled = false
     this.master.gain.setTargetAtTime(0, this.ctx.currentTime, 0.08)
-    if (this.timer) { clearInterval(this.timer); this.timer = null }
-    this.track?.pause()
     cancelAnimationFrame(this.raf)
     setTimeout(() => { if (!this.enabled) this.ctx?.suspend() }, 400)
   }
 
+  stop() {
+    this.musicOn = false
+    this.engineOn = false
+    if (this.timer) { clearInterval(this.timer); this.timer = null }
+    this.track?.pause()
+    this.maybeSuspend()
+  }
+
+  private volume = 0.7
   setVolume(v: number) {
-    if (this.ctx) this.master.gain.setTargetAtTime(v, this.ctx.currentTime, 0.05)
+    this.volume = v
+    if (this.ctx && this.enabled) this.master.gain.setTargetAtTime(v, this.ctx.currentTime, 0.05)
   }
 
   // ── Anthem ────────────────────────────────────────────────────────────────
@@ -309,10 +341,10 @@ class SoundEngine {
     const base = (rpm / 60) * 1.5 // V6, three firing pulses per revolution, voiced an octave down
     for (const o of this.eng.osc) o.frequency.setTargetAtTime(base * (o as OscillatorNode & { mult: number }).mult, t, 0.03)
     this.eng.filter.frequency.setTargetAtTime(600 + rpm * 0.22 * (telemetry.braking > 0.2 ? 0.5 : 1), t, 0.05)
-    const level = driving ? (telemetry.braking > 0.2 ? 0.05 : 0.11) : 0
+    const level = driving && this.engineOn ? (telemetry.braking > 0.2 ? 0.05 : 0.11) : 0
     this.engine.gain.setTargetAtTime(level, t, 0.15)
     // Duck the music under the engine.
-    this.music.gain.setTargetAtTime(driving ? 0.45 : 1, t, 0.4)
+    this.music.gain.setTargetAtTime(driving && this.engineOn ? 0.45 : 1, t, 0.4)
   }
 }
 

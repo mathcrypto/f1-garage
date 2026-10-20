@@ -1,6 +1,7 @@
 import OpenAI from "openai"
 import { MODEL, NEBIUS_BASE_URL, SYSTEM_PROMPT, TOOL_LABELS, TOOLS, type AgentEvent, type ChatTurn, type ToolName, type UiCommand } from "@/lib/agent"
 import { getCalendar, getLastResult, getLiveSession, getStandings } from "@/lib/f1data"
+import { LESSONS } from "@/lib/lessons"
 import { PART_IDS } from "@/lib/parts"
 import { searchAvailable, searchWeb, type SearchScope } from "@/lib/search"
 
@@ -72,8 +73,19 @@ async function runTool(name: string, args: Record<string, unknown>, send: Send):
       return "The part is now off the car and in focus."
     }
     case "set_view":
-      ui({ action: "view", exploded: args.exploded as boolean | undefined, mode: args.mode as "studio" | "drive" | undefined, camera: args.camera as "hero" | undefined })
+      ui({
+        action: "view",
+        exploded: args.exploded as boolean | undefined,
+        mode: args.mode as "studio" | "drive" | undefined,
+        camera: args.camera as "hero" | undefined,
+        technical: args.technical as boolean | undefined,
+        airflow: args.airflow as boolean | undefined,
+      })
       return "View updated."
+    case "start_lesson":
+      if (!LESSONS.some((l) => l.id === args.id)) return `Error: unknown lesson "${args.id}".`
+      ui({ action: "lesson", id: String(args.id) })
+      return "The lesson is playing on the user's screen; Lena narrates it. Keep your reply to one short line."
     default:
       return `Error: unknown tool "${name}".`
   }

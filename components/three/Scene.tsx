@@ -9,6 +9,7 @@ import { stepTelemetry, telemetry } from "@/lib/drive"
 import { partCentres, useGarage, type CameraPreset } from "@/lib/store"
 import { teamById } from "@/lib/teams"
 import { Car } from "./Car"
+import { Airflow, Blueprint } from "./Technical"
 
 const PRESETS: Record<CameraPreset, [number, number, number, number, number, number]> = {
   hero: [7.2, 2.9, 7.6, 0, 0.3, -0.2],
@@ -206,6 +207,7 @@ function Director() {
 export default function Scene() {
   const teamId = useGarage((s) => s.teamId)
   const mode = useGarage((s) => s.mode)
+  const technical = useGarage((s) => s.technical)
   const team = teamById(teamId)
   const reducedMotion = useMemo(() => typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches, [])
 
@@ -217,7 +219,7 @@ export default function Scene() {
       gl={{ antialias: true, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.05 }}
       onPointerMissed={() => useGarage.getState().select(null)}
     >
-      <color attach="background" args={[mode === "drive" ? "#0a0e16" : "#08090c"]} />
+      <color attach="background" args={[technical ? "#06101c" : mode === "drive" ? "#0a0e16" : "#08090c"]} />
       <fog attach="fog" args={[mode === "drive" ? "#0a0e16" : "#08090c", 16, mode === "drive" ? 70 : 32]} />
       <Director />
       <ambientLight intensity={0.25} />
@@ -236,6 +238,8 @@ export default function Scene() {
       <Suspense fallback={null}>
         <Car team={team} />
         {mode === "drive" ? <Road /> : <><Studio /><Ring color={team.livery.primary} /></>}
+        <Airflow />
+        <Blueprint />
         <ContactShadows position={[0, 0.004, 0]} opacity={0.75} scale={9} blur={2.2} far={1.4} resolution={512} />
       </Suspense>
 

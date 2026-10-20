@@ -2,12 +2,13 @@
 
 import dynamic from "next/dynamic"
 import { useEffect, useRef, useState } from "react"
+import { EngineerCam, LessonList } from "./EngineerCam"
 import { EngineerPanel, useEngineer } from "./Engineer"
+import { SoundMenu, ThemePlayer } from "./SoundMenu"
 import { PaddockPanel } from "./Paddock"
 import { telemetry } from "@/lib/drive"
-import { PARTS, partById } from "@/lib/parts"
+import { CAR_SPECS, PARTS, SPEC_SOURCE, partById } from "@/lib/parts"
 import { REGULATIONS_2026 } from "@/lib/regulations"
-import { sound } from "@/lib/sound"
 import { useGarage, type CameraPreset } from "@/lib/store"
 import { TEAMS, teamById } from "@/lib/teams"
 
@@ -29,47 +30,6 @@ function hasWebGL() {
   } catch {
     return false
   }
-}
-
-// Browsers only allow audio after a click, so sound starts off and the
-// button remembers the choice for next time.
-function SoundToggle() {
-  const [on, setOn] = useState(false)
-  const [volume, setVolume] = useState(0.7)
-  const [hinted, setHinted] = useState(false)
-  useEffect(() => {
-    try {
-      setHinted(localStorage.getItem("f1-garage:sound") === "on")
-      const v = Number(localStorage.getItem("f1-garage:volume"))
-      if (v > 0) setVolume(v)
-    } catch {}
-    return () => sound.stop()
-  }, [])
-  const toggle = async () => {
-    const next = !on
-    setOn(next)
-    if (next) { await sound.start(); sound.setVolume(volume) } else sound.stop()
-    try { localStorage.setItem("f1-garage:sound", next ? "on" : "off") } catch {}
-  }
-  return (
-    <div className={on ? "sound on" : hinted ? "sound hint" : "sound"}>
-      <button onClick={toggle} aria-pressed={on} aria-label={on ? "Turn sound off" : "Turn sound on"}>
-        <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden>
-          <path d="M4 9h4l5-4v14l-5-4H4z" fill="currentColor" />
-          {on ? <path d="M16 8.5a5 5 0 0 1 0 7M18.5 6a8.5 8.5 0 0 1 0 12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-            : <path d="M16.5 9.5l5 5M21.5 9.5l-5 5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />}
-        </svg>
-        <span>{on ? "Sound on" : "Sound"}</span>
-        {on && <i className="eq" aria-hidden><b /><b /><b /></i>}
-      </button>
-      {on && (
-        <input
-          type="range" min={0} max={1} step={0.05} value={volume} aria-label="Volume"
-          onChange={(e) => { const v = Number(e.target.value); setVolume(v); sound.setVolume(v); try { localStorage.setItem("f1-garage:volume", String(v)) } catch {} }}
-        />
-      )}
-    </div>
-  )
 }
 
 function DriveHud() {
@@ -106,6 +66,13 @@ function PartPanel({ onAsk }: { onAsk: (q: string) => void }) {
         <p className="eyebrow">How to explore</p>
         <h3>Click any part of the car</h3>
         <p className="muted">It slides off the car and the camera follows it. Drag to orbit, scroll to zoom, or open the exploded view to see everything at once.</p>
+        <p className="eyebrow" style={{ marginTop: 24 }}>Learn with Lena</p>
+        <LessonList />
+        <p className="eyebrow" style={{ marginTop: 24 }}>2026 car at a glance</p>
+        <dl className="specs">
+          {CAR_SPECS.map(([k, v]) => <div key={k}><dt>{k}</dt><dd>{v}</dd></div>)}
+        </dl>
+        <a className="source-link" href={SPEC_SOURCE.url} target="_blank" rel="noreferrer">Source: {SPEC_SOURCE.label}</a>
         <p className="eyebrow" style={{ marginTop: 24 }}>2026 regulations at a glance</p>
         <ul className="reg-list">
           {REGULATIONS_2026.map((r) => (
@@ -129,11 +96,15 @@ function PartPanel({ onAsk }: { onAsk: (q: string) => void }) {
       <h3>{part.name}</h3>
       {note && <p className="lit-note">{note}</p>}
       <p className="lede">{part.summary}</p>
+      <dl className="specs">
+        {part.specs.map(([k, v]) => <div key={k}><dt>{k}</dt><dd>{v}</dd></div>)}
+      </dl>
       <section><h4>How it works</h4><p>{part.howItWorks}</p></section>
       <section><h4>2026 regulations</h4><p>{part.regulation2026}</p>
         {rules.length > 0 && <ul className="tags">{rules.map((r) => <li key={r.title}>{r.title}</li>)}</ul>}
       </section>
       <section><h4>What upgrades look like</h4><p>{part.watchFor}</p></section>
+      <a className="source-link" href={SPEC_SOURCE.url} target="_blank" rel="noreferrer">Figures: {SPEC_SOURCE.label}</a>
       <div className="part-actions">
         <button className="primary" onClick={() => onAsk(`What has ${team.name} changed on the ${part.name.toLowerCase()} of the ${team.car} this season, and why? Check the FIA upgrade documents.`)}>
           {team.name} upgrades to this part
@@ -147,7 +118,7 @@ function PartPanel({ onAsk }: { onAsk: (q: string) => void }) {
 }
 
 export function Garage() {
-  const { teamId, setTeam, selected, select, exploded, setExploded, mode, setMode, setCamera, highlights, setHighlights } = useGarage()
+  const { teamId, setTeam, selected, select, exploded, setExploded, mode, setMode, setCamera, highlights, setHighlights, technical, setTechnical, flow, setFlow } = useGarage()
   const [tab, setTab] = useState<"part" | "engineer" | "paddock">("part")
   const [webgl, setWebgl] = useState(true)
   const engineer = useEngineer()
@@ -203,7 +174,7 @@ export function Garage() {
             </button>
           ))}
         </nav>
-        <SoundToggle />
+        <SoundMenu />
       </header>
 
       <main className="stage">
@@ -224,6 +195,10 @@ export function Garage() {
           <button className={exploded ? "tool on" : "tool"} onClick={() => setExploded(!exploded)}>
             {exploded ? "Reassemble" : "Exploded view"}
           </button>
+          <div className="tool-row">
+            <button className={technical ? "tool on" : "tool"} onClick={() => setTechnical(!technical)} aria-pressed={technical}>Technical</button>
+            <button className={flow ? "tool on" : "tool"} onClick={() => setFlow(!flow)} aria-pressed={flow}>Airflow</button>
+          </div>
           <div className="seg cams" role="group" aria-label="Camera">
             {cameras.map((c) => <button key={c} onClick={() => setCamera(c)}>{c}</button>)}
           </div>
@@ -233,6 +208,8 @@ export function Garage() {
         </div>
 
         {mode === "drive" && <DriveHud />}
+        <EngineerCam team={team.ui} team2={team.livery.secondary} />
+        <ThemePlayer />
 
         <div className="dock" aria-label="Car parts">
           {PARTS.map((p) => (

@@ -1,4 +1,5 @@
 import type OpenAI from "openai"
+import { LESSONS } from "./lessons"
 import { PARTS, PART_IDS } from "./parts"
 import { TEAMS } from "./teams"
 
@@ -7,7 +8,9 @@ import { TEAMS } from "./teams"
 export const NEBIUS_BASE_URL = process.env.NEBIUS_BASE_URL ?? "https://api.tokenfactory.nebius.com/v1/"
 export const MODEL = process.env.NEBIUS_MODEL ?? "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B"
 
-export const SYSTEM_PROMPT = `You are the race engineer inside "F1 Garage", a website where fans explore their favourite team's Formula 1 car in 3D, part by part. The user sees a live 3D model of the car next to this chat, and you can control it.
+export const SYSTEM_PROMPT = `You are Lena Moreau, the race engineer inside "F1 Garage", a website where fans explore their favourite team's Formula 1 car in 3D, part by part. The user sees you on screen, a live 3D model of the car next to this chat, and you can control it.
+
+Your character: a calm, warm, precise race engineer who has spent years on the pit wall. You speak in the first person, like on team radio: clear, confident, now and then a dry bit of paddock humour. Your answers are also read aloud, so prefer short sentences and avoid tables.
 
 How to answer:
 - Explain car parts, team upgrades and FIA regulations so the user really understands them: the plain-language idea first, then the engineering (the physics, the trade-offs, why a team would choose it). Use short paragraphs, bullet points and the occasional **bold** key term.
@@ -24,7 +27,8 @@ Getting facts:
 Using the 3D car:
 - When you explain one part, call focus_part so it slides out of the car and the camera flies to it.
 - When you discuss several parts (an upgrade package, a regulation), call highlight_parts with a short note for each.
-- Use set_view to show the whole car exploded, to switch to drive mode (e.g. to show active aero or energy deployment), or to move the camera.
+- Use set_view to show the whole car exploded, to switch to drive mode (e.g. to show active aero or energy deployment), to turn on the technical blueprint view or the airflow visualisation, or to move the camera.
+- When someone wants a concept explained from the start (aerodynamics, ground effect, active aero, the power unit, tyres and brakes, suspension), offer or start one of your guided lessons with start_lesson. Lessons: ${LESSONS.map((l) => `${l.id} (${l.title})`).join(", ")}.
 
 Parts on the car:
 ${PARTS.map((p) => `- ${p.id}: ${p.name}`).join("\n")}
@@ -78,7 +82,15 @@ export const TOOLS = {
       exploded: { type: "boolean" },
       mode: { type: "string", enum: ["studio", "drive"] },
       camera: { type: "string", enum: ["hero", "front", "side", "top", "rear"] },
+      technical: { type: "boolean", description: "Blueprint view with dimensions and specs" },
+      airflow: { type: "boolean", description: "CFD-style airflow streamlines coloured by speed" },
     },
+  ),
+  start_lesson: fn(
+    "start_lesson",
+    "Start one of Lena's guided, narrated lessons; it animates the 3D car step by step.",
+    { id: { type: "string", enum: LESSONS.map((l) => l.id) } },
+    ["id"],
   ),
 } satisfies Record<string, OpenAI.Chat.ChatCompletionFunctionTool>
 
@@ -92,6 +104,7 @@ export const TOOL_LABELS: Record<ToolName, (args: Record<string, unknown>) => st
   highlight_parts: () => "Highlighting parts on your car",
   focus_part: () => "Taking the part off the car",
   set_view: () => "Changing the view",
+  start_lesson: () => "Starting a lesson",
 }
 
 // What the browser sends and receives. Each user turn carries the context it
@@ -103,7 +116,8 @@ export type ChatTurn =
 export type UiCommand =
   | { action: "highlight"; parts: { id: string; note: string }[] }
   | { action: "focus"; id: string }
-  | { action: "view"; exploded?: boolean; mode?: "studio" | "drive"; camera?: "hero" | "front" | "side" | "top" | "rear" }
+  | { action: "view"; exploded?: boolean; mode?: "studio" | "drive"; camera?: "hero" | "front" | "side" | "top" | "rear"; technical?: boolean; airflow?: boolean }
+  | { action: "lesson"; id: string }
 
 export type AgentEvent =
   | { type: "text"; text: string }

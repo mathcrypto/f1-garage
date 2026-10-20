@@ -15,7 +15,9 @@ npm run dev                  # http://localhost:3002
 - **Take it apart.** Click any of the 14 parts and it slides off the car while the rest turns see-through and the camera flies to it. **Exploded view** separates everything; **Reassemble** or Esc puts it back.
 - **Part panel.** What the part does, how it works, the 2026 rules for it and what its upgrades look like, with buttons to ask about the selected team's upgrades or for a deep dive.
 - **Race engineer.** The engineer can search fia.com, recent news, live timing and the standings, and it controls the 3D car while it explains: it takes parts off, highlights several with numbered labels, explodes the car or switches to drive mode. Fan/Engineer depth toggle, an optional Deep analysis mode, a collapsible view of the model's reasoning, and source chips on every answer.
-- **Liveries and sound.** Each team has its own painted livery (base colour, dark lower body, a signature stripe, gloss or satin finish) with its name on the sidepods, rear wing and wings and the car name on the nose and shark fin. **Sound** in the top bar plays an original race-anthem soundtrack, and in Drive mode a V6 hybrid engine note that climbs through 8 gears and drops on every upshift.
+- **Lena, your race engineer.** An illustrated character who appears on screen when she talks, reads her answers aloud (browser speech, can be switched off), and shows live captions. She runs **six guided lessons** (downforce, ground effect, active aero, the power unit, tyres and brakes, suspension) that drive the 3D car step by step: taking parts off, highlighting, switching to drive mode, turning on the airflow.
+- **Technical view and airflow.** Blueprint rendering with glass bodywork and feature lines, FIA dimension lines (3400 mm wheelbase, 1900 mm width), spec tags on hover, labelled power-unit internals, and a spec sheet for every part with the 2026 figures. **Airflow** draws CFD-style streamlines coloured from slow (blue) to fast (red): over the wings, under the floor, through the diffuser and up behind the rear wing.
+- **Liveries and sound.** Each team has its own painted livery (base colour, dark lower body, a signature stripe, gloss or satin finish) with its name on the sidepods, rear wing and wings and the car name on the nose and shark fin. The **Sound** menu plays the **official F1 theme** (Brian Tyler) through its official Spotify or Apple Music player, or an original synthesized soundtrack, plus a V6 hybrid engine note in Drive mode that climbs through 8 gears and drops on every upshift.
 - **Paddock.** Live session and race control messages (OpenF1), next race with a countdown, last podium and constructors' standings (Jolpica-F1), and the selected team's news from the last week (Tavily).
 
 ## Code map
@@ -59,7 +61,8 @@ Set it as `NEBIUS_MODEL`. For the best explanations and tool use, pick the large
 
 ## Music and logos
 
-- The soundtrack is synthesized live in `lib/sound.ts`, so no audio files ship with the site. To use your own track, put a file you're licensed to use at `public/audio/theme.mp3`; it replaces the built-in anthem automatically. The official F1 theme is copyrighted, so it isn't included.
+- The official F1 theme plays through the official Spotify and Apple Music embeds (`components/SoundMenu.tsx`), which is how the rights holder makes it available for websites. Signed-in listeners hear the full track; everyone else gets the platform's preview. The audio file itself isn't copied into the site.
+- The garage soundtrack is synthesized live in `lib/sound.ts`. To use another track, put a file you're licensed to use at `public/audio/theme.mp3`; it replaces the built-in anthem automatically.
 - Team and sponsor logos are trademarks, so none are bundled; the car shows generated wordmarks instead. If you have the rights, drop the files into `public/logos/` and list them in `public/logos/manifest.json` (see `public/logos/README.md`). They then replace the wordmarks on the sidepods, shark fin and wings.
 
 ## About the 3D model
