@@ -1,215 +1,220 @@
 "use client"
 
+import dynamic from "next/dynamic"
 import { useEffect, useRef, useState } from "react"
-import { CarView } from "./CarView"
-import { Markdown } from "./Markdown"
-import { TEAMS, teamById } from "@/lib/teams"
+import { EngineerPanel, useEngineer } from "./Engineer"
+import { PaddockPanel } from "./Paddock"
+import { telemetry } from "@/lib/drive"
 import { PARTS, partById } from "@/lib/parts"
 import { REGULATIONS_2026 } from "@/lib/regulations"
-import type { AgentEvent, ChatTurn } from "@/lib/agent"
+import { useGarage, type CameraPreset } from "@/lib/store"
+import { TEAMS, teamById } from "@/lib/teams"
 
-type Message = ChatTurn & { sources?: { title: string; url: string }[]; status?: string; error?: string }
+const Scene = dynamic(() => import("./three/Scene"), {
+  ssr: false,
+  loading: () => <div className="scene-loading"><span className="spinner" />Building the car…</div>,
+})
 
-export function Garage() {
-  const [teamId, setTeamId] = useState("ferrari")
-  const [selected, setSelected] = useState<string | null>("floor")
-  const [highlights, setHighlights] = useState<{ id: string; note: string }[]>([])
-  const [messages, setMessages] = useState<Message[]>([])
-  const [input, setInput] = useState("")
-  const [busy, setBusy] = useState(false)
-  const logRef = useRef<HTMLDivElement>(null)
+// Black or white text, whichever reads better on the team's colour.
+function inkOn(hex: string) {
+  const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255).map((c) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4))
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b > 0.35 ? "#0b0c0f" : "#ffffff"
+}
 
+function hasWebGL() {
+  try {
+    const c = document.createElement("canvas")
+    return Boolean(c.getContext("webgl2") ?? c.getContext("webgl"))
+  } catch {
+    return false
+  }
+}
+
+function DriveHud() {
+  const [t, setT] = useState({ speed: 0, aero: "corner", ers: 0, braking: 0 })
+  useEffect(() => {
+    const id = setInterval(() => setT({ speed: telemetry.speed, aero: telemetry.aero, ers: telemetry.ers, braking: telemetry.braking }), 70)
+    return () => clearInterval(id)
+  }, [])
+  return (
+    <div className="hud" aria-hidden>
+      <div className="hud-speed"><span>{Math.round(t.speed)}</span><small>km/h</small></div>
+      <div className="hud-block">
+        <div className={`hud-aero ${t.aero}`}>
+          <b>{t.aero === "straight" ? "X-MODE" : "Z-MODE"}</b>
+          <small>{t.aero === "straight" ? "Straight · wings open, low drag" : "Corner · wings closed, full downforce"}</small>
+        </div>
+        <div className="hud-bar"><small>ERS deploy</small><div><i style={{ width: `${Math.round(t.ers * 100)}%` }} /></div></div>
+        <div className="hud-bar brake"><small>Brake</small><div><i style={{ width: `${Math.round(t.braking * 100)}%` }} /></div></div>
+      </div>
+    </div>
+  )
+}
+
+function PartPanel({ onAsk }: { onAsk: (q: string) => void }) {
+  const selected = useGarage((s) => s.selected)
+  const highlights = useGarage((s) => s.highlights)
+  const teamId = useGarage((s) => s.teamId)
   const team = teamById(teamId)
   const part = selected ? partById(selected) : undefined
-  const relatedRules = REGULATIONS_2026.filter((r) => selected && r.parts.includes(selected))
-  const highlightNote = highlights.find((h) => h.id === selected)?.note
+
+  if (!part) {
+    return (
+      <div className="part-intro">
+        <p className="eyebrow">How to explore</p>
+        <h3>Click any part of the car</h3>
+        <p className="muted">It slides off the car and the camera follows it. Drag to orbit, scroll to zoom, or open the exploded view to see everything at once.</p>
+        <p className="eyebrow" style={{ marginTop: 24 }}>2026 regulations at a glance</p>
+        <ul className="reg-list">
+          {REGULATIONS_2026.map((r) => (
+            <li key={r.title}>
+              <button onClick={() => useGarage.getState().setHighlights(r.parts.map((id) => ({ id, note: r.title })))}>
+                <strong>{r.title}</strong>
+                <span>{r.body}</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      </div>
+    )
+  }
+
+  const note = highlights.find((h) => h.id === part.id)?.note
+  const rules = REGULATIONS_2026.filter((r) => r.parts.includes(part.id))
+  return (
+    <article className="part">
+      <p className="eyebrow">{part.system}</p>
+      <h3>{part.name}</h3>
+      {note && <p className="lit-note">{note}</p>}
+      <p className="lede">{part.summary}</p>
+      <section><h4>How it works</h4><p>{part.howItWorks}</p></section>
+      <section><h4>2026 regulations</h4><p>{part.regulation2026}</p>
+        {rules.length > 0 && <ul className="tags">{rules.map((r) => <li key={r.title}>{r.title}</li>)}</ul>}
+      </section>
+      <section><h4>What upgrades look like</h4><p>{part.watchFor}</p></section>
+      <div className="part-actions">
+        <button className="primary" onClick={() => onAsk(`What has ${team.name} changed on the ${part.name.toLowerCase()} of the ${team.car} this season, and why? Check the FIA upgrade documents.`)}>
+          {team.name} upgrades to this part
+        </button>
+        <button className="secondary" onClick={() => onAsk(`Explain the ${part.name.toLowerCase()} in depth: the physics, the trade-offs, and how it interacts with the rest of the car.`)}>
+          Deep dive
+        </button>
+      </div>
+    </article>
+  )
+}
+
+export function Garage() {
+  const { teamId, setTeam, selected, select, exploded, setExploded, mode, setMode, setCamera, highlights, setHighlights } = useGarage()
+  const [tab, setTab] = useState<"part" | "engineer" | "paddock">("part")
+  const [webgl, setWebgl] = useState(true)
+  const engineer = useEngineer()
+  const team = teamById(teamId)
 
   useEffect(() => {
+    setWebgl(hasWebGL())
     try {
       const saved = localStorage.getItem("f1-garage:team")
-      if (saved && TEAMS.some((t) => t.id === saved)) setTeamId(saved)
+      if (saved && TEAMS.some((t) => t.id === saved)) setTeam(saved)
     } catch {}
-  }, [])
+  }, [setTeam])
 
   useEffect(() => {
-    logRef.current?.scrollTo({ top: logRef.current.scrollHeight })
-  }, [messages])
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return
+      const s = useGarage.getState()
+      if (s.selected) s.select(null)
+      else if (s.exploded) s.setExploded(false)
+    }
+    window.addEventListener("keydown", onKey)
+    return () => window.removeEventListener("keydown", onKey)
+  }, [])
+
+  // Selecting a part on the car brings its explanation forward, unless the
+  // engineer is mid-answer and drove the selection itself.
+  const busyRef = useRef(false)
+  busyRef.current = engineer.busy
+  useEffect(() => {
+    if (selected && !busyRef.current) setTab("part")
+  }, [selected])
 
   const pickTeam = (id: string) => {
-    setTeamId(id)
-    setHighlights([])
+    setTeam(id)
     try { localStorage.setItem("f1-garage:team", id) } catch {}
   }
+  const ask = (q: string) => { setTab("engineer"); return engineer.ask(q) }
 
-  async function ask(question: string) {
-    if (!question.trim() || busy) return
-    const context = [
-      `team: ${team.name} (${team.car}, ${team.powerUnit} power unit)`,
-      `selected part: ${part ? part.name : "none"}`,
-      `today: ${new Date().toISOString().slice(0, 10)}`,
-    ].join("; ")
-    const userTurn: Message = { role: "user", content: question.trim(), context }
-    const history = [...messages, userTurn]
-    setMessages([...history, { role: "assistant", content: "" }])
-    setInput("")
-    setBusy(true)
-
-    const update = (fn: (m: Message) => Message) =>
-      setMessages((all) => [...all.slice(0, -1), fn(all[all.length - 1])])
-
-    try {
-      const res = await fetch("/api/agent", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          turns: history
-            .filter((m) => m.content)
-            .map((m): ChatTurn => (m.role === "user" ? { role: "user", content: m.content, context: m.context } : { role: "assistant", content: m.content })),
-        }),
-      })
-      if (!res.body) throw new Error("No response")
-      const reader = res.body.getReader()
-      const decoder = new TextDecoder()
-      let pending = ""
-      for (;;) {
-        const { value, done } = await reader.read()
-        if (done) break
-        pending += decoder.decode(value, { stream: true })
-        const lines = pending.split("\n")
-        pending = lines.pop() ?? ""
-        for (const line of lines) {
-          if (!line) continue
-          const event = JSON.parse(line) as AgentEvent
-          if (event.type === "text") update((m) => ({ ...m, content: m.content + event.text, status: undefined }))
-          else if (event.type === "status") update((m) => ({ ...m, status: event.text }))
-          else if (event.type === "sources")
-            update((m) => {
-              const seen = new Map((m.sources ?? []).map((s) => [s.url, s]))
-              for (const s of event.sources) seen.set(s.url, s)
-              return { ...m, sources: [...seen.values()] }
-            })
-          else if (event.type === "highlight") {
-            setHighlights(event.parts)
-            if (event.parts[0]) setSelected(event.parts[0].id)
-          } else if (event.type === "error") update((m) => ({ ...m, error: event.text, status: undefined }))
-        }
-      }
-    } catch {
-      update((m) => ({ ...m, error: "Couldn't reach the engineer. Check your connection and try again.", status: undefined }))
-    } finally {
-      update((m) => ({ ...m, content: m.content.trim(), status: undefined }))
-      setBusy(false)
-    }
-  }
-
-  const quick = [
-    `What are the latest upgrades on the ${team.car}?`,
-    part ? `Explain the ${part.name.toLowerCase()} like I'm new to F1` : "How does a Formula 1 car make downforce?",
-    "What changed in the 2026 FIA regulations?",
-    "Any new FIA technical directives or rule changes this month?",
-  ]
+  const cameras: CameraPreset[] = ["hero", "front", "side", "top", "rear"]
 
   return (
-    <div className="garage" style={{ ["--team" as string]: team.livery.primary, ["--team-2" as string]: team.livery.secondary }}>
+    <div className="app" style={{ ["--team" as string]: team.ui, ["--team-ink" as string]: inkOn(team.ui), ["--team-2" as string]: team.livery.secondary }}>
       <header className="topbar">
         <div className="brand">
-          <span className="brand-mark" aria-hidden>▲</span>
-          <div>
-            <h1>F1 Garage</h1>
-            <p>Explore your team's car, its upgrades and the FIA rules behind them</p>
-          </div>
+          <svg viewBox="0 0 32 20" width="34" height="22" aria-hidden><path d="M2 18 L14 2 H30 L18 18 Z" fill="var(--team)" /><path d="M10 18 L16 10 H22 L16 18 Z" fill="var(--bg)" opacity=".85" /></svg>
+          <div><strong>F1 GARAGE</strong><small>Unofficial fan project</small></div>
         </div>
         <nav className="teams" aria-label="Choose a team">
           {TEAMS.map((t) => (
-            <button key={t.id} className={t.id === teamId ? "team is-active" : "team"} onClick={() => pickTeam(t.id)} aria-pressed={t.id === teamId}>
-              <span className="swatch" style={{ background: `linear-gradient(135deg, ${t.livery.primary} 55%, ${t.livery.secondary} 55%)` }} />
-              {t.name}
+            <button key={t.id} className={t.id === teamId ? "team on" : "team"} onClick={() => pickTeam(t.id)} aria-pressed={t.id === teamId} style={{ ["--c" as string]: t.livery.primary, ["--c2" as string]: t.livery.secondary }}>
+              <i aria-hidden />
+              <span>{t.name}</span>
             </button>
           ))}
         </nav>
       </header>
 
-      <main className="layout">
-        <section className="stage" aria-label="Car">
-          <div className="stage-head">
-            <div>
-              <h2>{team.car}</h2>
-              <p>{team.name} · {team.powerUnit} power unit · plan view</p>
-            </div>
-            {highlights.length > 0 && (
-              <button className="ghost" onClick={() => setHighlights([])}>Clear highlights</button>
-            )}
-          </div>
-          <CarView team={team} selected={selected} highlights={highlights} onSelect={setSelected} />
-          <div className="part-chips" aria-label="All parts">
-            {PARTS.map((p) => (
-              <button key={p.id} className={p.id === selected ? "chip is-active" : "chip"} onClick={() => setSelected(p.id)}>
-                {highlights.some((h) => h.id === p.id) && <span className="dot" aria-label="highlighted" />}
-                {p.name}
-              </button>
-            ))}
-          </div>
-        </section>
+      <main className="stage">
+        <div className="canvas-wrap">
+          {webgl ? <Scene /> : <div className="scene-loading">3D needs WebGL, which this browser has turned off. Everything else still works.</div>}
+        </div>
 
-        <aside className="side">
-          {part && (
-            <section className="card part-card" aria-live="polite">
-              <div className="eyebrow">{part.system}</div>
-              <h3>{part.name}</h3>
-              {highlightNote && <p className="lit-note">Engineer's note: {highlightNote}</p>}
-              <p>{part.summary}</p>
-              <h4>How it works</h4>
-              <p>{part.howItWorks}</p>
-              <h4>2026 regulations</h4>
-              <p>{part.regulation2026}</p>
-              {relatedRules.length > 0 && (
-                <ul className="rules">
-                  {relatedRules.map((r) => <li key={r.title}><strong>{r.title}.</strong> {r.body}</li>)}
-                </ul>
-              )}
-              <h4>What upgrades look like</h4>
-              <p>{part.watchFor}</p>
-              <button className="primary" disabled={busy} onClick={() => ask(`What has ${team.name} changed on the ${part.name.toLowerCase()} this season, and why?`)}>
-                Ask about {team.name}'s {part.name.toLowerCase()} upgrades
-              </button>
-            </section>
+        <div className="stage-title">
+          <p className="eyebrow">{team.name} · {team.powerUnit} power unit</p>
+          <h1 key={team.id}>{team.car}</h1>
+        </div>
+
+        <div className="stage-tools">
+          <div className="seg" role="group" aria-label="View mode">
+            <button className={mode === "studio" ? "on" : ""} onClick={() => setMode("studio")}>Studio</button>
+            <button className={mode === "drive" ? "on" : ""} onClick={() => setMode("drive")}>Drive</button>
+          </div>
+          <button className={exploded ? "tool on" : "tool"} onClick={() => setExploded(!exploded)}>
+            {exploded ? "Reassemble" : "Exploded view"}
+          </button>
+          <div className="seg cams" role="group" aria-label="Camera">
+            {cameras.map((c) => <button key={c} onClick={() => setCamera(c)}>{c}</button>)}
+          </div>
+          {(selected || highlights.length > 0) && (
+            <button className="tool ghost" onClick={() => { select(null); setHighlights([]) }}>Clear</button>
           )}
+        </div>
 
-          <section className="card chat" aria-label="Race engineer">
-            <div className="chat-head">
-              <h3>Race engineer</h3>
-              <span className="badge">Nemotron · Nebius</span>
-            </div>
-            <div className="log" ref={logRef}>
-              {messages.length === 0 && (
-                <p className="empty">Ask about upgrades, a part, or the FIA rules. The engineer searches the latest news and points at parts on your car.</p>
-              )}
-              {messages.map((m, i) => (
-                <div key={i} className={`msg ${m.role}`}>
-                  {m.role === "assistant" ? <Markdown text={m.content} /> : <p>{m.content}</p>}
-                  {m.status && <p className="status">{m.status}</p>}
-                  {m.role === "assistant" && !m.content && !m.status && !m.error && busy && i === messages.length - 1 && (
-                    <p className="status">Thinking…</p>
-                  )}
-                  {m.error && <p className="error">{m.error}</p>}
-                  {m.sources && m.sources.length > 0 && (
-                    <ol className="sources">
-                      {m.sources.slice(0, 6).map((s) => <li key={s.url}><a href={s.url} target="_blank" rel="noreferrer">{s.title}</a></li>)}
-                    </ol>
-                  )}
-                </div>
-              ))}
-            </div>
-            <div className="quick">
-              {quick.map((q) => <button key={q} className="chip" disabled={busy} onClick={() => ask(q)}>{q}</button>)}
-            </div>
-            <form className="composer" onSubmit={(e) => { e.preventDefault(); ask(input) }}>
-              <input value={input} onChange={(e) => setInput(e.target.value)} placeholder={`Ask about the ${team.car}…`} aria-label="Your question" />
-              <button className="primary" disabled={busy || !input.trim()}>Send</button>
-            </form>
-          </section>
-        </aside>
+        {mode === "drive" && <DriveHud />}
+
+        <div className="dock" aria-label="Car parts">
+          {PARTS.map((p) => (
+            <button key={p.id} className={p.id === selected ? "dock-item on" : "dock-item"} onClick={() => { if (exploded) setExploded(false); select(p.id === selected ? null : p.id) }}>
+              <small>{p.system}</small>
+              <span>{p.name}</span>
+              {highlights.some((h) => h.id === p.id) && <i className="dot" aria-label="highlighted" />}
+            </button>
+          ))}
+        </div>
       </main>
+
+      <aside className="panel">
+        <div className="tabs" role="tablist">
+          {(["part", "engineer", "paddock"] as const).map((t) => (
+            <button key={t} role="tab" aria-selected={tab === t} className={tab === t ? "on" : ""} onClick={() => setTab(t)}>
+              {t === "part" ? "Part" : t === "engineer" ? <>Engineer{engineer.busy && <i className="busy" />}</> : "Paddock"}
+            </button>
+          ))}
+        </div>
+        <div className="tab-body" hidden={tab !== "part"}><PartPanel onAsk={ask} /></div>
+        <div className="tab-body flush" hidden={tab !== "engineer"}><EngineerPanel engineer={{ ...engineer, ask }} /></div>
+        <div className="tab-body" hidden={tab !== "paddock"}>{tab === "paddock" && <PaddockPanel />}</div>
+        <p className="model-badge">Nemotron on Nebius · live data from FIA, OpenF1, Jolpica-F1</p>
+      </aside>
     </div>
   )
 }
