@@ -5,7 +5,7 @@ The engineer runs on an **NVIDIA Nemotron** model served by **Nebius Token Facto
 
 ```bash
 cd f1-garage
-cp .env.example .env.local   # add NEBIUS_API_KEY (and EXA_API_KEY for live news)
+cp .env.example .env.local   # add NEBIUS_API_KEY (and TAVILY_API_KEY for live news)
 npm install
 npm run dev                  # http://localhost:3002
 ```
@@ -26,7 +26,7 @@ npm run dev                  # http://localhost:3002
 Nebius exposes an OpenAI-compatible API, so the server uses the `openai` SDK with `baseURL` pointed at Nebius.
 The model gets two function tools, and both run on the server:
 
-- `web_search`: searches with [Exa](https://exa.ai) for recent upgrades, FIA documents and technical press. It's only offered when `EXA_API_KEY` is set. Without it, the engineer answers from what the model already knows.
+- `web_search`: searches with [Tavily](https://tavily.com) for recent upgrades, FIA documents and technical press. It's only offered when `TAVILY_API_KEY` is set. Without it, the engineer answers from what the model already knows.
 - `highlight_parts`: lights up parts on the user's car with numbered markers and a short note, like the arrows in a technical drawing.
 
 Each question carries a `[Garage context]` line (team, selected part, today's date), so "this part" and "the latest" resolve correctly.

@@ -37,7 +37,7 @@ function thinkFilter() {
 }
 
 // Streams newline-delimited AgentEvent JSON. Both tools run here on the
-// server: web_search calls Exa, highlight_parts only tells the browser which
+// server: web_search calls Tavily, highlight_parts only tells the browser which
 // parts to light up.
 export async function POST(req: Request) {
   const { turns } = (await req.json()) as { turns: ChatTurn[] }
