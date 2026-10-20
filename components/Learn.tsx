@@ -36,42 +36,6 @@ function FlipTile({ value, label, back }: (typeof STATS)[number]) {
   )
 }
 
-type Photo = { src: string; page: string; title: string; author: string; license: string; car: string }
-
-// Real photos of the car from Wikimedia Commons, credited as their licences require.
-function RealCar({ teamId, car }: { teamId: string; car: string }) {
-  const [photos, setPhotos] = useState<Photo[] | null>(null)
-  const [i, setI] = useState(0)
-  useEffect(() => {
-    let alive = true
-    setPhotos(null)
-    setI(0)
-    fetch(`/api/photos?team=${teamId}`).then((r) => r.json()).then((d) => alive && setPhotos(d.photos ?? [])).catch(() => alive && setPhotos([]))
-    return () => { alive = false }
-  }, [teamId])
-  if (photos === null) return <div className="real-car skeleton" />
-  if (!photos.length) return null
-  const p = photos[i]
-  const isCurrent = p.car.toLowerCase().includes(car.toLowerCase())
-  return (
-    <figure className="real-car">
-      <div className="real-img">
-        <img src={p.src} alt={p.title} loading="lazy" />
-        <span className="real-badge">{isCurrent ? `The real ${car}` : `Real car · ${p.car}`}</span>
-        {photos.length > 1 && (
-          <span className="real-nav">
-            <button onClick={() => setI((i - 1 + photos.length) % photos.length)} aria-label="Previous photo">‹</button>
-            <button onClick={() => setI((i + 1) % photos.length)} aria-label="Next photo">›</button>
-          </span>
-        )}
-      </div>
-      <figcaption>
-        Photo: {p.author} · <a href={p.page} target="_blank" rel="noreferrer">{p.license}</a>, via Wikimedia Commons
-      </figcaption>
-    </figure>
-  )
-}
-
 function FactCard() {
   const [i, setI] = useState(0)
   const fact = REGULATIONS_2026[i]
@@ -104,10 +68,8 @@ export function Explore() {
       </div>
       <button className="watch" onClick={() => startShowcase()}>
         <span className="watch-play" aria-hidden>▶</span>
-        <span><b>Watch the {team.car} come apart</b><small>Take-apart, X-ray, engine start, launch</small></span>
+        <span><b>Watch the {team.car} come apart</b><small>Take-apart, X-ray, then out on track</small></span>
       </button>
-
-      <RealCar teamId={teamId} car={team.car} />
 
       <h5>Learn with Lena</h5>
       <div className="lesson-rail">

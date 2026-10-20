@@ -43,9 +43,7 @@ export async function startShowcase() {
   g().setExploded(false)
   if (g().mode !== "studio") g().setMode("studio")
   cut("hero")
-  // Unlock audio now (this click is the user gesture browsers need); the
-  // engine itself is only heard once the car is out on track.
-  await sound.setEngine(true)
+  sound.unlock()
 
   if (!(await say(`Radio check. This is the ${team.car}. Let's take her apart.`, 2500))) return
 

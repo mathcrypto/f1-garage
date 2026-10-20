@@ -2,11 +2,12 @@
 
 import { useEngineerState } from "./store"
 
-// Lena's voice. A natural neural British voice from /api/voice when the
-// server has a TTS key, otherwise the browser's built-in speech.
-// Sentences queue up and always finish in order; nothing cuts a line short
-// except an explicit stop(). Optional team-radio sound: band-limited voice
-// with the classic beep at the start and end of each message.
+// Lena's voice: natural neural speech from /api/voice (Kokoro on the server,
+// or Azure / ElevenLabs with a key), the browser's own voice only when no
+// neural voice is available at all.
+// Sentences are generated ahead and played back to back through Web Audio,
+// so there are no gaps between them, they always finish in order, and the
+// same line is never started twice.
 
 // Browser fallback: British English female voices, best first.
 const PREFERRED = ["Microsoft Sonia Online", "Microsoft Libby Online", "Microsoft Maisie Online", "Google UK English Female", "Microsoft Libby", "Microsoft Sonia", "Microsoft Hazel", "Microsoft Susan", "Serena", "Kate", "Stephanie", "Martha"]
@@ -30,11 +31,10 @@ const clean = (text: string) =>
 
 const sentences = (text: string) => text.match(/[^.!?]+[.!?]+["')\]]*|[^.!?]+$/g)?.map((s) => s.trim()).filter(Boolean) ?? []
 
-type Line = { text: string; audio: Promise<Blob | null> | null }
+type Line = { text: string; audio: Promise<AudioBuffer | null> }
 
 class Voice {
-  enabled = false
-  radio = false
+  enabled = true
   private neural: boolean | null = null
   private queue: Line[] = []
   private playing = false
@@ -43,25 +43,18 @@ class Voice {
   private gen = 0
   private waiters: (() => void)[] = []
   private ctx: AudioContext | null = null
-  private el: HTMLAudioElement | null = null
   private analyser: AnalyserNode | null = null
-  private dry: GainNode | null = null
-  private wet: GainNode | null = null
+  private source: AudioBufferSourceNode | null = null
   private raf = 0
-  private lastEnd = 0
+  private current = { text: "", at: 0 }
 
   get supported() {
-    return typeof window !== "undefined" && ("speechSynthesis" in window || typeof Audio !== "undefined")
+    return typeof window !== "undefined" && (typeof AudioContext !== "undefined" || "speechSynthesis" in window)
   }
 
   setEnabled(on: boolean) {
     this.enabled = on
     if (!on) this.stop()
-  }
-
-  setRadio(on: boolean) {
-    this.radio = on
-    if (this.dry && this.wet) { this.dry.gain.value = on ? 0 : 1; this.wet.gain.value = on ? 1 : 0 }
   }
 
   async provider() {
@@ -76,17 +69,29 @@ class Voice {
     return this.neural
   }
 
-  // Speak a full line now (lessons, showcase, greetings). Resolves when the
-  // whole line has been spoken, or after a reading-time pause without voice.
+  get busy() {
+    return this.playing || this.queue.length > 0
+  }
+
+  // Speak a full line now (lessons, showcase, greetings), replacing whatever
+  // she was saying. Calls `done` when the whole line has been spoken.
   say(text: string, done?: () => void) {
+    const line = clean(text)
+    // The same line asked for again while it's still playing (a re-render,
+    // a double click): let it carry on rather than restarting it.
+    if (line === this.current.text && this.busy && performance.now() - this.current.at < 15000) {
+      this.whenIdle(done)
+      return
+    }
     this.stop()
+    this.current = { text: line, at: performance.now() }
     const st = useEngineerState.getState()
-    st.setCaption(clean(text))
+    st.setCaption(line)
     st.setStatus("talking")
     if (!this.enabled || !this.supported) {
-      const t = setTimeout(() => { useEngineerState.getState().setStatus("idle"); done?.() }, 1200 + text.split(/\s+/).length * 300)
       const g = this.gen
-      this.waiters.push(() => { if (g !== this.gen) clearTimeout(t) })
+      const t = setTimeout(() => { if (g === this.gen) { useEngineerState.getState().setStatus("idle"); done?.() } }, 1200 + line.split(/\s+/).length * 300)
+      this.waiters.push(() => clearTimeout(t))
       return
     }
     for (const s of sentences(text)) this.enqueue(s)
@@ -96,6 +101,13 @@ class Voice {
 
   speak(text: string) {
     return new Promise<void>((resolve) => this.say(text, resolve))
+  }
+
+  // Add a line after whatever she's saying, without interrupting (race radio).
+  add(text: string) {
+    if (!this.enabled || !this.supported) { useEngineerState.getState().setCaption(clean(text)); return }
+    for (const s of sentences(text)) this.enqueue(s)
+    this.enqueue("", true)
   }
 
   // Streaming: feed answer text as it arrives; complete sentences are queued.
@@ -121,11 +133,13 @@ class Voice {
     this.pending = ""
     this.queue = []
     this.playing = false
+    this.current = { text: "", at: 0 }
     const w = this.waiters
     this.waiters = []
     w.forEach((f) => f())
     if (typeof window !== "undefined" && "speechSynthesis" in window) window.speechSynthesis.cancel()
-    if (this.el) { this.el.pause(); this.el.removeAttribute("src") }
+    try { this.source?.stop() } catch {}
+    this.source = null
     cancelAnimationFrame(this.raf)
     const s = useEngineerState.getState()
     if (s.status === "talking") s.setStatus("idle")
@@ -137,6 +151,28 @@ class Voice {
     this.waiters.push(() => { if (g === this.gen) done() })
   }
 
+  private context() {
+    if (!this.ctx) {
+      this.ctx = new AudioContext()
+      this.analyser = this.ctx.createAnalyser()
+      this.analyser.fftSize = 512
+      this.analyser.connect(this.ctx.destination)
+    }
+    return this.ctx
+  }
+
+  // Generate one sentence; one retry if the server hiccups.
+  private async synth(text: string, g: number): Promise<AudioBuffer | null> {
+    if (!(await this.hasNeural())) return null
+    for (let attempt = 0; attempt < 2 && g === this.gen; attempt++) {
+      try {
+        const r = await fetch("/api/voice", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text }) })
+        if (r.ok) return await this.context().decodeAudioData(await r.arrayBuffer())
+      } catch {}
+    }
+    return null
+  }
+
   // Very short sentences ("Copy.") ride along with the next one, so the
   // voice keeps its natural flow instead of stopping after every word.
   private enqueue(raw: string, last = false) {
@@ -145,121 +181,61 @@ class Voice {
     if (!text) return
     if (!last && text.split(/\s+/).length < 4) { this.pending = text; return }
     const g = this.gen
-    const line: Line = { text, audio: null }
     // Request audio straight away so the next sentence is ready when this one ends.
-    line.audio = this.hasNeural().then((ok) =>
-      ok && g === this.gen
-        ? fetch("/api/voice", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text }) })
-            .then((r) => (r.ok ? r.blob() : null))
-            .catch(() => null)
-        : null,
-    )
-    this.queue.push(line)
+    this.queue.push({ text, audio: this.synth(text, g) })
     if (!this.playing) void this.pump(g)
   }
 
   private async pump(g: number): Promise<void> {
     this.playing = true
-    let first = true
     while (this.queue.length && g === this.gen) {
       const line = this.queue.shift()!
       const st = useEngineerState.getState()
       st.setStatus("talking")
       st.setCaption(line.text)
-      const blob = await line.audio
+      const audio = await line.audio
       if (g !== this.gen) return
-      if (blob) {
-        // One beep per radio message, not per pause in a streamed answer.
-        if (first && this.radio && Date.now() - this.lastEnd > 2500) await this.beep(true)
-        await this.playBlob(blob, g)
-      } else {
-        await this.speakBrowser(line.text)
-      }
-      first = false
+      if (audio) await this.play(audio, g)
+      else if (this.neural === false) await this.speakBrowser(line.text)
+      // Neural voice failed twice for this sentence: leave it as a caption only.
+      else await new Promise((r) => setTimeout(r, 400 + line.text.split(/\s+/).length * 250))
+      // A streamed answer may still be producing its next sentence.
+      if (!this.queue.length && g === this.gen) await new Promise((r) => setTimeout(r, 350))
     }
     if (g !== this.gen) return
-    if (this.radio && this.el && !first) {
-      // Wait a moment: a streamed answer may still have sentences coming.
-      await new Promise((r) => setTimeout(r, 700))
-      if (this.queue.length && g === this.gen) return this.pump(g)
-      await this.beep(false)
-    }
-    this.lastEnd = Date.now()
     this.playing = false
+    this.current = { text: "", at: 0 }
     useEngineerState.getState().setStatus("idle")
     const w = this.waiters
     this.waiters = []
     w.forEach((f) => f())
   }
 
-  // ── Neural playback with radio filter and lip-sync ─────────────────────────
-  private graph() {
-    if (this.ctx) return
-    const ctx = new AudioContext()
-    const el = new Audio()
-    el.crossOrigin = "anonymous"
-    const src = ctx.createMediaElementSource(el)
-    const analyser = ctx.createAnalyser()
-    analyser.fftSize = 512
-    // Team-radio colour: telephone band, a little grit.
-    const hp = ctx.createBiquadFilter(); hp.type = "highpass"; hp.frequency.value = 320
-    const lp = ctx.createBiquadFilter(); lp.type = "lowpass"; lp.frequency.value = 3600
-    const shaper = ctx.createWaveShaper()
-    const curve = new Float32Array(1024)
-    for (let i = 0; i < 1024; i++) { const x = i / 512 - 1; curve[i] = Math.tanh(x * 1.8) }
-    shaper.curve = curve
-    const wet = ctx.createGain(), dry = ctx.createGain()
-    wet.gain.value = this.radio ? 1 : 0
-    dry.gain.value = this.radio ? 0 : 1
-    src.connect(analyser)
-    analyser.connect(hp).connect(lp).connect(shaper).connect(wet).connect(ctx.destination)
-    analyser.connect(dry).connect(ctx.destination)
-    Object.assign(this, { ctx, el, analyser, wet, dry })
-  }
-
-  private async beep(start: boolean) {
-    this.graph()
-    const ctx = this.ctx!
-    await ctx.resume()
-    const t = ctx.currentTime
-    const o = ctx.createOscillator()
-    o.type = "square"
-    o.frequency.setValueAtTime(start ? 1400 : 1050, t)
-    o.frequency.setValueAtTime(start ? 1750 : 800, t + 0.07)
-    const g = ctx.createGain()
-    g.gain.setValueAtTime(0.0001, t)
-    g.gain.exponentialRampToValueAtTime(0.05, t + 0.01)
-    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.16)
-    const lp = ctx.createBiquadFilter(); lp.type = "lowpass"; lp.frequency.value = 3000
-    o.connect(lp).connect(g).connect(ctx.destination)
-    o.start(t)
-    o.stop(t + 0.18)
-    await new Promise((r) => setTimeout(r, 200))
-  }
-
-  private playBlob(blob: Blob, g: number) {
-    this.graph()
-    const el = this.el!
-    const url = URL.createObjectURL(blob)
+  private play(audio: AudioBuffer, g: number) {
+    const ctx = this.context()
     return new Promise<void>((resolve) => {
-      const finish = () => { cancelAnimationFrame(this.raf); URL.revokeObjectURL(url); resolve() }
-      el.onended = finish
-      el.onerror = finish
-      el.src = url
-      void this.ctx!.resume().then(() => el.play()).catch(finish)
-      // Mouth follows the loudness of the voice.
-      const data = new Uint8Array(this.analyser!.fftSize)
-      let last = 0
-      const tick = (now: number) => {
-        if (g !== this.gen) return
-        this.analyser!.getByteTimeDomainData(data)
-        let sum = 0
-        for (const v of data) sum += (v - 128) ** 2
-        const level = Math.sqrt(sum / data.length) / 128
-        if (level > 0.045 && now - last > 90) { last = now; useEngineerState.getState().bumpMouth() }
+      void ctx.resume().then(() => {
+        if (g !== this.gen) return resolve()
+        const src = ctx.createBufferSource()
+        src.buffer = audio
+        src.connect(this.analyser!)
+        this.source = src
+        src.onended = () => { cancelAnimationFrame(this.raf); if (this.source === src) this.source = null; resolve() }
+        src.start()
+        // Mouth follows the loudness of the voice.
+        const data = new Uint8Array(this.analyser!.fftSize)
+        let last = 0
+        const tick = (now: number) => {
+          if (g !== this.gen) return
+          this.analyser!.getByteTimeDomainData(data)
+          let sum = 0
+          for (const v of data) sum += (v - 128) ** 2
+          const level = Math.sqrt(sum / data.length) / 128
+          if (level > 0.045 && now - last > 90) { last = now; useEngineerState.getState().bumpMouth() }
+          this.raf = requestAnimationFrame(tick)
+        }
         this.raf = requestAnimationFrame(tick)
-      }
-      this.raf = requestAnimationFrame(tick)
+      }).catch(() => resolve())
     })
   }
 
@@ -283,11 +259,7 @@ class Voice {
       const v = this.pickVoice()
       if (v) u.voice = v
       u.lang = "en-GB"
-      u.rate = 1
-      u.pitch = 1.03
       u.onboundary = () => useEngineerState.getState().bumpMouth()
-      // If speech fails or ends instantly (no voices installed), still give
-      // people time to read the line before moving on.
       u.onend = u.onerror = () => setTimeout(resolve, Math.max(0, minMs - (Date.now() - started)))
       window.speechSynthesis.speak(u)
     })

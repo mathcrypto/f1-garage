@@ -127,7 +127,8 @@ export default function Scene() {
   const followed = useRef<{ s: number; lat: number } | null>(null)
   const setFollowed = useCallback((t: { s: number; lat: number }) => { followed.current = t }, [])
   const getFollowed = useCallback(() => followed.current, [])
-  const gridView = useCallback(() => race.phase === "grid" || race.phase === "lights", [])
+  // Watching a race: a high shot of the grid during the lights. Driving: stay in the car.
+  const gridView = useCallback(() => !race.player && (race.phase === "grid" || race.phase === "lights"), [])
 
   return (
     <Canvas

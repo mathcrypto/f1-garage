@@ -9,7 +9,8 @@ export type Motion = {
   steer: number // radians at the front wheels
   aero: AeroMode
   ers: number // 0..1
+  throttle: number // 0..1
 }
 
-export const IDLE: Motion = { speed: 0, wheelspin: 0, braking: 0, steer: 0, aero: "corner", ers: 0 }
+export const IDLE: Motion = { speed: 0, wheelspin: 0, braking: 0, steer: 0, aero: "corner", ers: 0, throttle: 0 }
 export const newMotion = (): Motion => ({ ...IDLE })

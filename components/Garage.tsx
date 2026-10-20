@@ -62,6 +62,12 @@ export function Garage() {
   const { teamId, setTeam, selected, select, exploded, setExploded, mode, highlights } = useGarage()
   const [tab, setTab] = useState<"part" | "engineer" | "paddock">("part")
   const [panelOpen, setPanelOpen] = useState(true)
+  // The race takes the full screen, like a game; the panel comes back after.
+  const panelBeforeRace = useRef<boolean | null>(null)
+  useEffect(() => {
+    if (mode === "race") setPanelOpen((open) => { panelBeforeRace.current ??= open; return false })
+    else if (panelBeforeRace.current !== null) { setPanelOpen(panelBeforeRace.current); panelBeforeRace.current = null }
+  }, [mode])
   const [webgl, setWebgl] = useState(true)
   const [firstVisit, setFirstVisit] = useState(false)
   const engineer = useEngineer()
@@ -118,10 +124,10 @@ export function Garage() {
       <header className="topbar">
         <div className="brand">
           <svg viewBox="0 0 32 20" width="34" height="22" aria-hidden><path d="M2 18 L14 2 H30 L18 18 Z" fill="var(--team)" /><path d="M10 18 L16 10 H22 L16 18 Z" fill="var(--bg)" opacity=".85" /></svg>
-          <div><strong>F1 GARAGE</strong><small>Unofficial fan project</small></div>
+          <div><strong>F1 GARAGE</strong></div>
         </div>
-        <TeamPicker teamId={teamId} onPick={pickTeam} firstVisit={firstVisit} />
         <div className="top-spacer" />
+        <TeamPicker teamId={teamId} onPick={pickTeam} firstVisit={firstVisit} />
         <SoundMenu />
       </header>
 
@@ -130,20 +136,20 @@ export function Garage() {
           {webgl ? <Scene /> : <div className="scene-loading">3D needs WebGL, which this browser has turned off. Everything else still works.</div>}
         </div>
 
-        <div className="stage-title">
+        <div className="stage-title" hidden={mode === "race"}>
           <p className="eyebrow">{team.name} · {team.powerUnit} power unit</p>
           <h1 key={team.id}>{team.car}</h1>
         </div>
 
         <ToolRail />
         <HoverChip />
-        {!panelOpen && (
+        {!panelOpen && mode !== "race" && (
           <button className="panel-open" onClick={() => setPanelOpen(true)}>
             <span className="panel-open-dot" aria-hidden />Lena &amp; info
           </button>
         )}
 
-        {mode !== "studio" && <DriveHud />}
+        {mode === "drive" && <DriveHud />}
         {mode === "race" && <RaceHud />}
         <EngineerCam />
 

@@ -84,7 +84,7 @@ class V6 extends AudioWorkletProcessor {
           // New combustion: its strength varies a little every cycle.
           const fired = cut > 0.5 ? 0.04 : 1
           this.last[c] = this.amp[c]
-          this.amp[c] = fired * (0.25 + 0.75 * this.load) * (1 + 0.14 * this.gauss())
+          this.amp[c] = fired * (0.25 + 0.75 * this.load) * (1 + 0.07 * this.gauss())
         }
         const amp = this.amp[c]
         // Exhaust valve open for ~250°: sharp blowdown, then a decaying push.
@@ -108,7 +108,7 @@ class V6 extends AudioWorkletProcessor {
       const mix = y * 1.0 + ia * 0.45 + this.block * 0.25
       this.hp = 0.995 * (this.hp + mix - this.hpIn)
       this.hpIn = mix
-      out[n] = Math.tanh(this.hp * 1.6) * 0.8
+      out[n] = Math.tanh(this.hp * 1.15) * 0.85
     }
     for (let ch = 1; ch < outputs[0].length; ch++) outputs[0][ch].set(out)
     return true

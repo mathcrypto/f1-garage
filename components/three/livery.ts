@@ -7,6 +7,9 @@ import type { LiveryDesign } from "@/lib/liveries"
 // The livery is painted in side view: canvas x runs along the car (z) and
 // canvas y is height (y). Body geometry gets matching planar UVs, so the same
 // paint scheme flows continuously across nose, chassis, sidepods and cover.
+// The texture holds both flanks (left in the lower half, right mirrored in
+// the upper half, tops meeting in the middle), so a car can be painted
+// differently on each side, like Cadillac's 2026 car.
 const Z_MIN = -3, Z_LEN = 6, Y_MAX = 1.25
 const W = 2048, H = 512
 
@@ -14,8 +17,10 @@ export function sideUV(geometry: THREE.BufferGeometry) {
   const pos = geometry.attributes.position
   const uv = new Float32Array(pos.count * 2)
   for (let i = 0; i < pos.count; i++) {
+    const h = Math.min(1, Math.max(0, pos.getY(i) / Y_MAX)) * 0.5
     uv[i * 2] = (pos.getZ(i) - Z_MIN) / Z_LEN
-    uv[i * 2 + 1] = pos.getY(i) / Y_MAX
+    // +x is the car's left side (it faces +z).
+    uv[i * 2 + 1] = pos.getX(i) >= 0 ? h : 1 - h
   }
   geometry.setAttribute("uv", new THREE.BufferAttribute(uv, 2))
   return geometry
@@ -27,9 +32,22 @@ const Y = (y: number) => (1 - y / Y_MAX) * H
 export function paintLivery(d: LiveryDesign) {
   const c = document.createElement("canvas")
   c.width = W
-  c.height = H
+  c.height = H * 2
   const g = c.getContext("2d")!
+  // Left flank in the lower half, right flank mirrored in the upper half.
+  g.setTransform(1, 0, 0, 1, 0, H)
+  paintSide(g, d)
+  g.setTransform(1, 0, 0, -1, 0, H)
+  paintSide(g, d.style === "sides" && d.right ? { ...d, base: d.right, lower: d.rightLower ?? d.lower, stripe: d.rightStripe ?? d.stripe } : d)
+  g.setTransform(1, 0, 0, 1, 0, 0)
 
+  const t = new THREE.CanvasTexture(c)
+  t.colorSpace = THREE.SRGBColorSpace
+  t.anisotropy = 8
+  return t
+}
+
+function paintSide(g: CanvasRenderingContext2D, d: LiveryDesign) {
   // Base coat
   if (d.style === "split" && d.rear) {
     g.fillStyle = d.rear
@@ -94,11 +112,6 @@ export function paintLivery(d: LiveryDesign) {
     g.lineTo(X(z), Y(0.2))
     g.stroke()
   }
-
-  const t = new THREE.CanvasTexture(c)
-  t.colorSpace = THREE.SRGBColorSpace
-  t.anisotropy = 8
-  return t
 }
 
 function paintWordmark(text: string, color: string, sub?: string) {

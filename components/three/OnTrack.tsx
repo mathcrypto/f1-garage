@@ -26,6 +26,9 @@ function shadowTexture() {
 }
 let shadowTex: THREE.Texture | null = null
 
+// Frame order: simulate, then place the cars, then move the camera.
+const SIMULATE = -3, PLACE = -2, CAMERA = -1
+
 // Testing aid: ?timescale=10 runs the simulation faster (for slow headless browsers).
 const TIMESCALE = typeof window === "undefined" ? 1 : Math.min(40, Number(new URLSearchParams(window.location.search).get("timescale")) || 1)
 const step = (raw: number) => Math.min(raw, 0.05) * TIMESCALE
@@ -40,7 +43,9 @@ export function TrackCar({ teamId, car }: { teamId: string; car: Driven & { lat?
     smokeSources.add(src)
     return () => { smokeSources.delete(src) }
   }, [car])
-  useFrame(() => placeOnTrack(group.current, car.s, car.lat ?? 0, 0))
+  // Runs after the simulation step and before the camera, so car and camera
+  // always agree on where the car is this frame (no jitter).
+  useFrame(() => placeOnTrack(group.current, car.s, car.lat ?? 0, 0), PLACE)
   return (
     <group ref={group}>
       <PlainParts.Provider value={true}>
@@ -64,6 +69,7 @@ const copyToTelemetry = (m: Motion) => {
   telemetry.braking = m.braking
   telemetry.steer = m.steer
   telemetry.wheelspin = m.wheelspin
+  telemetry.throttle = m.throttle
 }
 
 // Free drive: a burnout on the grid, a launch, then flying laps.
@@ -84,7 +90,7 @@ export function DriveSession({ onTarget }: { onTarget: (t: { s: number; lat: num
       car.motion.wheelspin = launch < 1.3 ? 1 - launch / 1.3 : 0
     }
     copyToTelemetry(car.motion)
-  })
+  }, SIMULATE)
   return <TrackCar teamId={teamId} car={car} />
 }
 
@@ -96,8 +102,54 @@ export function RaceSession({ onTarget }: { onTarget: (t: { s: number; lat: numb
     stepRace(dt)
     const followed = race.cars.find((c) => c.teamId === race.follow) ?? race.cars[0]
     if (followed) { onTarget(followed); copyToTelemetry(followed.motion) }
-  })
-  return <>{cars.map((c) => <TrackCar key={c.teamId} teamId={c.teamId} car={c} />)}</>
+  }, SIMULATE)
+  return (
+    <>
+      {cars.map((c) => <TrackCar key={c.teamId} teamId={c.teamId} car={c} />)}
+      {race.player && race.assist !== "full" && <RacingLine />}
+    </>
+  )
+}
+
+// The F1-game braking line: painted on the road ahead of your car, green
+// where you can accelerate, yellow to lift, red where you need to brake now.
+const LINE_SEGMENTS = 46
+const LINE_STEP = 3.2
+const GREEN = new THREE.Color("#2bd96b"), YELLOW = new THREE.Color("#ffd23f"), RED = new THREE.Color("#ff2a2a")
+function RacingLine() {
+  const mesh = useRef<THREE.InstancedMesh>(null!)
+  const tmp = useMemo(() => ({ o: new THREE.Object3D(), c: new THREE.Color() }), [])
+  useFrame(() => {
+    const me = race.cars.find((c) => c.player)
+    if (!me || !mesh.current) return
+    const { o, c } = tmp
+    for (let i = 0; i < LINE_SEGMENTS; i++) {
+      const d = 6 + i * LINE_STEP
+      const s = me.s + d
+      // Fade the line from the car's line toward the ideal line further ahead.
+      const k = track.curvature(s)
+      const ideal = Math.max(-4, Math.min(4, -Math.sign(k) * Math.min(4, Math.abs(k) * 700)))
+      const lat = me.lat + (ideal - me.lat) * Math.min(1, d / 60)
+      placeOnTrack(o, s, lat, 0.035)
+      o.rotation.x = -Math.PI / 2
+      o.rotation.order = "YXZ"
+      o.scale.set(0.55, LINE_STEP * 0.8, 1)
+      o.updateMatrix()
+      mesh.current.setMatrixAt(i, o.matrix)
+      const target = track.targetSpeed(s)
+      const mustBrake = me.v * me.v > target * target + 2 * track.brake * d * 0.8
+      c.copy(mustBrake ? RED : me.v > target * 0.97 ? YELLOW : GREEN)
+      mesh.current.setColorAt(i, c)
+    }
+    mesh.current.instanceMatrix.needsUpdate = true
+    if (mesh.current.instanceColor) mesh.current.instanceColor.needsUpdate = true
+  }, PLACE)
+  return (
+    <instancedMesh ref={mesh} args={[undefined, undefined, LINE_SEGMENTS]} frustumCulled={false}>
+      <planeGeometry args={[1, 1]} />
+      <meshBasicMaterial transparent opacity={0.55} toneMapped={false} depthWrite={false} />
+    </instancedMesh>
+  )
 }
 
 // ── Cameras ─────────────────────────────────────────────────────────────────
@@ -130,9 +182,9 @@ export function TrackCamera({ target, overview }: { target: () => { s: number; l
       a.copy(track.point(10, a))
       a.y = 2
     } else if (mode === "chase") {
-      // Rigid, high enough to see over the pack.
-      d.copy(p).addScaledVector(t, -9).setY(3.6)
-      a.copy(p).addScaledVector(t, 10).setY(0.6)
+      // Rigid T-cam behind the car, as in the F1 games.
+      d.copy(p).addScaledVector(t, -7.2).setY(2.5)
+      a.copy(p).addScaledVector(t, 12).setY(0.8)
       snap = true
     } else if (mode === "heli") {
       d.copy(p).addScaledVector(t, -26).addScaledVector(l, 20).setY(32)
@@ -158,6 +210,6 @@ export function TrackCamera({ target, overview }: { target: () => { s: number; l
     look.current.lerp(a, snap || first.current ? 1 : 1 - Math.exp(-dt * 10))
     cam.lookAt(look.current)
     first.current = false
-  })
+  }, CAMERA)
   return null
 }

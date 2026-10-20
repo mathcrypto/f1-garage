@@ -313,7 +313,7 @@ export function Car({ team }: { team: Team }) {
     const m = motion ?? IDLE
     const t = state.clock.elapsedTime
     const b = body.current
-    b.position.y = THREE.MathUtils.damp(b.position.y, driving ? Math.sin(t * 31) * 0.003 + Math.sin(t * 7.3) * 0.004 : 0, 12, dt)
+    b.position.y = THREE.MathUtils.damp(b.position.y, driving ? Math.sin(t * 23) * 0.0008 * Math.min(1, m.speed / 200) : 0, 8, dt)
     b.rotation.z = THREE.MathUtils.damp(b.rotation.z, driving ? -m.steer * 0.12 + Math.sin(t * 17) * 0.004 * m.wheelspin : 0, 4, dt)
     // Squat onto the rear under wheelspin, with a little fishtail.
     b.rotation.x = THREE.MathUtils.damp(b.rotation.x, driving ? m.braking * 0.012 - m.wheelspin * 0.012 : 0, 5, dt)

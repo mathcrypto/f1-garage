@@ -6,7 +6,6 @@ import { useContext, useLayoutEffect, useRef, useState, type ReactNode } from "r
 import { PlainParts } from "./CarMotion"
 import * as THREE from "three"
 import { PART_IDS, partById } from "@/lib/parts"
-import { sound } from "@/lib/sound"
 import { partCentres, useGarage } from "@/lib/store"
 
 const LIT = new THREE.Color("#a78bfa")
@@ -38,7 +37,6 @@ function InteractivePart({ id, explode, children, label = true }: PartProps) {
   const technical = useGarage((s) => s.technical)
   const selected = useGarage((s) => s.selected)
   const edges = useRef<THREE.LineSegments[]>([])
-  const wasActive = useRef(false)
   const [centre, setCentre] = useState<THREE.Vector3Tuple>([0, 0, 0])
 
   // Give this part its own material copies so it can fade and glow alone.
@@ -103,8 +101,6 @@ function InteractivePart({ id, explode, children, label = true }: PartProps) {
       exploded = s.exploded ? since > order * 0.2 : since < (PART_IDS.length - 1 - order) * 0.2
     }
     const active = exploded || s.selected === id || (s.selected === "power-unit" && id === "engine-cover")
-    if (label && s.explodeStagger && !s.exploded && wasActive.current && !active) setTimeout(() => sound.clunk(), 380)
-    wasActive.current = active
     const p = group.current.position
     p.x = THREE.MathUtils.damp(p.x, active ? explode[0] : 0, 5, dt)
     p.y = THREE.MathUtils.damp(p.y, active ? explode[1] : 0, 5, dt)

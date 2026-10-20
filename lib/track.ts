@@ -83,6 +83,8 @@ export const track = {
   brake: A_BRAKE,
   curvature: (s: number) => smooth[idx(s)],
   targetSpeed: (s: number) => vmax[idx(s)],
+  // The fastest a car can take the curve at s, ignoring braking zones.
+  grip: (s: number) => Math.min(VMAX, Math.sqrt(A_LAT / Math.max(1e-5, Math.abs(smooth[idx(s)])))),
   point(s: number, out = new THREE.Vector3()) {
     const { i, j, f } = lerpIdx(s)
     return out.copy(pos[i]).lerp(pos[j], f)

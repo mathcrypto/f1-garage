@@ -5,7 +5,7 @@ import { partById } from "@/lib/parts"
 import { startShowcase, stopShowcase, useShowcase } from "@/lib/showcase"
 import { sound } from "@/lib/sound"
 import { useGarage, type CameraPreset, type TrackCam } from "@/lib/store"
-import { endRace, openRaceSetup } from "./RaceUI"
+import { openRaceSetup } from "./RaceUI"
 
 const ICONS = {
   play: <path d="M8 5l11 7-11 7z" fill="currentColor" />,
@@ -40,29 +40,22 @@ export function ToolRail() {
   const [cam, setCam] = useState(0)
   const nextTrackCam = TRACK_CAMS[(TRACK_CAMS.indexOf(trackCam) + 1) % TRACK_CAMS.length]
 
-  if (mode === "race") {
-    return (
-      <div className="rail" role="toolbar" aria-label="Race controls">
-        <RailButton icon="camera" label={`Camera: ${TRACK_CAM_NAMES[nextTrackCam]}`} onClick={() => setTrackCam(nextTrackCam)} />
-        <RailButton icon="flag" label="New race" onClick={() => { endRace(); openRaceSetup() }} />
-        <RailButton icon="exit" label="Back to the garage" onClick={endRace} />
-      </div>
-    )
-  }
+  // The race has its own game HUD (camera, pause) instead of the rail.
+  if (mode === "race") return null
   if (mode === "drive") {
     return (
       <div className="rail" role="toolbar" aria-label="Drive controls">
         <RailButton icon={showcase ? "stop" : "play"} label={showcase ? "Stop showcase" : "Showcase"} primary on={showcase} onClick={() => (showcase ? stopShowcase() : startShowcase())} />
         <RailButton icon="camera" label={`Camera: ${TRACK_CAM_NAMES[nextTrackCam]}`} onClick={() => setTrackCam(nextTrackCam)} />
         <RailButton icon="flag" label="Race" onClick={openRaceSetup} />
-        <RailButton icon="exit" label="Back to the garage" onClick={() => { if (showcase) stopShowcase(); sound.engineStop(); setMode("studio") }} />
+        <RailButton icon="exit" label="Back to the garage" onClick={() => { if (showcase) stopShowcase(); setMode("studio") }} />
       </div>
     )
   }
   return (
     <div className="rail" role="toolbar" aria-label="View controls">
       <RailButton icon={showcase ? "stop" : "play"} label={showcase ? "Stop showcase" : "Showcase"} primary on={showcase} onClick={() => (showcase ? stopShowcase() : startShowcase())} />
-      <RailButton icon="drive" label="Drive a lap (burnout and launch)" onClick={() => { void sound.setEngine(true); setMode("drive") }} />
+      <RailButton icon="drive" label="Drive a lap (burnout and launch)" onClick={() => { sound.unlock(); setMode("drive") }} />
       <RailButton icon="flag" label="Race" onClick={openRaceSetup} />
       <RailButton icon="explode" label={exploded ? "Put it back together" : "Take it apart"} on={exploded} onClick={() => setExploded(!exploded)} />
       <RailButton icon="xray" label="X-ray view" on={technical} onClick={() => setTechnical(!technical)} />
