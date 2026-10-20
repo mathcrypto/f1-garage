@@ -12,7 +12,7 @@ const HOVER = new THREE.Color("#ffffff")
 const boxes = new Map<string, THREE.Box3>()
 
 type Mat = THREE.MeshStandardMaterial & {
-  userData: { baseEmissive: THREE.Color; baseIntensity: number; baseOpacity: number; baseTransparent: boolean; keepEmissive?: boolean }
+  userData: { source: THREE.MeshStandardMaterial; baseEmissive: THREE.Color; baseIntensity: number; baseOpacity: number; baseTransparent: boolean; keepEmissive?: boolean }
 }
 
 // One selectable component. Several <Part>s can share an id (left and right
@@ -30,8 +30,13 @@ export function Part({ id, explode, children, label = true }: { id: string; expl
     group.current.traverse((o) => {
       const mesh = o as THREE.Mesh
       if (!mesh.isMesh) return
-      const m = (mesh.material as THREE.MeshStandardMaterial).clone() as Mat
+      // mesh.material may still be our clone from before a team change, if
+      // React kept the same material and only updated its texture.
+      const current = mesh.material as Mat
+      const source = (current.userData?.source ?? current) as THREE.MeshStandardMaterial
+      const m = source.clone() as Mat
       m.userData = {
+        source,
         baseEmissive: m.emissive.clone(),
         baseIntensity: m.emissiveIntensity,
         baseOpacity: m.opacity,
@@ -67,6 +72,8 @@ export function Part({ id, explode, children, label = true }: { id: string; expl
     const hovered = s.hovered === id
     const pulse = 0.35 + 0.25 * Math.sin(state.clock.elapsedTime * 4)
     for (const m of mats.current) {
+      // Decal textures load after the clone was made (fonts, team logos).
+      if (m.map !== m.userData.source.map) { m.map = m.userData.source.map; m.needsUpdate = true }
       const target = ghost ? 0.1 : m.userData.baseOpacity
       m.opacity = THREE.MathUtils.damp(m.opacity, target, 8, dt)
       const transparent = m.userData.baseTransparent || m.opacity < 0.98

@@ -241,3 +241,17 @@ p { margin: 0; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }
+
+/* Sound */
+.sound { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.sound button { display: inline-flex; align-items: center; gap: 7px; padding: 8px 12px; border-radius: 999px; border: 1px solid var(--line-strong); font: 600 12.5px/1 var(--display); letter-spacing: 0.04em; color: var(--muted); transition: all 0.2s; }
+.sound button:hover { color: var(--ink); }
+.sound.hint button { border-color: var(--team); color: var(--ink); }
+.sound.on button { background: var(--team); border-color: var(--team); color: var(--team-ink); }
+.sound input[type="range"] { width: 72px; accent-color: var(--team); }
+.eq { display: inline-flex; gap: 2px; align-items: flex-end; height: 12px; }
+.eq b { width: 3px; background: currentColor; border-radius: 1px; animation: eq 0.9s ease-in-out infinite; }
+.eq b:nth-child(2) { animation-delay: -0.3s; }
+.eq b:nth-child(3) { animation-delay: -0.6s; }
+@keyframes eq { 0%, 100% { height: 3px; } 50% { height: 12px; } }
+@media (max-width: 960px) { .sound input[type="range"] { display: none; } }

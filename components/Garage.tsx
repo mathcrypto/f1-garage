@@ -7,6 +7,7 @@ import { PaddockPanel } from "./Paddock"
 import { telemetry } from "@/lib/drive"
 import { PARTS, partById } from "@/lib/parts"
 import { REGULATIONS_2026 } from "@/lib/regulations"
+import { sound } from "@/lib/sound"
 import { useGarage, type CameraPreset } from "@/lib/store"
 import { TEAMS, teamById } from "@/lib/teams"
 
@@ -28,6 +29,47 @@ function hasWebGL() {
   } catch {
     return false
   }
+}
+
+// Browsers only allow audio after a click, so sound starts off and the
+// button remembers the choice for next time.
+function SoundToggle() {
+  const [on, setOn] = useState(false)
+  const [volume, setVolume] = useState(0.7)
+  const [hinted, setHinted] = useState(false)
+  useEffect(() => {
+    try {
+      setHinted(localStorage.getItem("f1-garage:sound") === "on")
+      const v = Number(localStorage.getItem("f1-garage:volume"))
+      if (v > 0) setVolume(v)
+    } catch {}
+    return () => sound.stop()
+  }, [])
+  const toggle = async () => {
+    const next = !on
+    setOn(next)
+    if (next) { await sound.start(); sound.setVolume(volume) } else sound.stop()
+    try { localStorage.setItem("f1-garage:sound", next ? "on" : "off") } catch {}
+  }
+  return (
+    <div className={on ? "sound on" : hinted ? "sound hint" : "sound"}>
+      <button onClick={toggle} aria-pressed={on} aria-label={on ? "Turn sound off" : "Turn sound on"}>
+        <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden>
+          <path d="M4 9h4l5-4v14l-5-4H4z" fill="currentColor" />
+          {on ? <path d="M16 8.5a5 5 0 0 1 0 7M18.5 6a8.5 8.5 0 0 1 0 12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+            : <path d="M16.5 9.5l5 5M21.5 9.5l-5 5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />}
+        </svg>
+        <span>{on ? "Sound on" : "Sound"}</span>
+        {on && <i className="eq" aria-hidden><b /><b /><b /></i>}
+      </button>
+      {on && (
+        <input
+          type="range" min={0} max={1} step={0.05} value={volume} aria-label="Volume"
+          onChange={(e) => { const v = Number(e.target.value); setVolume(v); sound.setVolume(v); try { localStorage.setItem("f1-garage:volume", String(v)) } catch {} }}
+        />
+      )}
+    </div>
+  )
 }
 
 function DriveHud() {
@@ -161,6 +203,7 @@ export function Garage() {
             </button>
           ))}
         </nav>
+        <SoundToggle />
       </header>
 
       <main className="stage">

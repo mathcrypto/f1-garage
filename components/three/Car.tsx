@@ -1,12 +1,15 @@
 "use client"
 
+import { Decal } from "@react-three/drei"
 import { useFrame } from "@react-three/fiber"
-import { useMemo, useRef } from "react"
+import { useEffect, useMemo, useRef } from "react"
 import * as THREE from "three"
 import type { Team } from "@/lib/teams"
 import { telemetry } from "@/lib/drive"
+import { liveryFor } from "@/lib/liveries"
 import { useGarage } from "@/lib/store"
 import { airfoil, loft, plate, profile, rod, tube, tyre, type Section } from "./geometry"
+import { paintLivery, sideUV, useTeamLogos, useWordmark } from "./livery"
 import { Part } from "./Part"
 
 // ── Materials ────────────────────────────────────────────────────────────────
@@ -33,10 +36,22 @@ function carbonTexture() {
 
 function useMaterials(team: Team) {
   const carbonMap = useMemo(() => (typeof document === "undefined" ? null : carbonTexture()), [])
+  const design = liveryFor(team.id)
+  const liveryMap = useMemo(() => paintLivery(design), [design])
+  useEffect(() => () => liveryMap.dispose(), [liveryMap])
   return useMemo(() => {
     const paint = (color: string) =>
       new THREE.MeshPhysicalMaterial({ color, metalness: 0.35, roughness: 0.32, clearcoat: 1, clearcoatRoughness: 0.06 })
+    const matte = design.finish === "matte"
     return {
+      // Bodywork: the painted livery, gloss or satin depending on the team.
+      livery: new THREE.MeshPhysicalMaterial({
+        map: liveryMap,
+        metalness: matte ? 0.15 : 0.3,
+        roughness: matte ? 0.5 : 0.28,
+        clearcoat: matte ? 0.25 : 1,
+        clearcoatRoughness: matte ? 0.5 : 0.05,
+      }),
       paint: paint(team.livery.primary),
       paint2: paint(team.livery.secondary),
       accent: paint(team.livery.accent),
@@ -58,7 +73,7 @@ function useMaterials(team: Team) {
       helmet: paint(team.livery.secondary),
       visor: new THREE.MeshPhysicalMaterial({ color: "#0a0a0c", roughness: 0.05, metalness: 0.6, clearcoat: 1 }),
     }
-  }, [team, carbonMap])
+  }, [team, carbonMap, liveryMap, design])
 }
 type Mats = ReturnType<typeof useMaterials>
 
@@ -93,45 +108,45 @@ function useGeometry() {
       rod([0.14 * s, 0.56, -1.7], [0.58 * s, 0.28, -1.66], 0.011),
     ]
     return {
-      nose: loft([
+      nose: sideUV(loft([
         { z: 2.55, w: 0.1, h: 0.07, y: 0.2, n: 2.2 },
         { z: 2.3, w: 0.18, h: 0.13, y: 0.24 },
         { z: 1.9, w: 0.28, h: 0.22, y: 0.32 },
         { z: 1.5, w: 0.36, h: 0.3, y: 0.4 },
         { z: 1.12, w: 0.42, h: 0.36, y: 0.46, n: 3 },
-      ]),
-      chassis: loft([
+      ])),
+      chassis: sideUV(loft([
         { z: 1.15, w: 0.42, h: 0.36, y: 0.46, n: 3 },
         { z: 0.7, w: 0.56, h: 0.46, y: 0.5, n: 3 },
         { z: 0.2, w: 0.7, h: 0.52, y: 0.5, n: 3.2 },
         { z: -0.42, w: 0.76, h: 0.56, y: 0.5, n: 3.4 },
-      ]),
-      cover: loft([
+      ])),
+      cover: sideUV(loft([
         { z: -0.36, w: 0.76, h: 0.56, y: 0.5, n: 3.4 },
         { z: -0.9, w: 0.62, h: 0.58, y: 0.52, n: 3 },
         { z: -1.5, w: 0.38, h: 0.44, y: 0.48, n: 2.6 },
         { z: -2.0, w: 0.2, h: 0.28, y: 0.44 },
         { z: -2.32, w: 0.09, h: 0.13, y: 0.42 },
-      ]),
-      airbox: loft([
+      ])),
+      airbox: sideUV(loft([
         { z: -0.26, w: 0.22, h: 0.2, y: 0.93 },
         { z: -0.5, w: 0.25, h: 0.26, y: 0.9 },
         { z: -0.95, w: 0.17, h: 0.24, y: 0.82 },
         { z: -1.45, w: 0.05, h: 0.1, y: 0.7 },
-      ]),
-      fin: profile([[-0.7, 0.98], [-2.1, 0.66], [-2.1, 0.52], [-1.0, 0.8]], 0.012),
-      sidepodL: loft(SIDEPOD),
-      sidepodR: loft(mirrorX(SIDEPOD)),
+      ])),
+      fin: sideUV(profile([[-0.7, 0.98], [-2.1, 0.66], [-2.1, 0.52], [-1.0, 0.8]], 0.012)),
+      sidepodL: sideUV(loft(SIDEPOD)),
+      sidepodR: sideUV(loft(mirrorX(SIDEPOD))),
       floor: plate([[0.22, 1.32], [0.5, 0.98], [0.84, 0.62], [0.93, 0.2], [0.93, -1.05], [0.8, -1.35], [0.56, -1.5], [0.53, -2.05]], 0.022),
       halo: tube([[-0.27, 0.78, -0.36], [-0.25, 0.93, -0.08], [-0.13, 0.97, 0.16], [0, 0.97, 0.24], [0.13, 0.97, 0.16], [0.25, 0.93, -0.08], [0.27, 0.78, -0.36]], 0.03),
       haloPillar: tube([[0, 0.97, 0.24], [0, 0.9, 0.36], [0, 0.78, 0.46]], 0.026, 16),
       fwMain: airfoil(1.8, 0.36, 0.09),
       fwFlap1: airfoil(1.62, 0.22, 0.1),
       fwFlap2: airfoil(1.5, 0.16, 0.12),
-      fwEndplate: profile([[2.74, 0.04], [2.74, 0.2], [2.46, 0.31], [2.12, 0.31], [2.12, 0.05]], 0.015),
+      fwEndplate: sideUV(profile([[2.74, 0.04], [2.74, 0.2], [2.46, 0.31], [2.12, 0.31], [2.12, 0.05]], 0.015)),
       rwMain: airfoil(1.0, 0.32, 0.1),
       rwFlap: airfoil(1.0, 0.24, 0.1),
-      rwEndplate: profile([[-2.36, 0.74], [-2.4, 1.1], [-2.94, 1.12], [-2.9, 0.82]], 0.016),
+      rwEndplate: sideUV(profile([[-2.36, 0.74], [-2.4, 1.1], [-2.94, 1.12], [-2.9, 0.82]], 0.016)),
       swanNeck: profile([[-2.28, 0.42], [-2.36, 0.9], [-2.5, 0.9], [-2.44, 0.42]], 0.022),
       beam1: airfoil(0.8, 0.16, 0.12),
       beam2: airfoil(0.8, 0.15, 0.12),
@@ -230,9 +245,22 @@ function PowerUnit({ geo, m }: { geo: Geo; m: Mats }) {
   )
 }
 
+// A sticker projected onto the parent mesh's surface.
+function Badge({ map, position, rotation, scale }: { map: THREE.Texture; position: THREE.Vector3Tuple; rotation: THREE.Vector3Tuple; scale: THREE.Vector3Tuple }) {
+  return (
+    <Decal position={position} rotation={rotation} scale={scale}>
+      <meshPhysicalMaterial map={map} transparent polygonOffset polygonOffsetFactor={-6} depthWrite={false} roughness={0.35} clearcoat={0.8} metalness={0.1} />
+    </Decal>
+  )
+}
+
 export function Car({ team }: { team: Team }) {
   const m = useMaterials(team)
   const geo = useGeometry()
+  const design = liveryFor(team.id)
+  const word = useWordmark(design.wordmark, design.wordmarkColor)
+  const carName = useWordmark(team.car, design.wordmarkColor)
+  const brand = useTeamLogos(team.id)
   const body = useRef<THREE.Group>(null!)
 
   // Ride the bumps, pitch under braking, roll into the corner.
@@ -248,17 +276,21 @@ export function Car({ team }: { team: Team }) {
   return (
     <group ref={body}>
       <Part id="front-wing" explode={[0, 0.07, 1.38]}>
-        <mesh geometry={geo.fwMain} material={m.accent} position={[0, 0.09, 2.7]} rotation={[0.08, 0, 0]} />
+        <mesh geometry={geo.fwMain} material={m.accent} position={[0, 0.09, 2.7]} rotation={[0.08, 0, 0]}>
+          <Badge map={brand.sponsor ?? word} position={[0, 0.02, -0.17]} rotation={[-Math.PI / 2, 0, 0]} scale={[0.9, 0.15, 0.08]} />
+        </mesh>
         <Flap geometry={geo.fwFlap1} material={m.accent} position={[0, 0.13, 2.42]} corner={0.38} straight={0.12} />
         <Flap geometry={geo.fwFlap2} material={m.paint2} position={[0, 0.19, 2.26]} corner={0.6} straight={0.2} />
-        {[1, -1].map((s) => <mesh key={s} geometry={geo.fwEndplate} material={m.paint} position={[0.9 * s, 0, 0]} />)}
+        {[1, -1].map((s) => <mesh key={s} geometry={geo.fwEndplate} material={m.livery} position={[0.9 * s, 0, 0]} />)}
         {[1, -1].map((s) => (
           <mesh key={s} material={m.carbon} position={[0.06 * s, 0.15, 2.46]}><boxGeometry args={[0.012, 0.1, 0.12]} /></mesh>
         ))}
       </Part>
 
       <Part id="nose" explode={[0, 0.58, 1.09]}>
-        <mesh geometry={geo.nose} material={m.paint} />
+        <mesh geometry={geo.nose} material={m.livery}>
+          <Badge map={carName} position={[0, 0.5, 1.72]} rotation={[-Math.PI / 2, 0, 0]} scale={[0.26, 0.065, 0.3]} />
+        </mesh>
       </Part>
 
       <Part id="front-suspension" explode={[0.65, 0.51, 0.29]}>
@@ -269,7 +301,7 @@ export function Car({ team }: { team: Team }) {
       </Part>
 
       <Part id="cockpit" explode={[0, 0.8, 0.22]}>
-        <mesh geometry={geo.chassis} material={m.paint} />
+        <mesh geometry={geo.chassis} material={m.livery} />
         <mesh material={m.inlet} position={[0, 0.77, -0.06]} scale={[0.22, 0.05, 0.4]}><sphereGeometry args={[1, 32, 16]} /></mesh>
         <mesh material={m.helmet} position={[0, 0.84, -0.2]}><sphereGeometry args={[0.11, 32, 24]} /></mesh>
         <mesh material={m.visor} position={[0, 0.85, -0.13]} scale={[0.85, 0.35, 0.6]}><sphereGeometry args={[0.1, 24, 12]} /></mesh>
@@ -284,11 +316,15 @@ export function Car({ team }: { team: Team }) {
       </Part>
 
       <Part id="sidepods" explode={[0.94, 0.07, 0]}>
-        <mesh geometry={geo.sidepodL} material={m.paint} />
+        <mesh geometry={geo.sidepodL} material={m.livery}>
+          <Badge map={brand.main ?? word} position={[0.7, 0.43, -0.32]} rotation={[0, Math.PI / 2, 0]} scale={[0.82, 0.2, 0.25]} />
+        </mesh>
         <mesh material={m.inlet} position={[0.48, 0.47, 0.425]} scale={[0.17, 0.12, 0.012]}><sphereGeometry args={[1, 24, 12]} /></mesh>
       </Part>
       <Part id="sidepods" explode={[-0.94, 0.07, 0]} label={false}>
-        <mesh geometry={geo.sidepodR} material={m.paint} />
+        <mesh geometry={geo.sidepodR} material={m.livery}>
+          <Badge map={brand.main ?? word} position={[-0.7, 0.43, -0.32]} rotation={[0, -Math.PI / 2, 0]} scale={[0.82, 0.2, 0.25]} />
+        </mesh>
         <mesh material={m.inlet} position={[-0.48, 0.47, 0.425]} scale={[0.17, 0.12, 0.012]}><sphereGeometry args={[1, 24, 12]} /></mesh>
       </Part>
 
@@ -301,10 +337,13 @@ export function Car({ team }: { team: Team }) {
       </Part>
 
       <Part id="engine-cover" explode={[0, 1.52, -0.22]}>
-        <mesh geometry={geo.cover} material={m.paint} />
-        <mesh geometry={geo.airbox} material={m.paint} />
+        <mesh geometry={geo.cover} material={m.livery} />
+        <mesh geometry={geo.airbox} material={m.livery} />
         <mesh material={m.inlet} position={[0, 0.93, -0.25]} scale={[0.09, 0.08, 0.02]}><sphereGeometry args={[1, 24, 12]} /></mesh>
-        <mesh geometry={geo.fin} material={m.paint2} />
+        <mesh geometry={geo.fin} material={m.livery}>
+          <Badge map={brand.main ?? carName} position={[0.007, 0.76, -1.45]} rotation={[0, Math.PI / 2, 0]} scale={[0.62, 0.15, 0.008]} />
+          <Badge map={brand.main ?? carName} position={[-0.007, 0.76, -1.45]} rotation={[0, -Math.PI / 2, 0]} scale={[0.62, 0.15, 0.008]} />
+        </mesh>
         <mesh material={m.inlet} position={[0, 0.44, -2.33]} scale={[0.05, 0.06, 0.01]}><sphereGeometry args={[1, 16, 8]} /></mesh>
       </Part>
 
@@ -331,9 +370,15 @@ export function Car({ team }: { team: Team }) {
       </Part>
 
       <Part id="rear-wing" explode={[0, 0.87, -1.45]}>
-        <mesh geometry={geo.rwMain} material={m.accent} position={[0, 0.88, -2.42]} rotation={[0.18, 0, 0]} />
+        <mesh geometry={geo.rwMain} material={m.accent} position={[0, 0.88, -2.42]} rotation={[0.18, 0, 0]}>
+          <Badge map={brand.sponsor ?? word} position={[0, 0.02, -0.16]} rotation={[-Math.PI / 2, 0, Math.PI]} scale={[0.82, 0.2, 0.06]} />
+        </mesh>
         <Flap geometry={geo.rwFlap} material={m.paint} position={[0, 0.98, -2.68]} corner={0.65} straight={0.08} />
-        {[1, -1].map((s) => <mesh key={s} geometry={geo.rwEndplate} material={m.paint} position={[0.51 * s, 0, 0]} />)}
+        {[1, -1].map((s) => (
+          <mesh key={s} geometry={geo.rwEndplate} material={m.livery} position={[0.51 * s, 0, 0]}>
+            <Badge map={word} position={[0.009 * s, 0.94, -2.66]} rotation={[0, (Math.PI / 2) * s, 0]} scale={[0.5, 0.12, 0.012]} />
+          </mesh>
+        ))}
         <mesh geometry={geo.swanNeck} material={m.carbon} />
       </Part>
 
