@@ -10,20 +10,37 @@ export const telemetry = {
   steer: 0, // radians at the front wheels
   distance: 0, // metres travelled, drives the road scroll
   driveTime: 0, // seconds since drive mode started; the first straight is a standing start
+  wheelspin: 0, // 0..1 rear wheelspin: full during the burnout, fading through the launch
 }
+
+// Drive mode opens with a burnout: car held on the brakes, rear tyres spinning
+// up and smoking, then a standing start.
+export const BURNOUT = 2.2
 
 const LAP = 9 // seconds: a straight, a braking zone, a corner, then repeat
 
 // A scripted lap segment that shows off 2026 active aero: low-drag straight-line
 // mode with full electrical deployment, then high-downforce corner mode.
 export function stepTelemetry(dt: number) {
-  const t = (telemetry.driveTime += dt)
-  const phase = t % LAP
+  const total = (telemetry.driveTime += dt)
   let speed: number
+  telemetry.wheelspin = 0
+  if (total < BURNOUT) {
+    telemetry.aero = "straight"
+    telemetry.speed = 0
+    telemetry.wheelspin = Math.min(1, total / 0.3)
+    telemetry.ers = 0.2
+    telemetry.braking = 0
+    telemetry.steer = 0
+    return
+  }
+  const t = total - BURNOUT
+  const phase = t % LAP
   if (t < 4.5) {
-    // Launch from the grid: hard acceleration that tails off with drag.
+    // Launch: hard acceleration that tails off with drag, wheelspin dying away.
     telemetry.aero = "straight"
     speed = 330 * (1 - Math.exp(-t / 1.55))
+    telemetry.wheelspin = Math.max(0, 1 - t / 1.4)
     telemetry.ers = 1
     telemetry.braking = 0
     telemetry.steer = 0

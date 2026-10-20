@@ -6,7 +6,6 @@ import { useGarage } from "./store"
 // The garage soundtrack and engine note are synthesized in the browser, so no
 // audio files ship with the site. The anthem is an original composition; a
 // licensed track placed at public/audio/theme.mp3 replaces it automatically.
-// The official F1 theme plays through its official players (see SoundMenu).
 
 const BPM = 126
 const STEP = 60 / BPM / 4 // one 16th note, in seconds
@@ -24,6 +23,17 @@ const BARS: number[][] = [
   [45, 49, 52], // A
 ]
 const LEAD = [0, 2, 1, 2, 0, 2, 1, 3, 0, 2, 1, 2, 3, 2, 1, 2] // chord-tone indices per 16th; 3 = octave root
+// The hook: [16th step, MIDI note, length in 16ths] for each of the eight bars.
+const MELODY: [number, number, number][][] = [
+  [[0, 74, 3], [3, 72, 1], [4, 74, 4], [8, 77, 4], [12, 76, 2], [14, 74, 2]],
+  [[0, 70, 6], [6, 72, 2], [8, 74, 4], [12, 77, 4]],
+  [[0, 72, 3], [3, 69, 1], [4, 72, 4], [8, 77, 3], [11, 76, 1], [12, 72, 4]],
+  [[0, 76, 8], [8, 74, 4], [12, 72, 4]],
+  [[0, 74, 3], [3, 72, 1], [4, 74, 4], [8, 79, 4], [12, 77, 4]],
+  [[0, 77, 6], [6, 74, 2], [8, 77, 4], [12, 82, 4]],
+  [[0, 81, 6], [6, 79, 2], [8, 77, 4], [12, 76, 4]],
+  [[0, 76, 8], [8, 73, 4], [12, 76, 4]],
+]
 const midi = (n: number) => 440 * 2 ** ((n - 69) / 12)
 
 class SoundEngine {
@@ -32,6 +42,8 @@ class SoundEngine {
   music!: GainNode
   engine!: GainNode
   private delay!: DelayNode
+  private verb!: GainNode
+  private padBus!: GainNode
   private noise!: AudioBuffer
   private timer: ReturnType<typeof setInterval> | null = null
   private raf = 0
@@ -70,6 +82,25 @@ class SoundEngine {
     this.noise = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate)
     const data = this.noise.getChannelData(0)
     for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1
+
+    // Big-hall reverb from a generated impulse response.
+    const len = Math.floor(ctx.sampleRate * 3.2)
+    const ir = ctx.createBuffer(2, len, ctx.sampleRate)
+    for (let c = 0; c < 2; c++) {
+      const d = ir.getChannelData(c)
+      for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / len) ** 3.2
+    }
+    const conv = ctx.createConvolver()
+    conv.buffer = ir
+    this.verb = ctx.createGain()
+    const verbWet = ctx.createGain()
+    verbWet.gain.value = 0.45
+    this.verb.connect(conv).connect(verbWet).connect(this.music)
+
+    // Pads run through their own bus so the kick can pump them (sidechain).
+    this.padBus = ctx.createGain()
+    this.padBus.connect(this.music)
+    this.padBus.connect(this.verb)
   }
 
   musicOn = false
@@ -148,29 +179,132 @@ class SoundEngine {
     while (this.nextTime < ctx.currentTime + LOOKAHEAD) {
       this.playStep(this.step, this.nextTime)
       this.nextTime += STEP
-      this.step = (this.step + 1) % (16 * BARS.length * 2)
+      this.step = (this.step + 1) % (16 * BARS.length * 4)
     }
   }
 
+  // 32-bar arrangement in four sections: intro, build, full theme, breakdown.
   private playStep(step: number, t: number) {
     const s16 = step % 16
-    const bar = Math.floor(step / 16) % BARS.length
-    const pass = Math.floor(step / (16 * BARS.length)) // second time round adds the lead
+    const barAbs = Math.floor(step / 16)
+    const bar = barAbs % BARS.length
+    const section = Math.floor(barAbs / 8) % 4
     const chord = BARS[bar]
+    const full = section === 2
 
     if (s16 === 0) {
       this.pad(chord, t, STEP * 16)
-      if (bar % 4 === 0) this.brass(chord, t)
+      if (bar === 0 && section !== 0) this.impact(t)
+      if (full && bar % 2 === 0) this.brass(chord, t)
+      if (full) this.tom(midi(chord[0] - 24), t, 0.4)
     }
-    if (s16 % 2 === 0) this.bass(midi(chord[0] - 24), t, s16 % 4 === 0 ? 0.32 : 0.2)
-    if (s16 % 4 === 0) this.kick(t)
-    if (s16 === 4 || s16 === 12) this.snare(t)
-    if (s16 % 2 === 1) this.hat(t, 0.05)
-    if (bar === BARS.length - 1 && s16 >= 12) this.snare(t, 0.5) // fill into the loop
-    if (pass === 1 || bar >= 4) {
+    if (bar === 7 && s16 === 0 && section !== 3) this.riser(t, STEP * 16)
+
+    if (section >= 1 && section <= 2) {
+      if (s16 % 4 === 0) { this.kick(t); this.pump(t) }
+      if (s16 === 4 || s16 === 12) this.snare(t)
+      if (bar === 7 && s16 >= 8 && s16 % 2 === 0) this.snare(t, 0.35 + (s16 - 8) * 0.08) // build into the next section
+      this.bass(midi(chord[0] - 24), t, s16 % 4 === 2 ? 0.36 : 0.2)
+    } else if (section === 3 && s16 === 0) {
+      this.kick(t)
+    }
+    if (section !== 3 && s16 % 2 === 1) this.hat(t, s16 % 4 === 3 ? 0.06 : 0.035)
+
+    if (section === 1) {
       const i = LEAD[s16]
       this.pluck(midi(i === 3 ? chord[0] + 12 : chord[i]) * 2, t)
     }
+    if (section >= 2) {
+      for (const [at, note, length] of MELODY[bar]) if (at === s16) this.lead(midi(note), t, length * STEP, section === 3 ? 0.6 : 1)
+    }
+  }
+
+  // Duck the pads on every kick for that pumping, driving feel.
+  private pump(t: number) {
+    const g = this.padBus.gain
+    g.cancelScheduledValues(t)
+    g.setValueAtTime(0.35, t)
+    g.linearRampToValueAtTime(1, t + STEP * 3)
+  }
+
+  private lead(freq: number, t: number, len: number, level = 1) {
+    const ctx = this.ctx!
+    const f = ctx.createBiquadFilter()
+    f.type = "lowpass"
+    f.Q.value = 4
+    f.frequency.setValueAtTime(900, t)
+    f.frequency.exponentialRampToValueAtTime(4200, t + 0.08)
+    f.frequency.exponentialRampToValueAtTime(1800, t + len)
+    const g = ctx.createGain()
+    g.gain.setValueAtTime(0.0001, t)
+    g.gain.exponentialRampToValueAtTime(0.06 * level, t + 0.02)
+    g.gain.setValueAtTime(0.05 * level, t + Math.max(0.03, len - 0.05))
+    g.gain.exponentialRampToValueAtTime(0.0001, t + len + 0.25)
+    f.connect(g)
+    g.connect(this.music)
+    g.connect(this.delay)
+    g.connect(this.verb)
+    for (const [type, detune] of [["sawtooth", -7], ["sawtooth", 7], ["square", 0]] as const) {
+      const o = ctx.createOscillator()
+      o.type = type
+      o.frequency.value = freq
+      o.detune.value = detune
+      // Gentle vibrato on long notes.
+      if (len > STEP * 3) {
+        const lfo = ctx.createOscillator(), depth = ctx.createGain()
+        lfo.frequency.value = 5.5
+        depth.gain.setValueAtTime(0, t)
+        depth.gain.linearRampToValueAtTime(freq * 0.006, t + len)
+        lfo.connect(depth).connect(o.frequency)
+        lfo.start(t)
+        lfo.stop(t + len + 0.3)
+      }
+      o.connect(f)
+      o.start(t)
+      o.stop(t + len + 0.3)
+    }
+  }
+
+  private tom(freq: number, t: number, peak: number) {
+    const ctx = this.ctx!
+    const o = ctx.createOscillator()
+    o.frequency.setValueAtTime(freq * 2, t)
+    o.frequency.exponentialRampToValueAtTime(freq, t + 0.25)
+    const g = ctx.createGain()
+    this.env(g, t, peak * 0.5, 0.004, 0.6)
+    o.connect(g)
+    g.connect(this.music)
+    g.connect(this.verb)
+    o.start(t)
+    o.stop(t + 0.7)
+  }
+
+  // Low boom and a burst of noise at the top of a section.
+  private impact(t: number) {
+    this.tom(40, t, 1.2)
+    this.noiseHit(t, "lowpass", 1800, 0.25, 1.2)
+  }
+
+  // White-noise sweep that builds into the next section.
+  private riser(t: number, len: number) {
+    const ctx = this.ctx!
+    const src = ctx.createBufferSource()
+    src.buffer = this.noise
+    src.loop = true
+    const f = ctx.createBiquadFilter()
+    f.type = "bandpass"
+    f.Q.value = 2
+    f.frequency.setValueAtTime(300, t)
+    f.frequency.exponentialRampToValueAtTime(9000, t + len)
+    const g = ctx.createGain()
+    g.gain.setValueAtTime(0.0001, t)
+    g.gain.exponentialRampToValueAtTime(0.09, t + len)
+    g.gain.exponentialRampToValueAtTime(0.0001, t + len + 0.05)
+    src.connect(f).connect(g)
+    g.connect(this.music)
+    g.connect(this.verb)
+    src.start(t)
+    src.stop(t + len + 0.1)
   }
 
   private env(g: GainNode, t: number, peak: number, attack: number, decay: number) {
@@ -190,7 +324,7 @@ class SoundEngine {
     g.gain.exponentialRampToValueAtTime(0.05, t + 0.25)
     g.gain.setValueAtTime(0.05, t + len - 0.2)
     g.gain.exponentialRampToValueAtTime(0.0001, t + len + 0.3)
-    f.connect(g).connect(this.music)
+    f.connect(g).connect(this.padBus)
     for (const n of chord) for (const detune of [-8, 8]) {
       const o = ctx.createOscillator()
       o.type = "sawtooth"
@@ -213,6 +347,7 @@ class SoundEngine {
     const g = ctx.createGain()
     this.env(g, t, 0.09, 0.03, 1.3)
     f.connect(g).connect(this.music)
+    g.connect(this.verb)
     for (const n of [chord[0] - 12, ...chord]) {
       const o = ctx.createOscillator()
       o.type = "sawtooth"
@@ -464,6 +599,8 @@ class SoundEngine {
       const k = Math.min(1, Math.max(0, (v - lo) / (tops[gear] - lo)))
       rpm = (gear === 0 ? 6000 : 7600) + k * (gear === 0 ? 5600 : 4300)
       throttle = telemetry.braking > 0.2 ? 0.15 : 1
+      // Burnout: bouncing off the limiter with the rears spinning.
+      if (telemetry.wheelspin > 0.5 && v < 60) rpm = 11400 + Math.sin(t * 31) * 350
       // Upshift: a 40 ms ignition cut and a crack from the exhaust.
       if (on && gear > this.lastGear) {
         p.body.gain.cancelScheduledValues(t)

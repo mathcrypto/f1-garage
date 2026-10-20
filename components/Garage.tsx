@@ -2,17 +2,17 @@
 
 import dynamic from "next/dynamic"
 import { useEffect, useRef, useState } from "react"
-import { EngineerCam, LessonList } from "./EngineerCam"
+import { HoverChip, ToolRail } from "./Controls"
+import { EngineerCam } from "./EngineerCam"
+import { PartCard } from "./Learn"
 import { EngineerPanel, useEngineer } from "./Engineer"
-import { SoundMenu, ThemePlayer } from "./SoundMenu"
-import { startShowcase, stopShowcase, useShowcase } from "@/lib/showcase"
-import { sound } from "@/lib/sound"
+import { SoundMenu } from "./SoundMenu"
+import { useShowcase } from "@/lib/showcase"
 import { voice } from "@/lib/voice"
 import { PaddockPanel } from "./Paddock"
 import { telemetry } from "@/lib/drive"
-import { CAR_SPECS, PARTS, SPEC_SOURCE, partById } from "@/lib/parts"
-import { REGULATIONS_2026 } from "@/lib/regulations"
-import { useEngineerState, useGarage, type CameraPreset } from "@/lib/store"
+import { PARTS } from "@/lib/parts"
+import { useEngineerState, useGarage } from "@/lib/store"
 import { TEAMS, teamById } from "@/lib/teams"
 
 const Scene = dynamic(() => import("./three/Scene"), {
@@ -47,7 +47,7 @@ function DriveHud() {
       <div className="hud-block">
         <div className={`hud-aero ${t.aero}`}>
           <b>{t.aero === "straight" ? "X-MODE" : "Z-MODE"}</b>
-          <small>{t.aero === "straight" ? "Straight · wings open, low drag" : "Corner · wings closed, full downforce"}</small>
+          <small>{t.aero === "straight" ? "Wings open · low drag" : "Wings closed · max grip"}</small>
         </div>
         <div className="hud-bar"><small>ERS deploy</small><div><i style={{ width: `${Math.round(t.ers * 100)}%` }} /></div></div>
         <div className="hud-bar brake"><small>Brake</small><div><i style={{ width: `${Math.round(t.braking * 100)}%` }} /></div></div>
@@ -56,73 +56,10 @@ function DriveHud() {
   )
 }
 
-function PartPanel({ onAsk }: { onAsk: (q: string) => void }) {
-  const selected = useGarage((s) => s.selected)
-  const highlights = useGarage((s) => s.highlights)
-  const teamId = useGarage((s) => s.teamId)
-  const team = teamById(teamId)
-  const part = selected ? partById(selected) : undefined
-
-  if (!part) {
-    return (
-      <div className="part-intro">
-        <p className="eyebrow">How to explore</p>
-        <h3>Click any part of the car</h3>
-        <p className="muted">It slides off the car and the camera follows it. Drag to orbit, scroll to zoom, or open the exploded view to see everything at once.</p>
-        <p className="eyebrow" style={{ marginTop: 24 }}>Learn with Lena</p>
-        <LessonList />
-        <p className="eyebrow" style={{ marginTop: 24 }}>2026 car at a glance</p>
-        <dl className="specs">
-          {CAR_SPECS.map(([k, v]) => <div key={k}><dt>{k}</dt><dd>{v}</dd></div>)}
-        </dl>
-        <a className="source-link" href={SPEC_SOURCE.url} target="_blank" rel="noreferrer">Source: {SPEC_SOURCE.label}</a>
-        <p className="eyebrow" style={{ marginTop: 24 }}>2026 regulations at a glance</p>
-        <ul className="reg-list">
-          {REGULATIONS_2026.map((r) => (
-            <li key={r.title}>
-              <button onClick={() => useGarage.getState().setHighlights(r.parts.map((id) => ({ id, note: r.title })))}>
-                <strong>{r.title}</strong>
-                <span>{r.body}</span>
-              </button>
-            </li>
-          ))}
-        </ul>
-      </div>
-    )
-  }
-
-  const note = highlights.find((h) => h.id === part.id)?.note
-  const rules = REGULATIONS_2026.filter((r) => r.parts.includes(part.id))
-  return (
-    <article className="part">
-      <p className="eyebrow">{part.system}</p>
-      <h3>{part.name}</h3>
-      {note && <p className="lit-note">{note}</p>}
-      <p className="lede">{part.summary}</p>
-      <dl className="specs">
-        {part.specs.map(([k, v]) => <div key={k}><dt>{k}</dt><dd>{v}</dd></div>)}
-      </dl>
-      <section><h4>How it works</h4><p>{part.howItWorks}</p></section>
-      <section><h4>2026 regulations</h4><p>{part.regulation2026}</p>
-        {rules.length > 0 && <ul className="tags">{rules.map((r) => <li key={r.title}>{r.title}</li>)}</ul>}
-      </section>
-      <section><h4>What upgrades look like</h4><p>{part.watchFor}</p></section>
-      <a className="source-link" href={SPEC_SOURCE.url} target="_blank" rel="noreferrer">Figures: {SPEC_SOURCE.label}</a>
-      <div className="part-actions">
-        <button className="primary" onClick={() => onAsk(`What has ${team.name} changed on the ${part.name.toLowerCase()} of the ${team.car} this season, and why? Check the FIA upgrade documents.`)}>
-          {team.name} upgrades to this part
-        </button>
-        <button className="secondary" onClick={() => onAsk(`Explain the ${part.name.toLowerCase()} in depth: the physics, the trade-offs, and how it interacts with the rest of the car.`)}>
-          Deep dive
-        </button>
-      </div>
-    </article>
-  )
-}
-
 export function Garage() {
-  const { teamId, setTeam, selected, select, exploded, setExploded, mode, setMode, setCamera, highlights, setHighlights, technical, setTechnical, flow, setFlow } = useGarage()
+  const { teamId, setTeam, selected, select, exploded, setExploded, mode, highlights } = useGarage()
   const [tab, setTab] = useState<"part" | "engineer" | "paddock">("part")
+  const [panelOpen, setPanelOpen] = useState(true)
   const [webgl, setWebgl] = useState(true)
   const engineer = useEngineer()
   const team = teamById(teamId)
@@ -170,12 +107,10 @@ export function Garage() {
     setTeam(id)
     try { localStorage.setItem("f1-garage:team", id) } catch {}
   }
-  const ask = (q: string) => { setTab("engineer"); return engineer.ask(q) }
-
-  const cameras: CameraPreset[] = ["hero", "front", "side", "top", "rear"]
+  const ask = (q: string) => { setTab("engineer"); setPanelOpen(true); return engineer.ask(q) }
 
   return (
-    <div className="app" style={{ ["--team" as string]: team.ui, ["--team-ink" as string]: inkOn(team.ui), ["--team-2" as string]: team.livery.secondary }}>
+    <div className={panelOpen ? "app" : "app panel-closed"} style={{ ["--team" as string]: team.ui, ["--team-ink" as string]: inkOn(team.ui), ["--team-2" as string]: team.livery.secondary }}>
       <header className="topbar">
         <div className="brand">
           <svg viewBox="0 0 32 20" width="34" height="22" aria-hidden><path d="M2 18 L14 2 H30 L18 18 Z" fill="var(--team)" /><path d="M10 18 L16 10 H22 L16 18 Z" fill="var(--bg)" opacity=".85" /></svg>
@@ -202,37 +137,21 @@ export function Garage() {
           <h1 key={team.id}>{team.car}</h1>
         </div>
 
-        <div className="stage-tools">
-          <div className="seg" role="group" aria-label="View mode">
-            <button className={mode === "studio" ? "on" : ""} onClick={() => { if (showcase) stopShowcase(); sound.engineStop(); setMode("studio") }}>Studio</button>
-            <button className={mode === "drive" ? "on" : ""} onClick={() => setMode("drive")}>Drive</button>
-          </div>
-          <button className={showcase ? "showcase on" : "showcase"} onClick={() => (showcase ? stopShowcase() : startShowcase())}>
-            {showcase ? <>■ Stop showcase</> : <>▶ Showcase</>}
+        <ToolRail />
+        <HoverChip />
+        {!panelOpen && (
+          <button className="panel-open" onClick={() => setPanelOpen(true)}>
+            <span className="panel-open-dot" aria-hidden />Lena &amp; info
           </button>
-          <button className={exploded ? "tool on" : "tool"} onClick={() => setExploded(!exploded)}>
-            {exploded ? "Reassemble" : "Exploded view"}
-          </button>
-          <div className="tool-row">
-            <button className={technical ? "tool on" : "tool"} onClick={() => setTechnical(!technical)} aria-pressed={technical}>Technical</button>
-            <button className={flow ? "tool on" : "tool"} onClick={() => setFlow(!flow)} aria-pressed={flow}>Airflow</button>
-          </div>
-          <div className="seg cams" role="group" aria-label="Camera">
-            {cameras.map((c) => <button key={c} onClick={() => setCamera(c)}>{c}</button>)}
-          </div>
-          {(selected || highlights.length > 0) && (
-            <button className="tool ghost" onClick={() => { select(null); setHighlights([]) }}>Clear</button>
-          )}
-        </div>
+        )}
 
         {mode === "drive" && <DriveHud />}
         <EngineerCam />
-        <ThemePlayer />
 
         <div className="dock" aria-label="Car parts">
           {PARTS.map((p) => (
-            <button key={p.id} className={p.id === selected ? "dock-item on" : "dock-item"} onClick={() => { if (exploded) setExploded(false); select(p.id === selected ? null : p.id) }}>
-              <small>{p.system}</small>
+            <button key={p.id} className={p.id === selected ? "dock-item on" : "dock-item"} data-system={p.system} title={p.system} onClick={() => { if (exploded) setExploded(false); select(p.id === selected ? null : p.id) }}>
+              <i className="sys" aria-hidden />
               <span>{p.name}</span>
               {highlights.some((h) => h.id === p.id) && <i className="dot" aria-label="highlighted" />}
             </button>
@@ -244,11 +163,12 @@ export function Garage() {
         <div className="tabs" role="tablist">
           {(["part", "engineer", "paddock"] as const).map((t) => (
             <button key={t} role="tab" aria-selected={tab === t} className={tab === t ? "on" : ""} onClick={() => setTab(t)}>
-              {t === "part" ? "Part" : t === "engineer" ? <>Engineer{engineer.busy && <i className="busy" />}</> : "Paddock"}
+              {t === "part" ? "Explore" : t === "engineer" ? <>Lena{engineer.busy && <i className="busy" />}</> : "Paddock"}
             </button>
           ))}
+          <button className="panel-hide" onClick={() => setPanelOpen(false)} aria-label="Hide panel" title="Hide panel">›</button>
         </div>
-        <div className="tab-body" hidden={tab !== "part"}><PartPanel onAsk={ask} /></div>
+        <div className="tab-body" hidden={tab !== "part"}><PartCard onAsk={ask} /></div>
         <div className="tab-body flush" hidden={tab !== "engineer"}><EngineerPanel engineer={{ ...engineer, ask }} /></div>
         <div className="tab-body" hidden={tab !== "paddock"}>{tab === "paddock" && <PaddockPanel />}</div>
         <p className="model-badge">Nemotron on Nebius · live data from FIA, OpenF1, Jolpica-F1</p>

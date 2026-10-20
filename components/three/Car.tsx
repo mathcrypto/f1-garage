@@ -177,7 +177,9 @@ function Wheel({ geo, m, side, front }: { geo: Geo; m: Mats; side: 1 | -1; front
   useFrame((_, dt) => {
     const driving = useGarage.getState().mode === "drive"
     const speed = driving ? telemetry.speed / 3.6 : 0
-    spin.current.rotation.x += (speed / 0.36) * dt
+    // Rear tyres spin far faster than the car moves during the burnout.
+    const spinBoost = driving && !front ? telemetry.wheelspin * 70 : 0
+    spin.current.rotation.x += (speed / 0.36 + spinBoost) * dt
     if (front) steer.current.rotation.y = THREE.MathUtils.damp(steer.current.rotation.y, driving ? telemetry.steer : 0, 6, dt)
     const mat = brake.current.material as THREE.MeshStandardMaterial
     mat.emissiveIntensity = THREE.MathUtils.damp(mat.emissiveIntensity, driving ? telemetry.braking * 6 : 0, 4, dt)
@@ -307,8 +309,10 @@ export function Car({ team }: { team: Team }) {
     const t = state.clock.elapsedTime
     const b = body.current
     b.position.y = THREE.MathUtils.damp(b.position.y, driving ? Math.sin(t * 31) * 0.003 + Math.sin(t * 7.3) * 0.004 : 0, 12, dt)
-    b.rotation.x = THREE.MathUtils.damp(b.rotation.x, driving ? telemetry.braking * 0.012 : 0, 5, dt)
-    b.rotation.z = THREE.MathUtils.damp(b.rotation.z, driving ? -telemetry.steer * 0.12 : 0, 4, dt)
+    b.rotation.z = THREE.MathUtils.damp(b.rotation.z, driving ? -telemetry.steer * 0.12 + Math.sin(t * 17) * 0.004 * telemetry.wheelspin : 0, 4, dt)
+    // Squat onto the rear under wheelspin, with a little fishtail.
+    b.rotation.x = THREE.MathUtils.damp(b.rotation.x, driving ? telemetry.braking * 0.012 - telemetry.wheelspin * 0.012 : 0, 5, dt)
+    b.rotation.y = THREE.MathUtils.damp(b.rotation.y, driving ? Math.sin(t * 6.5) * 0.012 * telemetry.wheelspin : 0, 6, dt)
   })
 
   return (

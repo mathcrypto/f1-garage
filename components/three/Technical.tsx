@@ -124,11 +124,44 @@ function Dimension({ from, to, label, tick = 0.08 }: { from: THREE.Vector3Tuple;
   const mid = a.clone().add(b).multiplyScalar(0.5)
   return (
     <group>
-      <Line points={[a, b]} color="#7dd3fc" lineWidth={1.2} dashed dashSize={0.06} gapSize={0.04} toneMapped={false} />
-      <Line points={[a.clone().add(side), a.clone().sub(side)]} color="#7dd3fc" lineWidth={1.5} toneMapped={false} />
-      <Line points={[b.clone().add(side), b.clone().sub(side)]} color="#7dd3fc" lineWidth={1.5} toneMapped={false} />
+      <Line points={[a, b]} color="#ff6a4d" lineWidth={1.2} dashed dashSize={0.06} gapSize={0.04} toneMapped={false} />
+      <Line points={[a.clone().add(side), a.clone().sub(side)]} color="#ff6a4d" lineWidth={1.5} toneMapped={false} />
+      <Line points={[b.clone().add(side), b.clone().sub(side)]} color="#ff6a4d" lineWidth={1.5} toneMapped={false} />
       <Html position={mid.toArray()} center className="dim-wrap"><div className="dim">{label}</div></Html>
     </group>
+  )
+}
+
+function scanTexture() {
+  const c = document.createElement("canvas")
+  c.width = 256
+  c.height = 16
+  const g = c.getContext("2d")!
+  const grad = g.createLinearGradient(0, 0, 256, 0)
+  grad.addColorStop(0, "rgba(255,60,20,0)")
+  grad.addColorStop(0.75, "rgba(255,80,30,0.35)")
+  grad.addColorStop(0.97, "rgba(255,220,200,1)")
+  grad.addColorStop(1, "rgba(255,220,200,0)")
+  g.fillStyle = grad
+  g.fillRect(0, 0, 256, 16)
+  return new THREE.CanvasTexture(c)
+}
+
+// A glowing scan plane that sweeps nose to tail as the X-ray view switches on.
+function ScanSweep() {
+  const ref = useRef<THREE.Mesh>(null!)
+  const tex = useMemo(scanTexture, [])
+  const start = useRef(performance.now())
+  useFrame(() => {
+    const k = (performance.now() - start.current) / 1300
+    ref.current.visible = k < 1
+    ref.current.position.z = 3.4 - k * 6.8
+  })
+  return (
+    <mesh ref={ref} rotation={[0, Math.PI / 2, 0]} position={[0, 0.7, 3.4]}>
+      <planeGeometry args={[1.6, 1.8]} />
+      <meshBasicMaterial map={tex} transparent blending={THREE.AdditiveBlending} depthWrite={false} side={THREE.DoubleSide} toneMapped={false} />
+    </mesh>
   )
 }
 
@@ -137,7 +170,8 @@ export function Blueprint() {
   if (!technical) return null
   return (
     <group>
-      <gridHelper args={[14, 56, "#1e3a5f", "#132338"]} position={[0, 0.003, 0]} />
+      <gridHelper args={[14, 56, "#5a1a10", "#2a0c08"]} position={[0, 0.003, 0]} />
+      <ScanSweep />
       <Dimension from={[1.25, 0.02, 1.75]} to={[1.25, 0.02, -1.65]} label="Wheelbase 3400 mm (max)" />
       <Dimension from={[-0.95, 0.02, 3.05]} to={[0.95, 0.02, 3.05]} label="Width 1900 mm (max)" />
       <Dimension from={[-1.25, 0, 1.75]} to={[-1.25, 0.72, 1.75]} label="18-inch rim" tick={0.06} />

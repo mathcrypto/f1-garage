@@ -9,10 +9,10 @@ import { sound } from "@/lib/sound"
 import { partCentres, useGarage } from "@/lib/store"
 
 const LIT = new THREE.Color("#a78bfa")
-const BLUEPRINT = new THREE.Color("#38bdf8")
-// Shared line materials for the technical (blueprint) view.
-const EDGE = new THREE.LineBasicMaterial({ color: "#7dd3fc", transparent: true, opacity: 0.75, depthWrite: false })
-const EDGE_ACTIVE = new THREE.LineBasicMaterial({ color: "#ffffff", transparent: true, opacity: 0.95, depthWrite: false })
+const BLUEPRINT = new THREE.Color("#ff2a10")
+// Shared line materials for the X-ray (technical) view.
+const EDGE = new THREE.LineBasicMaterial({ color: "#ff5a36", transparent: true, opacity: 0.85, depthWrite: false })
+const EDGE_ACTIVE = new THREE.LineBasicMaterial({ color: "#ffe1d6", transparent: true, opacity: 1, depthWrite: false })
 const HOVER = new THREE.Color("#ffffff")
 const boxes = new Map<string, THREE.Box3>()
 

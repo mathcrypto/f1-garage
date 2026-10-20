@@ -9,6 +9,7 @@ import { stepTelemetry, telemetry } from "@/lib/drive"
 import { partCentres, useGarage, type CameraPreset } from "@/lib/store"
 import { teamById } from "@/lib/teams"
 import { Car } from "./Car"
+import { Smoke } from "./Smoke"
 import { Airflow, Blueprint } from "./Technical"
 
 const PRESETS: Record<CameraPreset, [number, number, number, number, number, number]> = {
@@ -109,33 +110,84 @@ function roadTexture() {
   return t
 }
 
-const ROAD_LENGTH = 120
-const POSTS = 16
+const ROAD_LENGTH = 140
+const TOWERS = 6
+const FENCE_POSTS = 36
 
+// Wraps a track-relative position into the visible stretch, so objects stream
+// past the car toward the rear (-z) as distance grows.
+const wrap = (z: number, span: number) => ((((z % span) + span) % span) - span / 2)
+
+function lampTexture() {
+  const c = document.createElement("canvas")
+  c.width = 256
+  c.height = 160
+  const g = c.getContext("2d")!
+  g.fillStyle = "#15171b"
+  g.fillRect(0, 0, 256, 160)
+  for (let y = 0; y < 4; y++)
+    for (let x = 0; x < 6; x++) {
+      const cx = 24 + x * 42, cy = 22 + y * 38
+      const grad = g.createRadialGradient(cx, cy, 0, cx, cy, 16)
+      grad.addColorStop(0, "#ffffff")
+      grad.addColorStop(0.5, "#e8f0ff")
+      grad.addColorStop(1, "#2a2f3a")
+      g.fillStyle = grad
+      g.beginPath()
+      g.arc(cx, cy, 15, 0, Math.PI * 2)
+      g.fill()
+    }
+  const t = new THREE.CanvasTexture(c)
+  t.colorSpace = THREE.SRGBColorSpace
+  return t
+}
+
+// Night circuit: asphalt with kerbs, floodlight towers and catch fencing
+// streaming past, plus speed streaks close to the car.
 function Road() {
   const tex = useMemo(roadTexture, [])
-  const posts = useRef<THREE.InstancedMesh>(null!)
+  const lamp = useMemo(lampTexture, [])
+  const poles = useRef<THREE.InstancedMesh>(null!)
+  const lamps = useRef<THREE.InstancedMesh>(null!)
+  const fence = useRef<THREE.InstancedMesh>(null!)
   const streaks = useRef<THREE.InstancedMesh>(null!)
   const dummy = useMemo(() => new THREE.Object3D(), [])
   const streakSeeds = useMemo(() => Array.from({ length: 40 }, () => [Math.random() * 2 - 1, Math.random(), Math.random()]), [])
 
   useFrame(() => {
-    // The road texture repeats every ROAD_LENGTH / 6 metres.
-    tex.offset.y = (telemetry.distance / (ROAD_LENGTH / 6)) % 1
-    const spacing = ROAD_LENGTH / POSTS
-    for (let i = 0; i < POSTS * 2; i++) {
+    const d = telemetry.distance
+    // The texture repeats every ROAD_LENGTH / 6 metres along the plane.
+    tex.offset.y = -((d / (ROAD_LENGTH / 6)) % 1)
+    const towerGap = ROAD_LENGTH / TOWERS
+    for (let i = 0; i < TOWERS * 2; i++) {
       const side = i % 2 ? 1 : -1
-      const z = ((((Math.floor(i / 2) * spacing - telemetry.distance) % ROAD_LENGTH) + ROAD_LENGTH) % ROAD_LENGTH) - ROAD_LENGTH / 2
-      dummy.position.set(side * 10, 1.4, -z)
+      const z = wrap(Math.floor(i / 2) * towerGap + (side > 0 ? towerGap / 2 : 0) - d, ROAD_LENGTH)
+      dummy.position.set(side * 11.5, 3.5, z)
+      dummy.rotation.set(0, 0, 0)
       dummy.scale.set(1, 1, 1)
       dummy.updateMatrix()
-      posts.current.setMatrixAt(i, dummy.matrix)
+      poles.current.setMatrixAt(i, dummy.matrix)
+      dummy.position.set(side * 11.2, 7.4, z)
+      dummy.rotation.set(0, -side * Math.PI / 2, 0)
+      dummy.rotateX(-0.35)
+      dummy.updateMatrix()
+      lamps.current.setMatrixAt(i, dummy.matrix)
     }
-    posts.current.instanceMatrix.needsUpdate = true
+    poles.current.instanceMatrix.needsUpdate = true
+    lamps.current.instanceMatrix.needsUpdate = true
+    const postGap = ROAD_LENGTH / (FENCE_POSTS / 2)
+    for (let i = 0; i < FENCE_POSTS; i++) {
+      const side = i % 2 ? 1 : -1
+      dummy.position.set(side * 8.4, 1.6, wrap(Math.floor(i / 2) * postGap - d, ROAD_LENGTH))
+      dummy.rotation.set(0, 0, side * 0.12)
+      dummy.updateMatrix()
+      fence.current.setMatrixAt(i, dummy.matrix)
+    }
+    fence.current.instanceMatrix.needsUpdate = true
     const len = 1 + telemetry.speed / 60
     streakSeeds.forEach(([x, y, o], i) => {
-      const z = ((((o * ROAD_LENGTH - telemetry.distance * 1.4) % 40) + 40) % 40) - 20
-      dummy.position.set(x * 4.5 + Math.sign(x) * 1.5, 0.05 + y * 1.2, -z)
+      dummy.position.set(x * 4.5 + Math.sign(x) * 1.5, 0.05 + y * 1.2, wrap(o * 40 - d * 1.4, 40))
+      dummy.rotation.set(0, 0, 0)
       dummy.scale.set(1, 1, len)
       dummy.updateMatrix()
       streaks.current.setMatrixAt(i, dummy.matrix)
@@ -145,17 +197,25 @@ function Road() {
 
   return (
     <group>
-      <mesh rotation={[-Math.PI / 2, 0, 0]} receiveShadow position={[0, 0, 0]}>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
         <planeGeometry args={[14, ROAD_LENGTH]} />
-        <meshStandardMaterial map={tex} roughness={0.85} metalness={0.05} />
+        <meshStandardMaterial map={tex} roughness={0.78} metalness={0.08} envMapIntensity={0.2} />
       </mesh>
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.01, 0]}>
         <planeGeometry args={[200, 200]} />
-        <meshStandardMaterial color="#0d1410" roughness={1} />
+        <meshStandardMaterial color="#030405" roughness={1} envMapIntensity={0} />
       </mesh>
-      <instancedMesh ref={posts} args={[undefined, undefined, POSTS * 2]}>
-        <boxGeometry args={[0.12, 2.8, 0.12]} />
-        <meshStandardMaterial color="#cfd3da" emissive="#ffffff" emissiveIntensity={0.6} />
+      <instancedMesh ref={fence} args={[undefined, undefined, FENCE_POSTS]}>
+        <boxGeometry args={[0.06, 3.2, 0.06]} />
+        <meshStandardMaterial color="#5b626c" metalness={0.8} roughness={0.4} />
+      </instancedMesh>
+      <instancedMesh ref={poles} args={[undefined, undefined, TOWERS * 2]}>
+        <boxGeometry args={[0.28, 7, 0.28]} />
+        <meshStandardMaterial color="#2a2e35" metalness={0.7} roughness={0.5} />
+      </instancedMesh>
+      <instancedMesh ref={lamps} args={[undefined, undefined, TOWERS * 2]}>
+        <boxGeometry args={[3.2, 2, 0.2]} />
+        <meshStandardMaterial color="#15171b" emissive="#ffffff" emissiveMap={lamp} emissiveIntensity={1.9} toneMapped={false} />
       </instancedMesh>
       <instancedMesh ref={streaks} args={[undefined, undefined, 40]}>
         <boxGeometry args={[0.01, 0.01, 1]} />
@@ -220,11 +280,11 @@ export default function Scene() {
       gl={{ antialias: true, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.05 }}
       onPointerMissed={() => useGarage.getState().select(null)}
     >
-      <color attach="background" args={[technical ? "#06101c" : mode === "drive" ? "#0a0e16" : "#08090c"]} />
-      <fog attach="fog" args={[mode === "drive" ? "#0a0e16" : "#08090c", 16, mode === "drive" ? 70 : 32]} />
+      <color attach="background" args={[technical ? "#0b0303" : mode === "drive" ? "#040507" : "#08090c"]} />
+      <fog attach="fog" args={[technical ? "#0b0303" : mode === "drive" ? "#020203" : "#08090c", mode === "drive" ? 22 : 16, mode === "drive" ? 75 : 32]} />
       <Director />
-      <ambientLight intensity={0.25} />
-      <directionalLight position={[5, 9, 4]} intensity={2.2} castShadow shadow-mapSize={[2048, 2048]} shadow-camera-left={-5} shadow-camera-right={5} shadow-camera-top={5} shadow-camera-bottom={-5} />
+      <ambientLight intensity={mode === "drive" ? 0.1 : 0.25} />
+      <directionalLight position={[5, 9, 4]} intensity={mode === "drive" ? 1.5 : 2.2} castShadow shadow-mapSize={[2048, 2048]} shadow-camera-left={-5} shadow-camera-right={5} shadow-camera-top={5} shadow-camera-bottom={-5} />
       <spotLight position={[-6, 5, -6]} intensity={40} angle={0.5} penumbra={1} color={team.livery.primary} />
 
       {/* Studio softboxes, used only for reflections on the paint */}
@@ -239,6 +299,7 @@ export default function Scene() {
       <Suspense fallback={null}>
         <Car team={team} />
         {mode === "drive" ? <Road /> : <><Studio /><Ring color={team.livery.primary} /></>}
+        <Smoke />
         <Airflow />
         <Blueprint />
         <ContactShadows position={[0, 0.004, 0]} opacity={0.75} scale={9} blur={2.2} far={1.4} resolution={512} />
@@ -247,7 +308,7 @@ export default function Scene() {
       <CameraRig reducedMotion={reducedMotion} />
 
       <EffectComposer multisampling={4}>
-        <Bloom mipmapBlur intensity={0.7} luminanceThreshold={0.85} luminanceSmoothing={0.2} />
+        <Bloom mipmapBlur intensity={0.7} radius={0.55} luminanceThreshold={0.9} luminanceSmoothing={0.15} />
         <Vignette offset={0.25} darkness={0.75} />
       </EffectComposer>
     </Canvas>
