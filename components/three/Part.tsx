@@ -4,7 +4,8 @@ import { Html } from "@react-three/drei"
 import { useFrame, type ThreeEvent } from "@react-three/fiber"
 import { useLayoutEffect, useRef, useState, type ReactNode } from "react"
 import * as THREE from "three"
-import { partById } from "@/lib/parts"
+import { PART_IDS, partById } from "@/lib/parts"
+import { sound } from "@/lib/sound"
 import { partCentres, useGarage } from "@/lib/store"
 
 const LIT = new THREE.Color("#a78bfa")
@@ -29,6 +30,7 @@ export function Part({ id, explode, children, label = true }: { id: string; expl
   const technical = useGarage((s) => s.technical)
   const selected = useGarage((s) => s.selected)
   const edges = useRef<THREE.LineSegments[]>([])
+  const wasActive = useRef(false)
   const [centre, setCentre] = useState<THREE.Vector3Tuple>([0, 0, 0])
 
   // Give this part its own material copies so it can fade and glow alone.
@@ -85,7 +87,16 @@ export function Part({ id, explode, children, label = true }: { id: string; expl
 
   useFrame((state, dt) => {
     const s = useGarage.getState()
-    const active = s.exploded || s.selected === id || (s.selected === "power-unit" && id === "engine-cover")
+    // Staggered: parts leave in order and come back in reverse.
+    let exploded = s.exploded
+    if (s.explodeStagger) {
+      const order = PART_IDS.indexOf(id)
+      const since = performance.now() / 1000 - s.explodeChangedAt
+      exploded = s.exploded ? since > order * 0.2 : since < (PART_IDS.length - 1 - order) * 0.2
+    }
+    const active = exploded || s.selected === id || (s.selected === "power-unit" && id === "engine-cover")
+    if (label && s.explodeStagger && !s.exploded && wasActive.current && !active) setTimeout(() => sound.clunk(), 380)
+    wasActive.current = active
     const p = group.current.position
     p.x = THREE.MathUtils.damp(p.x, active ? explode[0] : 0, 5, dt)
     p.y = THREE.MathUtils.damp(p.y, active ? explode[1] : 0, 5, dt)

@@ -1,16 +1,25 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { liveryFor } from "@/lib/liveries"
 import { useEngineerState } from "@/lib/store"
+import { teamById } from "@/lib/teams"
 
 export const ENGINEER = { name: "Lena Moreau", role: "Race engineer" }
 
-// Lena, drawn in SVG. She wears the team's colours, blinks, sways a little,
-// looks up while thinking, and her mouth follows the words she speaks.
-export function Lena({ size = 120, team, team2 }: { size?: number; team: string; team2: string }) {
+// Lena, drawn in SVG. She wears the selected team's kit and a pit-wall
+// headset, blinks, sways a little, looks up while thinking, and her mouth
+// follows the words she speaks. The kit animates in on every team change.
+export function Lena({ size = 120, teamId }: { size?: number; teamId: string }) {
   const status = useEngineerState((s) => s.status)
   const mouth = useEngineerState((s) => s.mouth)
   const [open, setOpen] = useState(0)
+  const team = teamById(teamId)
+  const kit = liveryFor(teamId)
+  const shirt = kit.base
+  const panel = kit.stripe
+  const trim = kit.lower
+  const ink = kit.wordmarkColor === kit.base ? kit.lower : kit.wordmarkColor
 
   // Each spoken word opens the mouth briefly; a light flutter keeps it alive
   // on voices that don't report word boundaries.
@@ -30,30 +39,32 @@ export function Lena({ size = 120, team, team2 }: { size?: number; team: string;
   const skin = "#e9b994"
   const skinShade = "#d59f7b"
   const hair = "#2a1912"
+  const clip = `lena-frame-${size}`
 
   return (
-    <svg className={`lena lena-${status}`} viewBox="0 0 200 220" width={size} height={size * 1.1} role="img" aria-label={`${ENGINEER.name}, ${ENGINEER.role}`}>
+    <svg className={`lena lena-${status}`} viewBox="0 0 200 220" width={size} height={size * 1.1} role="img" aria-label={`${ENGINEER.name}, ${ENGINEER.role}, ${team.name}`}>
       <defs>
-        <linearGradient id="lena-polo" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor={team} />
-          <stop offset="1" stopColor={team} stopOpacity="0.75" />
-        </linearGradient>
-        <clipPath id="lena-frame"><rect width="200" height="220" rx="18" /></clipPath>
+        <clipPath id={clip}><rect width="200" height="220" rx="18" /></clipPath>
       </defs>
-      <g clipPath="url(#lena-frame)">
+      <g clipPath={`url(#${clip})`}>
         {/* Ponytail and back hair */}
         <path d="M128 70 C160 80 166 130 150 168 C146 150 140 130 132 118 Z" fill={hair} />
         <path d="M60 92 C56 60 76 44 100 44 C126 44 146 60 140 96 L140 120 L60 120 Z" fill={hair} />
 
-        {/* Shoulders: team polo with collar and piping */}
-        <path d="M14 220 C18 192 40 180 70 174 L130 174 C160 180 182 192 186 220 Z" fill="url(#lena-polo)" />
-        <path d="M70 174 L100 202 L130 174 L120 172 L100 190 L80 172 Z" fill={team2} />
-        <path d="M30 196 C50 186 64 182 72 180" stroke={team2} strokeWidth="3" fill="none" opacity="0.7" />
-        <path d="M170 196 C150 186 136 182 128 180" stroke={team2} strokeWidth="3" fill="none" opacity="0.7" />
-        <rect x="138" y="190" width="22" height="12" rx="2" fill={team2} opacity="0.85" />
+        {/* Team shirt: base colour, a sweep across the shoulders, collar, name on the chest */}
+        <g key={teamId} className="lena-kit">
+          <path d="M8 220 C12 190 36 178 70 172 L130 172 C164 178 188 190 192 220 Z" fill={shirt} />
+          <path d="M8 220 C12 196 30 184 52 178 L64 200 C40 204 22 212 18 220 Z" fill={panel} />
+          <path d="M192 220 C188 196 170 184 148 178 L136 200 C160 204 178 212 182 220 Z" fill={panel} />
+          <path d="M30 206 C70 194 130 194 170 206" stroke={kit.pin} strokeWidth="2" fill="none" opacity="0.8" />
+          <path d="M72 172 L100 196 L128 172 L118 170 L100 186 L82 170 Z" fill={trim} />
+          <text x="62" y="207" fontFamily="'Titillium Web', sans-serif" fontWeight="900" fontStyle="italic" fontSize={kit.wordmark.length > 8 ? 7.5 : 10} fill={ink}>{kit.wordmark}</text>
+          <rect x="122" y="198" width="22" height="9" rx="1.5" fill={trim} opacity="0.85" />
+          <rect x="125" y="201" width="16" height="3" rx="1" fill={panel} />
+        </g>
 
         {/* Neck */}
-        <path d="M86 140 L86 176 C92 184 108 184 114 176 L114 140 Z" fill={skinShade} />
+        <path d="M86 140 L86 174 C92 182 108 182 114 174 L114 140 Z" fill={skinShade} />
 
         <g className="lena-head">
           {/* Ears and face */}
@@ -95,13 +106,22 @@ export function Lena({ size = 120, team, team2 }: { size?: number; team: string;
             </g>
           )}
 
-          {/* Headset: band, ear cups, boom mic */}
-          <path d="M58 104 C54 52 146 52 142 104" stroke="#1b1c20" strokeWidth="6" fill="none" strokeLinecap="round" />
-          <circle cx="58" cy="106" r="14" fill="#1b1c20" />
-          <circle cx="58" cy="106" r="9" fill="none" stroke={team} strokeWidth="2.5" />
-          <circle cx="142" cy="106" r="11" fill="#1b1c20" />
-          <path d="M60 118 C64 136 72 140 82 138" stroke="#1b1c20" strokeWidth="3.5" fill="none" strokeLinecap="round" />
-          <ellipse cx="85" cy="137.5" rx="5" ry="3.6" fill="#2b2d33" />
+          {/* Pit-wall headset: padded band, big closed-back cups in team colours, boom mic */}
+          <path d="M54 100 C48 40 152 40 146 100" stroke="#141519" strokeWidth="11" fill="none" strokeLinecap="round" />
+          <path d="M60 78 C70 50 130 50 140 78" stroke={panel} strokeWidth="2.5" fill="none" strokeLinecap="round" opacity="0.9" />
+          <g key={`cups-${teamId}`} className="lena-kit">
+            {[52, 148].map((cx) => (
+              <g key={cx}>
+                <rect x={cx - 13} y="86" width="26" height="40" rx="12" fill="#141519" />
+                <rect x={cx - 9} y="91" width="18" height="30" rx="8" fill={shirt} />
+                <rect x={cx - 9} y="103" width="18" height="5" fill={panel} />
+                <circle cx={cx} cy="96" r="1.6" fill="#7cf29b" />
+              </g>
+            ))}
+          </g>
+          <path d="M56 122 C58 140 68 146 80 142" stroke="#141519" strokeWidth="4" fill="none" strokeLinecap="round" />
+          <ellipse cx="84" cy="141" rx="6.5" ry="4.6" fill="#2b2d33" />
+          <ellipse cx="84" cy="141" rx="4.5" ry="3" fill="#3a3d45" />
         </g>
       </g>
       {status === "thinking" && (

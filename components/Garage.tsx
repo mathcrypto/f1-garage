@@ -5,11 +5,14 @@ import { useEffect, useRef, useState } from "react"
 import { EngineerCam, LessonList } from "./EngineerCam"
 import { EngineerPanel, useEngineer } from "./Engineer"
 import { SoundMenu, ThemePlayer } from "./SoundMenu"
+import { startShowcase, stopShowcase, useShowcase } from "@/lib/showcase"
+import { sound } from "@/lib/sound"
+import { voice } from "@/lib/voice"
 import { PaddockPanel } from "./Paddock"
 import { telemetry } from "@/lib/drive"
 import { CAR_SPECS, PARTS, SPEC_SOURCE, partById } from "@/lib/parts"
 import { REGULATIONS_2026 } from "@/lib/regulations"
-import { useGarage, type CameraPreset } from "@/lib/store"
+import { useEngineerState, useGarage, type CameraPreset } from "@/lib/store"
 import { TEAMS, teamById } from "@/lib/teams"
 
 const Scene = dynamic(() => import("./three/Scene"), {
@@ -151,7 +154,19 @@ export function Garage() {
     if (selected && !busyRef.current) setTab("part")
   }, [selected])
 
+  const showcase = useShowcase((s) => s.running)
   const pickTeam = (id: string) => {
+    if (id !== teamId) {
+      // Lena changes into the new team's kit and says hello.
+      const next = teamById(id)
+      const line = `Right, I'm on the ${next.name} pit wall now. Let's have a look at the ${next.car}.`
+      const lena = useEngineerState.getState()
+      if (!lena.lesson && !showcase) {
+        lena.setCaption(line)
+        if (voice.enabled && voice.supported) voice.say(line)
+        else { lena.setStatus("talking"); setTimeout(() => useEngineerState.getState().setStatus("idle"), 3500) }
+      }
+    }
     setTeam(id)
     try { localStorage.setItem("f1-garage:team", id) } catch {}
   }
@@ -189,9 +204,12 @@ export function Garage() {
 
         <div className="stage-tools">
           <div className="seg" role="group" aria-label="View mode">
-            <button className={mode === "studio" ? "on" : ""} onClick={() => setMode("studio")}>Studio</button>
+            <button className={mode === "studio" ? "on" : ""} onClick={() => { if (showcase) stopShowcase(); sound.engineStop(); setMode("studio") }}>Studio</button>
             <button className={mode === "drive" ? "on" : ""} onClick={() => setMode("drive")}>Drive</button>
           </div>
+          <button className={showcase ? "showcase on" : "showcase"} onClick={() => (showcase ? stopShowcase() : startShowcase())}>
+            {showcase ? <>■ Stop showcase</> : <>▶ Showcase</>}
+          </button>
           <button className={exploded ? "tool on" : "tool"} onClick={() => setExploded(!exploded)}>
             {exploded ? "Reassemble" : "Exploded view"}
           </button>
@@ -208,7 +226,7 @@ export function Garage() {
         </div>
 
         {mode === "drive" && <DriveHud />}
-        <EngineerCam team={team.ui} team2={team.livery.secondary} />
+        <EngineerCam />
         <ThemePlayer />
 
         <div className="dock" aria-label="Car parts">

@@ -18,6 +18,7 @@ const PRESETS: Record<CameraPreset, [number, number, number, number, number, num
   top: [0, 12.5, 0.01, 0, 0, 0],
   rear: [0, 1.8, -9.4, 0, 0.5, 0],
   chase: [5.4, 1.4, 6.6, 0, 0.4, 0.2],
+  low: [2.6, 0.32, 5.4, 0, 0.35, 0.6],
 }
 
 function CameraRig({ reducedMotion }: { reducedMotion: boolean }) {
@@ -198,8 +199,8 @@ function Ring({ color }: { color: string }) {
 
 function Director() {
   useFrame((state, dt) => {
-    if (useGarage.getState().mode === "drive") stepTelemetry(state.clock.elapsedTime, Math.min(dt, 0.05))
-    else telemetry.speed = 0
+    if (useGarage.getState().mode === "drive") stepTelemetry(Math.min(dt, 0.05))
+    else { telemetry.speed = 0; telemetry.driveTime = 0; telemetry.braking = 0; telemetry.ers = 0 }
   })
   return null
 }

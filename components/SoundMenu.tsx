@@ -49,6 +49,11 @@ export function SoundMenu() {
     return () => sound.stop()
   }, [])
 
+  // The showcase can switch sounds on by itself; reflect that when opening.
+  useEffect(() => {
+    if (open) { setMusic(sound.musicOn); setEngine(sound.engineOn) }
+  }, [open])
+
   useEffect(() => {
     if (!open) return
     const close = (e: MouseEvent) => { if (!ref.current?.contains(e.target as Node)) setOpen(false) }

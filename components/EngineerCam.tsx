@@ -77,19 +77,23 @@ export function LessonList({ compact = false }: { compact?: boolean }) {
   )
 }
 
-export function EngineerCam({ team, team2 }: { team: string; team2: string }) {
+export function EngineerCam() {
   useLessonRunner()
+  const teamId = useGarage((s) => s.teamId)
   const { status, caption, lesson, setLesson, setCaption } = useEngineerState()
   const [hidden, setHidden] = useState(false)
   const [lingering, setLingering] = useState(false)
   const data = lesson ? lessonById(lesson.id) : undefined
 
-  // Keep the last line on screen for a moment after she stops talking.
+  // Show every new line, and keep it on screen for a moment after she stops.
   useEffect(() => {
-    if (status !== "idle") { setLingering(true); setHidden(false); return }
-    const t = setTimeout(() => setLingering(false), 5000)
+    if (!caption && status === "idle") return
+    setLingering(true)
+    setHidden(false)
+    if (status !== "idle") return
+    const t = setTimeout(() => setLingering(false), 6000)
     return () => clearTimeout(t)
-  }, [status])
+  }, [status, caption])
 
   const visible = !hidden && (status !== "idle" || lesson || lingering) && (caption || status === "thinking" || lesson)
   if (!visible) return null
@@ -107,7 +111,7 @@ export function EngineerCam({ team, team2 }: { team: string; team2: string }) {
   return (
     <section className="cam" aria-live="polite" aria-label={`${ENGINEER.name} explains`}>
       <div className="cam-portrait">
-        <Lena size={84} team={team} team2={team2} />
+        <Lena size={84} teamId={teamId} />
         <span className={`cam-status ${status}`}>{status === "thinking" ? "Thinking" : status === "talking" ? "On radio" : "Standing by"}</span>
       </div>
       <div className="cam-body">

@@ -143,7 +143,7 @@ export function EngineerPanel({ engineer }: { engineer: ReturnType<typeof useEng
   return (
     <div className="engineer">
       <div className="engineer-id">
-        <Lena size={44} team={team.ui} team2={team.livery.secondary} />
+        <Lena size={44} teamId={teamId} />
         <div><strong>{ENGINEER.name}</strong><small>{ENGINEER.role} · {team.name}</small></div>
       </div>
       <div className="engineer-controls">
@@ -162,7 +162,7 @@ export function EngineerPanel({ engineer }: { engineer: ReturnType<typeof useEng
         {messages.length === 0 && (
           <div className="empty">
             <div className="empty-hero">
-              <Lena size={96} team={team.ui} team2={team.livery.secondary} />
+              <Lena size={96} teamId={teamId} />
               <div>
                 <p className="empty-title">Hi, I'm Lena.</p>
                 <p>I'm your race engineer. Ask me about any part, upgrade or rule. I'll check fia.com, live timing and the news, and take parts off the car to show you.</p>

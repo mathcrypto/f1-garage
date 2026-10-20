@@ -1,7 +1,7 @@
 import { create } from "zustand"
 
 export type ViewMode = "studio" | "drive"
-export type CameraPreset = "hero" | "front" | "side" | "top" | "rear" | "chase"
+export type CameraPreset = "hero" | "front" | "side" | "top" | "rear" | "chase" | "low"
 export type Highlight = { id: string; note: string }
 
 type GarageState = {
@@ -9,6 +9,9 @@ type GarageState = {
   selected: string | null
   hovered: string | null
   exploded: boolean
+  // Showcase mode takes parts off one after another instead of all at once.
+  explodeStagger: boolean
+  explodeChangedAt: number
   mode: ViewMode
   highlights: Highlight[]
   // Bumped on every request so the same preset can be re-applied.
@@ -22,7 +25,7 @@ type GarageState = {
   setTeam: (id: string) => void
   select: (id: string | null) => void
   hover: (id: string | null) => void
-  setExploded: (v: boolean) => void
+  setExploded: (v: boolean, stagger?: boolean) => void
   setMode: (m: ViewMode) => void
   setHighlights: (h: Highlight[]) => void
   setCamera: (preset: CameraPreset) => void
@@ -33,6 +36,8 @@ export const useGarage = create<GarageState>((set) => ({
   selected: null,
   hovered: null,
   exploded: false,
+  explodeStagger: false,
+  explodeChangedAt: 0,
   mode: "studio",
   highlights: [],
   camera: { preset: "hero", nonce: 0 },
@@ -43,7 +48,8 @@ export const useGarage = create<GarageState>((set) => ({
   setTeam: (teamId) => set({ teamId, highlights: [] }),
   select: (selected) => set({ selected }),
   hover: (hovered) => set({ hovered }),
-  setExploded: (exploded) => set(exploded ? { exploded, selected: null } : { exploded }),
+  setExploded: (exploded, stagger = false) =>
+    set({ exploded, explodeStagger: stagger, explodeChangedAt: performance.now() / 1000, ...(exploded ? { selected: null } : {}) }),
   setMode: (mode) => set((s) => ({ mode, camera: { preset: mode === "drive" ? "chase" : "hero", nonce: s.camera.nonce + 1 } })),
   setHighlights: (highlights) => set({ highlights }),
   setCamera: (preset) => set((s) => ({ camera: { preset, nonce: s.camera.nonce + 1 }, selected: null })),

@@ -5,7 +5,9 @@ import { useEngineerState } from "./store"
 // Lena's voice, using the browser's built-in speech synthesis. Answers are
 // spoken sentence by sentence as they stream in.
 
-const PREFERRED = ["Google UK English Female", "Microsoft Libby", "Microsoft Sonia", "Serena", "Kate", "Martha", "Samantha", "Microsoft Aria", "Microsoft Jenny", "Google US English", "Karen", "Moira", "Tessa"]
+// British English voices, best first. Lena always speaks en-GB.
+const PREFERRED = ["Microsoft Sonia Online", "Microsoft Libby Online", "Microsoft Maisie Online", "Google UK English Female", "Microsoft Libby", "Microsoft Sonia", "Microsoft Hazel", "Microsoft Susan", "Serena", "Kate", "Stephanie", "Martha"]
+const MALE = /\b(Daniel|Arthur|Oliver|George|Ryan|Thomas|Male|Google UK English Male)\b/i
 
 const clean = (text: string) =>
   text
@@ -39,7 +41,8 @@ class Voice {
       const v = voices.find((x) => x.name.startsWith(name))
       if (v) return v
     }
-    return voices.find((v) => v.lang.startsWith("en-GB")) ?? voices.find((v) => v.lang.startsWith("en")) ?? null
+    const gb = voices.filter((v) => v.lang.replace("_", "-").startsWith("en-GB"))
+    return gb.find((v) => !MALE.test(v.name)) ?? gb[0] ?? null
   }
 
   setEnabled(on: boolean) {
@@ -57,6 +60,10 @@ class Voice {
     const minMs = 1200 + text.split(/\s+/).length * 300
     this.onIdle = done ? () => setTimeout(done, Math.max(0, minMs - (Date.now() - started) - 2000)) : null
     this.queue(text)
+    // Show her talking right away, even if the voice is slow to start or missing.
+    const st = useEngineerState.getState()
+    st.setCaption(clean(text))
+    st.setStatus("talking")
   }
 
   // Streaming: feed answer text as it arrives; complete sentences are spoken.
@@ -91,8 +98,9 @@ class Voice {
     const u = new SpeechSynthesisUtterance(text)
     const v = this.pickVoice()
     if (v) u.voice = v
-    u.rate = 1.04
-    u.pitch = 1.08
+    u.lang = "en-GB"
+    u.rate = 1.02
+    u.pitch = 1.05
     const st = useEngineerState.getState
     u.onstart = () => { st().setStatus("talking"); st().setCaption(text) }
     u.onboundary = () => st().bumpMouth()

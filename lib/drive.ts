@@ -9,16 +9,25 @@ export const telemetry = {
   braking: 0, // 0..1
   steer: 0, // radians at the front wheels
   distance: 0, // metres travelled, drives the road scroll
+  driveTime: 0, // seconds since drive mode started; the first straight is a standing start
 }
 
 const LAP = 9 // seconds: a straight, a braking zone, a corner, then repeat
 
 // A scripted lap segment that shows off 2026 active aero: low-drag straight-line
 // mode with full electrical deployment, then high-downforce corner mode.
-export function stepTelemetry(t: number, dt: number) {
+export function stepTelemetry(dt: number) {
+  const t = (telemetry.driveTime += dt)
   const phase = t % LAP
   let speed: number
-  if (phase < 4.5) {
+  if (t < 4.5) {
+    // Launch from the grid: hard acceleration that tails off with drag.
+    telemetry.aero = "straight"
+    speed = 330 * (1 - Math.exp(-t / 1.55))
+    telemetry.ers = 1
+    telemetry.braking = 0
+    telemetry.steer = 0
+  } else if (phase < 4.5) {
     telemetry.aero = "straight"
     speed = 190 + (330 - 190) * Math.min(1, phase / 4.5) ** 0.7
     telemetry.ers = 0.75 + 0.25 * Math.sin(t * 9) * 0.2
