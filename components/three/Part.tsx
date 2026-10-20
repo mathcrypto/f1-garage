@@ -2,7 +2,8 @@
 
 import { Html } from "@react-three/drei"
 import { useFrame, type ThreeEvent } from "@react-three/fiber"
-import { useLayoutEffect, useRef, useState, type ReactNode } from "react"
+import { useContext, useLayoutEffect, useRef, useState, type ReactNode } from "react"
+import { PlainParts } from "./CarMotion"
 import * as THREE from "three"
 import { PART_IDS, partById } from "@/lib/parts"
 import { sound } from "@/lib/sound"
@@ -22,7 +23,14 @@ type Mat = THREE.MeshStandardMaterial & {
 
 // One selectable component. Several <Part>s can share an id (left and right
 // sidepods); they move together but each slides along its own direction.
-export function Part({ id, explode, children, label = true }: { id: string; explode: THREE.Vector3Tuple; children: ReactNode; label?: boolean }) {
+type PartProps = { id: string; explode: THREE.Vector3Tuple; children: ReactNode; label?: boolean }
+
+export function Part(props: PartProps) {
+  // On the track and in races the car is just a car: no picking or labels.
+  return useContext(PlainParts) ? <group>{props.children}</group> : <InteractivePart {...props} />
+}
+
+function InteractivePart({ id, explode, children, label = true }: PartProps) {
   const group = useRef<THREE.Group>(null!)
   const mats = useRef<Mat[]>([])
   const teamId = useGarage((s) => s.teamId)

@@ -529,6 +529,23 @@ class SoundEngine {
     this.script = null
   }
 
+  // Start-light tone: one short beep per light.
+  async beep(freq = 880, len = 0.18) {
+    await this.ensure()
+    const ctx = this.ctx!, t = ctx.currentTime
+    const o = ctx.createOscillator()
+    o.type = "square"
+    o.frequency.value = freq
+    const f = ctx.createBiquadFilter()
+    f.type = "lowpass"
+    f.frequency.value = 2400
+    const g = ctx.createGain()
+    this.env(g, t, 0.12, 0.005, len)
+    o.connect(f).connect(g).connect(this.master)
+    o.start(t)
+    o.stop(t + len + 0.05)
+  }
+
   // Heavy carbon part seating into place.
   async clunk() {
     if (!this.enabled || !this.ctx) return
@@ -585,7 +602,7 @@ class SoundEngine {
     if (!this.ctx || !this.parts) return
     const p = this.parts
     const t = this.ctx.currentTime
-    const driving = useGarage.getState().mode === "drive"
+    const driving = useGarage.getState().mode !== "studio"
     const on = this.engineOn && (driving || this.running)
     let rpm = 0
     let throttle = 0.35

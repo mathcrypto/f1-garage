@@ -1,6 +1,7 @@
 import { create } from "zustand"
 
-export type ViewMode = "studio" | "drive"
+export type ViewMode = "studio" | "drive" | "race"
+export type TrackCam = "chase" | "tv" | "heli" | "onboard"
 export type CameraPreset = "hero" | "front" | "side" | "top" | "rear" | "chase" | "low"
 export type Highlight = { id: string; note: string }
 
@@ -18,6 +19,8 @@ type GarageState = {
   camera: { preset: CameraPreset; nonce: number }
   // Blueprint rendering with edges, dimensions and spec callouts.
   technical: boolean
+  trackCam: TrackCam
+  setTrackCam: (c: TrackCam) => void
   // CFD-style airflow streamlines around the car.
   flow: boolean
   setTechnical: (v: boolean) => void
@@ -42,6 +45,8 @@ export const useGarage = create<GarageState>((set) => ({
   highlights: [],
   camera: { preset: "hero", nonce: 0 },
   technical: false,
+  trackCam: "chase",
+  setTrackCam: (trackCam) => set({ trackCam }),
   flow: false,
   setTechnical: (technical) => set({ technical }),
   setFlow: (flow) => set({ flow }),
@@ -50,7 +55,13 @@ export const useGarage = create<GarageState>((set) => ({
   hover: (hovered) => set({ hovered }),
   setExploded: (exploded, stagger = false) =>
     set({ exploded, explodeStagger: stagger, explodeChangedAt: performance.now() / 1000, ...(exploded ? { selected: null } : {}) }),
-  setMode: (mode) => set((s) => ({ mode, camera: { preset: mode === "drive" ? "chase" : "hero", nonce: s.camera.nonce + 1 } })),
+  setMode: (mode) =>
+    set((s) => ({
+      mode,
+      // Leaving the garage: nothing selected, taken apart or in X-ray.
+      ...(mode === "studio" ? {} : { selected: null, exploded: false, technical: false, flow: false, highlights: [] }),
+      camera: { preset: "hero", nonce: s.camera.nonce + 1 },
+    })),
   setHighlights: (highlights) => set({ highlights }),
   setCamera: (preset) => set((s) => ({ camera: { preset, nonce: s.camera.nonce + 1 }, selected: null })),
 }))

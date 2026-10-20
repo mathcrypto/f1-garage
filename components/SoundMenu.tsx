@@ -26,12 +26,18 @@ export function SoundMenu() {
   const [engine, setEngine] = useState(false)
   const [lena, setLena] = useState(true)
   const [volume, setVolume] = useState(0.7)
+  const [radio, setRadio] = useState(true)
+  const [natural, setNatural] = useState<boolean | null>(null)
   const ref = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     const v = load("f1-garage:voice", "on") === "on"
     setLena(v)
     voice.setEnabled(v)
+    const r = load("f1-garage:radio", "on") === "on"
+    setRadio(r)
+    voice.setRadio(r)
+    void voice.provider().then((p) => setNatural(Boolean(p)))
     const vol = Number(load("f1-garage:volume", "0.7"))
     if (vol > 0) { setVolume(vol); sound.setVolume(vol) }
     return () => sound.stop()
@@ -66,7 +72,13 @@ export function SoundMenu() {
           <p className="eyebrow">Sound</p>
           <Switch label="F1 Garage anthem" hint="Original soundtrack made for this site" on={music} onChange={(v) => { setMusic(v); sound.setMusic(v) }} />
           <Switch label="Engine sound" hint="V6 hybrid in Drive mode" on={engine} onChange={(v) => { setEngine(v); sound.setEngine(v) }} />
-          <Switch label="Lena's voice" hint={voice.supported ? "She reads her answers aloud" : "Not supported in this browser"} on={lena} onChange={(v) => { setLena(v); voice.setEnabled(v); save("f1-garage:voice", v ? "on" : "off") }} />
+          <Switch
+            label="Lena's voice"
+            hint={natural ? "Natural British voice" : natural === false ? "Browser voice · add a TTS key for a natural one" : "British English"}
+            on={lena}
+            onChange={(v) => { setLena(v); voice.setEnabled(v); save("f1-garage:voice", v ? "on" : "off") }}
+          />
+          <Switch label="Team radio effect" hint="Radio filter and beeps on her voice" on={radio} onChange={(v) => { setRadio(v); voice.setRadio(v); save("f1-garage:radio", v ? "on" : "off") }} />
           <label className="sm-row volume">
             <span><b>Volume</b><small>Anthem and engine</small></span>
             <input type="range" min={0} max={1} step={0.05} value={volume} onChange={(e) => { const v = Number(e.target.value); setVolume(v); sound.setVolume(v); save("f1-garage:volume", String(v)) }} aria-label="Volume" />

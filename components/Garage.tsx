@@ -3,10 +3,12 @@
 import dynamic from "next/dynamic"
 import { useEffect, useRef, useState } from "react"
 import { HoverChip, ToolRail } from "./Controls"
+import { RaceHud, RaceSetup } from "./RaceUI"
 import { EngineerCam } from "./EngineerCam"
 import { PartCard } from "./Learn"
 import { EngineerPanel, useEngineer } from "./Engineer"
 import { SoundMenu } from "./SoundMenu"
+import { TeamPicker } from "./TeamPicker"
 import { useShowcase } from "@/lib/showcase"
 import { voice } from "@/lib/voice"
 import { PaddockPanel } from "./Paddock"
@@ -61,6 +63,7 @@ export function Garage() {
   const [tab, setTab] = useState<"part" | "engineer" | "paddock">("part")
   const [panelOpen, setPanelOpen] = useState(true)
   const [webgl, setWebgl] = useState(true)
+  const [firstVisit, setFirstVisit] = useState(false)
   const engineer = useEngineer()
   const team = teamById(teamId)
 
@@ -69,6 +72,7 @@ export function Garage() {
     try {
       const saved = localStorage.getItem("f1-garage:team")
       if (saved && TEAMS.some((t) => t.id === saved)) setTeam(saved)
+      else setFirstVisit(true)
     } catch {}
   }, [setTeam])
 
@@ -116,14 +120,8 @@ export function Garage() {
           <svg viewBox="0 0 32 20" width="34" height="22" aria-hidden><path d="M2 18 L14 2 H30 L18 18 Z" fill="var(--team)" /><path d="M10 18 L16 10 H22 L16 18 Z" fill="var(--bg)" opacity=".85" /></svg>
           <div><strong>F1 GARAGE</strong><small>Unofficial fan project</small></div>
         </div>
-        <nav className="teams" aria-label="Choose a team">
-          {TEAMS.map((t) => (
-            <button key={t.id} className={t.id === teamId ? "team on" : "team"} onClick={() => pickTeam(t.id)} aria-pressed={t.id === teamId} style={{ ["--c" as string]: t.livery.primary, ["--c2" as string]: t.livery.secondary }}>
-              <i aria-hidden />
-              <span>{t.name}</span>
-            </button>
-          ))}
-        </nav>
+        <TeamPicker teamId={teamId} onPick={pickTeam} firstVisit={firstVisit} />
+        <div className="top-spacer" />
         <SoundMenu />
       </header>
 
@@ -145,10 +143,11 @@ export function Garage() {
           </button>
         )}
 
-        {mode === "drive" && <DriveHud />}
+        {mode !== "studio" && <DriveHud />}
+        {mode === "race" && <RaceHud />}
         <EngineerCam />
 
-        <div className="dock" aria-label="Car parts">
+        <div className="dock" aria-label="Car parts" hidden={mode !== "studio"}>
           {PARTS.map((p) => (
             <button key={p.id} className={p.id === selected ? "dock-item on" : "dock-item"} data-system={p.system} title={p.system} onClick={() => { if (exploded) setExploded(false); select(p.id === selected ? null : p.id) }}>
               <i className="sys" aria-hidden />
@@ -173,6 +172,7 @@ export function Garage() {
         <div className="tab-body" hidden={tab !== "paddock"}>{tab === "paddock" && <PaddockPanel />}</div>
         <p className="model-badge">Nemotron on Nebius · live data from FIA, OpenF1, Jolpica-F1</p>
       </aside>
+      <RaceSetup />
     </div>
   )
 }

@@ -3,13 +3,15 @@
 import { useFrame } from "@react-three/fiber"
 import { useMemo, useRef } from "react"
 import * as THREE from "three"
-import { telemetry } from "@/lib/drive"
-import { useGarage } from "@/lib/store"
+import type { Motion } from "@/lib/motion"
 
-// Tyre smoke: soft, lit billboards that pour off the rear tyres during the
-// burnout and launch, rise, swell, curl and drift back with the track.
-const MAX = 900
+// Tyre smoke: soft, lit billboards that pour off the rear tyres while they
+// spin (burnouts and launches), then rise, swell, curl and hang in the air.
+const MAX = 1400
 const EMITTERS: THREE.Vector3Tuple[] = [[0.78, 0.1, -1.72], [-0.78, 0.1, -1.72]]
+
+// Cars register here; each one smokes in proportion to its wheelspin.
+export const smokeSources = new Set<{ obj: THREE.Object3D; motion: Motion; carry?: number }>()
 
 function puffTexture() {
   const size = 256
@@ -76,6 +78,7 @@ const fragment = /* glsl */ `
 
 export function Smoke() {
   const mesh = useRef<THREE.Mesh>(null!)
+  const tmp = useMemo(() => ({ p: new THREE.Vector3(), v: new THREE.Vector3() }), [])
   const state = useMemo(
     () => ({
       pos: new Float32Array(MAX * 3),
@@ -118,30 +121,30 @@ export function Smoke() {
 
   useFrame((_, rawDt) => {
     const dt = Math.min(rawDt, 0.05)
-    const driving = useGarage.getState().mode === "drive"
-    const ground = telemetry.speed / 3.6 // the track moves backward at car speed
-
-    // Emission: heavy in the burnout, thinning out through the launch.
-    const rate = driving ? telemetry.wheelspin * 260 : 0
-    state.carry += rate * dt
-    while (state.carry >= 1) {
-      state.carry -= 1
-      const i = state.next
-      state.next = (state.next + 1) % MAX
-      const [ex, ey, ez] = EMITTERS[i % 2]
-      const side = Math.sign(ex)
-      state.pos[i * 3] = ex + (Math.random() - 0.5) * 0.3
-      state.pos[i * 3 + 1] = ey + Math.random() * 0.15
-      state.pos[i * 3 + 2] = ez + (Math.random() - 0.5) * 0.3
-      // Thrown outward and backward by the spinning tyre.
-      state.vel[i * 3] = side * (0.6 + Math.random() * 1.4)
-      state.vel[i * 3 + 1] = 0.25 + Math.random() * 0.7
-      state.vel[i * 3 + 2] = -(2.5 + Math.random() * 3.5)
-      state.age[i] = 0
-      state.life[i] = 2.4 + Math.random() * 2.0
-      state.grow[i] = 1.4 + Math.random() * 1.4
-      state.spin[i] = (Math.random() - 0.5) * 1.2
-      ;(geom.attributes.angle.array as Float32Array)[i] = Math.random() * Math.PI * 2
+    // Emission: heavy in a burnout, thinning out through a launch.
+    for (const src of smokeSources) {
+      src.carry = (src.carry ?? 0) + src.motion.wheelspin * 260 * dt
+      if (src.carry < 1) continue
+      src.obj.updateWorldMatrix(true, false)
+      while (src.carry >= 1) {
+        src.carry -= 1
+        const i = state.next
+        state.next = (state.next + 1) % MAX
+        const [ex, ey, ez] = EMITTERS[i % 2]
+        const side = Math.sign(ex)
+        tmp.p.set(ex + (Math.random() - 0.5) * 0.3, ey + Math.random() * 0.15, ez + (Math.random() - 0.5) * 0.3).applyMatrix4(src.obj.matrixWorld)
+        // Thrown outward and backward by the spinning tyre, in the car's frame.
+        tmp.v.set(side * (0.6 + Math.random() * 1.4), 0.25 + Math.random() * 0.7, -(2.5 + Math.random() * 3.5))
+        const speed = tmp.v.length()
+        tmp.v.transformDirection(src.obj.matrixWorld).multiplyScalar(speed)
+        state.pos.set([tmp.p.x, tmp.p.y, tmp.p.z], i * 3)
+        state.vel.set([tmp.v.x, tmp.v.y, tmp.v.z], i * 3)
+        state.age[i] = 0
+        state.life[i] = 2.4 + Math.random() * 2.0
+        state.grow[i] = 1.4 + Math.random() * 1.4
+        state.spin[i] = (Math.random() - 0.5) * 1.2
+        ;(geom.attributes.angle.array as Float32Array)[i] = Math.random() * Math.PI * 2
+      }
     }
 
     const size = geom.attributes.size.array as Float32Array
@@ -151,11 +154,11 @@ export function Smoke() {
       if (!(state.age[i] < state.life[i])) { alpha[i] = 0; continue }
       const a = (state.age[i] += dt)
       const k = a / state.life[i]
-      // Drag toward still air, buoyant rise, and the track carrying it away.
+      // Drag toward still air and a buoyant rise.
       const drag = Math.exp(-1.6 * dt)
       state.vel[i * 3] *= drag
       state.vel[i * 3 + 1] = state.vel[i * 3 + 1] * drag + 0.22 * dt
-      state.vel[i * 3 + 2] = state.vel[i * 3 + 2] * drag + (-ground * 0.9 - state.vel[i * 3 + 2]) * (1 - drag) * 0.6
+      state.vel[i * 3 + 2] *= drag
       state.pos[i * 3] += state.vel[i * 3] * dt
       state.pos[i * 3 + 1] = Math.max(0.05, state.pos[i * 3 + 1] + state.vel[i * 3 + 1] * dt)
       state.pos[i * 3 + 2] += state.vel[i * 3 + 2] * dt
@@ -167,7 +170,7 @@ export function Smoke() {
     geom.attributes.size.needsUpdate = true
     geom.attributes.alpha.needsUpdate = true
     geom.attributes.angle.needsUpdate = true
-    mesh.current.visible = driving || alpha.some((v) => v > 0)
+    mesh.current.visible = smokeSources.size > 0 || alpha.some((v) => v > 0)
   })
 
   return <mesh ref={mesh} geometry={geom} material={material} frustumCulled={false} renderOrder={5} />

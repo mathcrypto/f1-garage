@@ -4,7 +4,8 @@ import { useEffect, useState, type ReactNode } from "react"
 import { partById } from "@/lib/parts"
 import { startShowcase, stopShowcase, useShowcase } from "@/lib/showcase"
 import { sound } from "@/lib/sound"
-import { useGarage, type CameraPreset } from "@/lib/store"
+import { useGarage, type CameraPreset, type TrackCam } from "@/lib/store"
+import { endRace, openRaceSetup } from "./RaceUI"
 
 const ICONS = {
   play: <path d="M8 5l11 7-11 7z" fill="currentColor" />,
@@ -15,6 +16,8 @@ const ICONS = {
   wind: <path d="M3 9h11a3 3 0 1 0-3-3M3 15h15a3 3 0 1 1-3 3M3 12h8" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />,
   camera: <><rect x="3" y="7" width="18" height="12" rx="2" fill="none" stroke="currentColor" strokeWidth="2" /><circle cx="12" cy="13" r="3.2" fill="none" stroke="currentColor" strokeWidth="2" /><path d="M8 7l1.5-2.5h5L16 7" fill="none" stroke="currentColor" strokeWidth="2" /></>,
   clear: <path d="M6 6l12 12M18 6L6 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />,
+  flag: <><path d="M5 21V4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" /><path d="M5 4h13l-2.5 4L18 12H5z" fill="currentColor" /></>,
+  exit: <path d="M10 4H5v16h5M14 8l4 4-4 4M18 12H9" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />,
 }
 
 function RailButton({ icon, label, on, primary, onClick }: { icon: keyof typeof ICONS; label: string; on?: boolean; primary?: boolean; onClick: () => void }) {
@@ -27,24 +30,40 @@ function RailButton({ icon, label, on, primary, onClick }: { icon: keyof typeof 
 }
 
 const CAMS: CameraPreset[] = ["hero", "side", "front", "top", "rear"]
+const TRACK_CAMS: TrackCam[] = ["chase", "tv", "onboard", "heli"]
+const TRACK_CAM_NAMES: Record<TrackCam, string> = { chase: "chase", tv: "TV", onboard: "onboard", heli: "helicopter" }
 
 // One compact rail of icon buttons; labels appear on hover or focus.
 export function ToolRail() {
-  const { mode, setMode, exploded, setExploded, technical, setTechnical, flow, setFlow, selected, highlights, select, setHighlights, setCamera } = useGarage()
+  const { mode, setMode, exploded, setExploded, technical, setTechnical, flow, setFlow, selected, highlights, select, setHighlights, setCamera, trackCam, setTrackCam } = useGarage()
   const showcase = useShowcase((s) => s.running)
   const [cam, setCam] = useState(0)
+  const nextTrackCam = TRACK_CAMS[(TRACK_CAMS.indexOf(trackCam) + 1) % TRACK_CAMS.length]
+
+  if (mode === "race") {
+    return (
+      <div className="rail" role="toolbar" aria-label="Race controls">
+        <RailButton icon="camera" label={`Camera: ${TRACK_CAM_NAMES[nextTrackCam]}`} onClick={() => setTrackCam(nextTrackCam)} />
+        <RailButton icon="flag" label="New race" onClick={() => { endRace(); openRaceSetup() }} />
+        <RailButton icon="exit" label="Back to the garage" onClick={endRace} />
+      </div>
+    )
+  }
+  if (mode === "drive") {
+    return (
+      <div className="rail" role="toolbar" aria-label="Drive controls">
+        <RailButton icon={showcase ? "stop" : "play"} label={showcase ? "Stop showcase" : "Showcase"} primary on={showcase} onClick={() => (showcase ? stopShowcase() : startShowcase())} />
+        <RailButton icon="camera" label={`Camera: ${TRACK_CAM_NAMES[nextTrackCam]}`} onClick={() => setTrackCam(nextTrackCam)} />
+        <RailButton icon="flag" label="Race" onClick={openRaceSetup} />
+        <RailButton icon="exit" label="Back to the garage" onClick={() => { if (showcase) stopShowcase(); sound.engineStop(); setMode("studio") }} />
+      </div>
+    )
+  }
   return (
     <div className="rail" role="toolbar" aria-label="View controls">
       <RailButton icon={showcase ? "stop" : "play"} label={showcase ? "Stop showcase" : "Showcase"} primary on={showcase} onClick={() => (showcase ? stopShowcase() : startShowcase())} />
-      <RailButton
-        icon="drive"
-        label={mode === "drive" ? "Back to the garage" : "Drive (burnout and launch)"}
-        on={mode === "drive"}
-        onClick={() => {
-          if (mode === "drive") { if (showcase) stopShowcase(); sound.engineStop(); setMode("studio") }
-          else { sound.setEngine(true); setMode("drive") }
-        }}
-      />
+      <RailButton icon="drive" label="Drive a lap (burnout and launch)" onClick={() => { void sound.setEngine(true); setMode("drive") }} />
+      <RailButton icon="flag" label="Race" onClick={openRaceSetup} />
       <RailButton icon="explode" label={exploded ? "Put it back together" : "Take it apart"} on={exploded} onClick={() => setExploded(!exploded)} />
       <RailButton icon="xray" label="X-ray view" on={technical} onClick={() => setTechnical(!technical)} />
       <RailButton icon="wind" label="Airflow" on={flow} onClick={() => setFlow(!flow)} />

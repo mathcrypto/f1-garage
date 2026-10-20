@@ -5,11 +5,11 @@ import { useFrame } from "@react-three/fiber"
 import { useEffect, useMemo, useRef } from "react"
 import * as THREE from "three"
 import type { Team } from "@/lib/teams"
-import { telemetry } from "@/lib/drive"
 import { liveryFor } from "@/lib/liveries"
 import { useGarage } from "@/lib/store"
 import { airfoil, loft, plate, profile, rod, tube, tyre, type Section } from "./geometry"
 import { paintLivery, sideUV, useTeamLogos, useWordmark } from "./livery"
+import { IDLE, useMotion } from "./CarMotion"
 import { Part } from "./Part"
 
 // ── Materials ────────────────────────────────────────────────────────────────
@@ -171,18 +171,20 @@ function Wheel({ geo, m, side, front }: { geo: Geo; m: Mats; side: 1 | -1; front
   const steer = useRef<THREE.Group>(null!)
   const spin = useRef<THREE.Group>(null!)
   const brake = useRef<THREE.Mesh>(null!)
+  const motion = useMotion()
   const width = front ? 0.3 : 0.38
   const half = width / 2
 
   useFrame((_, dt) => {
-    const driving = useGarage.getState().mode === "drive"
-    const speed = driving ? telemetry.speed / 3.6 : 0
+    const m = motion ?? IDLE
+    const driving = motion !== null
+    const speed = m.speed / 3.6
     // Rear tyres spin far faster than the car moves during the burnout.
-    const spinBoost = driving && !front ? telemetry.wheelspin * 70 : 0
+    const spinBoost = !front ? m.wheelspin * 70 : 0
     spin.current.rotation.x += (speed / 0.36 + spinBoost) * dt
-    if (front) steer.current.rotation.y = THREE.MathUtils.damp(steer.current.rotation.y, driving ? telemetry.steer : 0, 6, dt)
+    if (front) steer.current.rotation.y = THREE.MathUtils.damp(steer.current.rotation.y, m.steer, 6, dt)
     const mat = brake.current.material as THREE.MeshStandardMaterial
-    mat.emissiveIntensity = THREE.MathUtils.damp(mat.emissiveIntensity, driving ? telemetry.braking * 6 : 0, 4, dt)
+    mat.emissiveIntensity = THREE.MathUtils.damp(mat.emissiveIntensity, driving ? m.braking * 6 : 0, 4, dt)
   })
 
   return (
@@ -225,8 +227,9 @@ function Wheel({ geo, m, side, front }: { geo: Geo; m: Mats; side: 1 | -1; front
 
 function Flap({ geometry, material, position, corner, straight }: { geometry: THREE.BufferGeometry; material: THREE.Material; position: THREE.Vector3Tuple; corner: number; straight: number }) {
   const ref = useRef<THREE.Mesh>(null!)
+  const motion = useMotion()
   useFrame((_, dt) => {
-    const open = useGarage.getState().mode === "drive" && telemetry.aero === "straight"
+    const open = motion !== null && motion.aero === "straight"
     ref.current.rotation.x = THREE.MathUtils.damp(ref.current.rotation.x, open ? straight : corner, 7, dt)
   })
   return <mesh ref={ref} geometry={geometry} material={material} position={position} rotation={[corner, 0, 0]} />
@@ -234,10 +237,10 @@ function Flap({ geometry, material, position, corner, straight }: { geometry: TH
 
 function PowerUnit({ geo, m }: { geo: Geo; m: Mats }) {
   const battery = useRef<THREE.Mesh>(null!)
+  const motion = useMotion()
   useFrame((state) => {
-    const driving = useGarage.getState().mode === "drive"
     const mat = battery.current.material as THREE.MeshStandardMaterial
-    mat.emissiveIntensity = driving ? 0.4 + telemetry.ers * 2.5 : 0.35 + 0.15 * Math.sin(state.clock.elapsedTime * 2)
+    mat.emissiveIntensity = motion ? 0.4 + motion.ers * 2.5 : 0.35 + 0.15 * Math.sin(state.clock.elapsedTime * 2)
   })
   return (
     <>
@@ -302,17 +305,19 @@ export function Car({ team }: { team: Team }) {
   const carName = useWordmark(team.car, design.wordmarkColor)
   const brand = useTeamLogos(team.id)
   const body = useRef<THREE.Group>(null!)
+  const motion = useMotion()
 
   // Ride the bumps, pitch under braking, roll into the corner.
   useFrame((state, dt) => {
-    const driving = useGarage.getState().mode === "drive"
+    const driving = motion !== null && motion.speed + motion.wheelspin > 0
+    const m = motion ?? IDLE
     const t = state.clock.elapsedTime
     const b = body.current
     b.position.y = THREE.MathUtils.damp(b.position.y, driving ? Math.sin(t * 31) * 0.003 + Math.sin(t * 7.3) * 0.004 : 0, 12, dt)
-    b.rotation.z = THREE.MathUtils.damp(b.rotation.z, driving ? -telemetry.steer * 0.12 + Math.sin(t * 17) * 0.004 * telemetry.wheelspin : 0, 4, dt)
+    b.rotation.z = THREE.MathUtils.damp(b.rotation.z, driving ? -m.steer * 0.12 + Math.sin(t * 17) * 0.004 * m.wheelspin : 0, 4, dt)
     // Squat onto the rear under wheelspin, with a little fishtail.
-    b.rotation.x = THREE.MathUtils.damp(b.rotation.x, driving ? telemetry.braking * 0.012 - telemetry.wheelspin * 0.012 : 0, 5, dt)
-    b.rotation.y = THREE.MathUtils.damp(b.rotation.y, driving ? Math.sin(t * 6.5) * 0.012 * telemetry.wheelspin : 0, 6, dt)
+    b.rotation.x = THREE.MathUtils.damp(b.rotation.x, driving ? m.braking * 0.012 - m.wheelspin * 0.012 : 0, 5, dt)
+    b.rotation.y = THREE.MathUtils.damp(b.rotation.y, driving ? Math.sin(t * 6.5) * 0.012 * m.wheelspin : 0, 6, dt)
   })
 
   return (

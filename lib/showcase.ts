@@ -28,12 +28,12 @@ export async function startShowcase() {
   const wait = (ms: number) => new Promise<boolean>((r) => setTimeout(() => r(alive()), ms))
   const g = useGarage.getState
   const team = teamById(g().teamId)
-  const say = (text: string) => {
-    const lena = useEngineerState.getState()
-    lena.setLesson(null)
-    lena.setCaption(text)
-    if (voice.enabled && voice.supported) voice.say(text)
-    else lena.setStatus("talking")
+  // Each line plays to the end before the show moves on; `atLeast` keeps the
+  // visuals on screen long enough even when she's quick.
+  const say = async (text: string, atLeast = 0) => {
+    useEngineerState.getState().setLesson(null)
+    await Promise.all([voice.speak(text), wait(atLeast)])
+    return alive()
   }
   const cut = (preset: CameraPreset) => g().setCamera(preset)
 
@@ -47,43 +47,37 @@ export async function startShowcase() {
   // Engine sound is part of the show; this click is the user gesture browsers need.
   await sound.setEngine(true)
 
-  say(`This is the ${team.car}. Let me show you how it all fits together.`)
-  if (!(await wait(3400))) return
+  if (!(await say(`Radio check. This is the ${team.car}. Let's take her apart.`, 2500))) return
 
   g().setExploded(true, true)
-  say("Front wing, nose, suspension, bodywork, the floor, the power unit. Every major component comes off.")
-  if (!(await wait(STAGGER_MS + 3600))) return
+  if (!(await say("Front wing, nose, suspension. Bodywork, floor, power unit. All off, all accounted for.", STAGGER_MS + 1500))) return
 
   g().setTechnical(true)
-  say("In blueprint view you can see the structure, and the FIA's limits: a maximum wheelbase of 3400 millimetres and 1900 wide.")
-  if (!(await wait(5200))) return
+  if (!(await say("X-ray. Wheelbase thirty-four hundred, width nineteen hundred. Right on the limits.", 3500))) return
 
   g().setTechnical(false)
   g().setExploded(false, true)
-  say("And back together.")
-  if (!(await wait(STAGGER_MS + 1400))) return
+  if (!(await say("Putting her back together.", STAGGER_MS + 800))) return
 
-  say("Fire it up.")
+  if (!(await say("Engine fire-up in three, two, one."))) return
   await sound.engineStart()
   if (!(await wait(2300))) return
   sound.revBlip()
   if (!(await wait(1300))) return
   sound.revBlip(12200)
-  if (!(await wait(1700))) return
+  if (!(await wait(1500))) return
 
+  g().setTrackCam("chase")
   g().setMode("drive")
-  say("Lights out, and away we go!")
-  if (!(await wait(4200))) return
-  cut("side")
-  say("On the straights it runs X-mode: the wings open, drag drops and the electric motor gives everything it has.")
-  if (!(await wait(4600))) return
-  cut("low")
-  say("Into the corner, Z-mode: wings closed for downforce, and the brakes glowing at over a thousand degrees.")
-  if (!(await wait(4600))) return
-  cut("front")
-  if (!(await wait(3800))) return
-  cut("chase")
-  say("That's the car. Click any part, or ask me anything.")
-  await wait(4000)
+  if (!(await say("Burnout. Get some heat in those rears.", 1800))) return
+  if (!(await say("Launch, launch! Good start.", 2500))) return
+  g().setTrackCam("tv")
+  if (!(await say("Straight-line mode. Wings open, full deployment.", 3500))) return
+  g().setTrackCam("onboard")
+  if (!(await say("Corner mode. Wings closed. Hit your marks.", 3500))) return
+  g().setTrackCam("heli")
+  if (!(await wait(3500))) return
+  g().setTrackCam("chase")
+  await say("Good job. That's the car. Over to you.", 2500)
   if (alive()) useShowcase.setState({ running: false })
 }

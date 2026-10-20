@@ -109,9 +109,11 @@ export function Airflow() {
       <points geometry={geom}>
         <pointsMaterial size={0.07} map={tex} vertexColors transparent depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} sizeAttenuation />
       </points>
-      <Html position={[0, 2.2, -3.6]} center className="flow-legend-wrap">
-        <div className="flow-legend"><span>Air speed</span><i /><small>slow</small><small>fast</small></div>
-      </Html>
+      {flow && (
+        <Html position={[0, 2.2, -3.6]} center className="flow-legend-wrap">
+          <div className="flow-legend"><span>Air speed</span><i /><small>slow</small><small>fast</small></div>
+        </Html>
+      )}
     </group>
   )
 }
