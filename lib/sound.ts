@@ -41,6 +41,9 @@ async function fetchAudio(ctx: AudioContext, ...urls: string[]) {
 class SoundEngine {
   ctx: AudioContext | null = null
   muted = false
+  // Set while the showcase runs: the garage music carries on through it.
+  showcase = false
+  private lastTalk = -Infinity
   private master!: GainNode
   private engine!: GainNode
   private music!: GainNode
@@ -303,15 +306,21 @@ class SoundEngine {
     // Music: "Limit 70" while you explore the car, "Apex" on the race grid;
     // both fade out once the cars are moving, and dip under Lena's voice.
     const moving = onTrack && (v > 1 || telemetry.wheelspin > 0.1)
+    // The music stops while Lena speaks and comes back a moment after she's
+    // finished, picking up where it left off.
+    if (talking) this.lastTalk = t
+    const quiet = !talking && t - this.lastTalk > 1.2
     const fade = (track: typeof this.theme, want: boolean, level: number) => {
       if (!track) return
-      track.gain.gain.setTargetAtTime(want ? (talking ? level * 0.35 : level) : 0, t, want ? 0.5 : 0.8)
-      if (want && track.el.paused) { if (track === this.grid) track.el.currentTime = 0; void track.el.play().catch(() => {}) }
-      if (!want && !track.el.paused && track.gain.gain.value < 0.005) track.el.pause()
+      const on = want && quiet
+      track.gain.gain.setTargetAtTime(on ? level : 0, t, on ? 0.6 : 0.12)
+      if (on && track.el.paused) void track.el.play().catch(() => {})
+      if (!on && !track.el.paused && track.gain.gain.value < 0.005) track.el.pause()
     }
     this.music.gain.value = 1
-    fade(this.theme, !this.muted && garage.mode === "studio", 0.3)
-    fade(this.grid, !this.muted && garage.mode === "race" && !moving, 0.4)
+    fade(this.theme, !this.muted && (garage.mode === "studio" || this.showcase), 0.3)
+    if (this.grid && garage.mode === "race" && !moving && this.grid.el.paused && this.grid.el.currentTime > 70) this.grid.el.currentTime = 0
+    fade(this.grid, !this.muted && garage.mode === "race" && !moving && !this.showcase, 0.4)
 
     if (onTrack && !this.wasOnTrack) this.engineStart(t)
     this.wasOnTrack = onTrack

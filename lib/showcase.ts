@@ -19,12 +19,14 @@ const STAGGER_MS = PART_IDS.length * 200
 export function stopShowcase() {
   run++
   useShowcase.setState({ running: false })
+  sound.showcase = false
   voice.stop()
 }
 
 export async function startShowcase() {
   const me = ++run
   useShowcase.setState({ running: true })
+  sound.showcase = true
   const alive = () => me === run
   const wait = (ms: number) => new Promise<boolean>((r) => setTimeout(() => r(alive()), ms))
   const g = useGarage.getState
@@ -78,5 +80,5 @@ export async function startShowcase() {
   if (!(await wait(3500))) return
   g().setTrackCam("chase")
   await say(L[9], 2500)
-  if (alive()) useShowcase.setState({ running: false })
+  if (alive()) { useShowcase.setState({ running: false }); sound.showcase = false }
 }

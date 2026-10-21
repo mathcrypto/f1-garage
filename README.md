@@ -83,7 +83,7 @@ The engine is only heard on track (Drive and Race). It uses real recordings from
 
 ## Music and logos
 
-- Music is public domain: "Limit 70" by Kevin MacLeod in the garage (`public/audio/theme.mp3`) and "Apex" by Alexander Nakarada on the race grid (`public/audio/grid.mp3`), both from FreePD. They fade out once the cars are moving. The official F1 theme and the F1 film soundtrack are copyrighted and aren't used; replace either file with a track you're licensed to use if you like.
+- Music is public domain: "Limit 70" by Kevin MacLeod in the garage (`public/audio/theme.mp3`) and "Apex" by Alexander Nakarada on the race grid (`public/audio/grid.mp3`), both from FreePD. The garage track plays while you explore and through the showcase; it stops whenever Lena speaks and picks up where it left off a moment after she's finished. The grid track fades out once the cars are moving. The official F1 theme and the F1 film soundtrack are copyrighted and aren't used; replace either file with a track you're licensed to use if you like.
 - Team and sponsor logos are trademarks, so none are bundled; the car shows generated wordmarks instead. If you have the rights, drop the files into `public/logos/` and list them in `public/logos/manifest.json` (see `public/logos/README.md`). They then replace the wordmarks on the sidepods, shark fin and wings.
 
 ## About the 3D model
