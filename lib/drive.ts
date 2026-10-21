@@ -19,7 +19,7 @@ export const BURNOUT = 2.2
 export const driveLaps = { lap: 0, last: null as number | null, best: null as number | null, start: null as number | null, s: 0 }
 
 // Before that, the engine is fired up with the car standing still.
-export const ENGINE_START = 2.4
+export const ENGINE_START = 3.2
 
 // 8-speed gearbox: up at about 11,900 rpm, landing near 10,300.
 const TOPS = [95, 135, 170, 205, 240, 272, 302, 340] // km/h at the top of each gear

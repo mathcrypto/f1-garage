@@ -1,0 +1,157 @@
+{
+ "_source": "Ferrari 458 (2013) recordings by Pole Position Production, Sonniss GDC 2020 Game Audio Bundle (royalty-free, no attribution required); looped and cut by Yassin Soliman (MIT, github.com/yassinsolim/personal-portfolio). Revs mapped from 1,015-9,000 rpm onto this car's 4,300-11,900.",
+ "sprite": [
+  "ferrari-458.m4a",
+  "ferrari-458.webm"
+ ],
+ "layers": [
+  {
+   "start": 0.08,
+   "dur": 2.009542,
+   "rpm": 4300,
+   "load": "on",
+   "db": 0.0
+  },
+  {
+   "start": 2.209542,
+   "dur": 1.12,
+   "rpm": 4762,
+   "load": "on",
+   "db": -0.17
+  },
+  {
+   "start": 3.449542,
+   "dur": 1.090833,
+   "rpm": 5428,
+   "load": "on",
+   "db": -0.83
+  },
+  {
+   "start": 4.660375,
+   "dur": 1.12,
+   "rpm": 6189,
+   "load": "on",
+   "db": -0.02
+  },
+  {
+   "start": 5.900375,
+   "dur": 1.10775,
+   "rpm": 7046,
+   "load": "on",
+   "db": -1.48
+  },
+  {
+   "start": 7.128125,
+   "dur": 1.1,
+   "rpm": 7903,
+   "load": "on",
+   "db": -2.12
+  },
+  {
+   "start": 8.348125,
+   "dur": 1.09525,
+   "rpm": 8757,
+   "load": "on",
+   "db": -3.0
+  },
+  {
+   "start": 9.563375,
+   "dur": 1.09125,
+   "rpm": 9614,
+   "load": "on",
+   "db": -3.08
+  },
+  {
+   "start": 10.774625,
+   "dur": 1.104,
+   "rpm": 10472,
+   "load": "on",
+   "db": -1.87
+  },
+  {
+   "start": 11.998625,
+   "dur": 1.100458,
+   "rpm": 11326,
+   "load": "on",
+   "db": -3.37
+  },
+  {
+   "start": 13.219083,
+   "dur": 1.106667,
+   "rpm": 11900,
+   "load": "on",
+   "db": -2.82
+  },
+  {
+   "start": 14.44575,
+   "dur": 1.114208,
+   "rpm": 5999,
+   "load": "off",
+   "db": -0.33
+  },
+  {
+   "start": 15.679958,
+   "dur": 1.113938,
+   "rpm": 7333,
+   "load": "off",
+   "db": -0.9
+  },
+  {
+   "start": 16.913896,
+   "dur": 1.093312,
+   "rpm": 8662,
+   "load": "off",
+   "db": -2.3
+  },
+  {
+   "start": 18.127208,
+   "dur": 1.097333,
+   "rpm": 9995,
+   "load": "off",
+   "db": -3.05
+  },
+  {
+   "start": 19.344542,
+   "dur": 1.100458,
+   "rpm": 11326,
+   "load": "off",
+   "db": -2.53
+  }
+ ],
+ "shots": {
+  "pop": [
+   {
+    "start": 20.575,
+    "dur": 0.35
+   },
+   {
+    "start": 21.045,
+    "dur": 0.35
+   },
+   {
+    "start": 21.515,
+    "dur": 0.35
+   },
+   {
+    "start": 21.985,
+    "dur": 0.35
+   }
+  ],
+  "crackle": [
+   {
+    "start": 22.455,
+    "dur": 0.6
+   },
+   {
+    "start": 23.175,
+    "dur": 0.7
+   }
+  ],
+  "shift": [
+   {
+    "start": 23.995,
+    "dur": 0.37
+   }
+  ]
+ }
+}

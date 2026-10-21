@@ -13,17 +13,30 @@ import { useEngineerState, useGarage } from "./store"
 //   public/audio/engine/engine.json  a set of loops recorded at several rpm,
 //   on and off throttle: { "layers": [{ "file": "on_high.mp3", "rpm": 11000, "load": "on" }, ...] }
 // Without recordings a physical model of the V6 runs in an AudioWorklet.
-// Start-up (optional): public/audio/engine-start.mp3, a recording of the car
-// being fired up; otherwise the starter, catch and flare are synthesized.
-// Music (optional): public/audio/theme.mp3, a track you have the rights to.
+// Shipped: real Ferrari 458 engine loops (public/audio/engine/), a real
+// Ferrari 812 start-up (engine-start.m4a), "Limit 70" by Kevin MacLeod for
+// the garage (theme.mp3) and "Apex" by Alexander Nakarada for the grid
+// (grid.mp3), both public domain via FreePD. See public/audio/README.md.
 
-type Layer = { rpm: number; on: boolean; src: AudioBufferSourceNode; gain: GainNode }
+type Layer = { rpm: number; on: boolean; level: number; src: AudioBufferSourceNode; gain: GainNode }
+type Slice = { start: number; dur: number }
+type Manifest = {
+  sprite?: string | string[]
+  layers?: { file?: string; start?: number; dur?: number; rpm: number; load?: string; db?: number }[]
+  shots?: Record<string, Slice[]>
+}
 
-const fetchAudio = (ctx: AudioContext, url: string) =>
+// Servers label .webm as video/webm; anything audio-like is accepted.
+const fetchOne = (ctx: AudioContext, url: string) =>
   fetch(url)
-    .then((r) => (r.ok && (r.headers.get("content-type") ?? "").startsWith("audio") ? r.arrayBuffer() : null))
+    .then((r) => (r.ok && /^(audio|video\/webm)/.test(r.headers.get("content-type") ?? "") ? r.arrayBuffer() : null))
     .then((b) => (b ? ctx.decodeAudioData(b) : null))
     .catch(() => null)
+// The first of several encodings this browser can decode (AAC, then Opus).
+async function fetchAudio(ctx: AudioContext, ...urls: string[]) {
+  for (const url of urls) { const b = await fetchOne(ctx, url); if (b) return b }
+  return null
+}
 
 class SoundEngine {
   ctx: AudioContext | null = null
@@ -32,7 +45,8 @@ class SoundEngine {
   private engine!: GainNode
   private music!: GainNode
   private noise!: AudioBuffer
-  private theme: HTMLAudioElement | null | undefined
+  private theme: { el: HTMLAudioElement; gain: GainNode } | null = null
+  private grid: { el: HTMLAudioElement; gain: GainNode } | null = null
   private raf = 0
   private listeners = new Set<() => void>()
 
@@ -67,7 +81,7 @@ class SoundEngine {
   setMuted(m: boolean) {
     this.muted = m
     if (this.ctx) this.master.gain.setTargetAtTime(m ? 0 : 0.8, this.ctx.currentTime, 0.05)
-    if (this.theme && m) this.theme.pause()
+    if (m) { this.theme?.el.pause(); this.grid?.el.pause() }
     this.listeners.forEach((f) => f())
   }
 
@@ -78,12 +92,18 @@ class SoundEngine {
 
   // ── Music ─────────────────────────────────────────────────────────────────
   private async loadTheme() {
-    const ok = await fetch("/audio/theme.mp3", { method: "HEAD" }).then((r) => r.ok && (r.headers.get("content-type") ?? "").startsWith("audio")).catch(() => false)
-    if (!ok || !this.ctx) { this.theme = null; return }
-    const el = new Audio("/audio/theme.mp3")
-    el.loop = true
-    this.ctx.createMediaElementSource(el).connect(this.music)
-    this.theme = el
+    const track = async (url: string, loop: boolean) => {
+      const ok = await fetch(url, { method: "HEAD" }).then((r) => r.ok && (r.headers.get("content-type") ?? "").startsWith("audio")).catch(() => false)
+      if (!ok || !this.ctx) return null
+      const el = new Audio(url)
+      el.loop = loop
+      el.preload = "auto"
+      const gain = this.ctx.createGain()
+      gain.gain.value = 0
+      this.ctx.createMediaElementSource(el).connect(gain).connect(this.music)
+      return { el, gain }
+    }
+    ;[this.theme, this.grid] = await Promise.all([track("/audio/theme.mp3", true), track("/audio/grid.mp3", false)])
   }
 
   // ── Engine ────────────────────────────────────────────────────────────────
@@ -117,7 +137,7 @@ class SoundEngine {
     turbo.start()
     Object.assign(this, { distance, turbo, turboGain })
 
-    this.startClip = await fetchAudio(ctx, "/audio/engine-start.mp3")
+    this.startClip = await fetchAudio(ctx, "/audio/engine-start.m4a", "/audio/engine-start.webm", "/audio/engine-start.mp3")
     const loaded = await this.loadRecordings(ctx, body)
     if (loaded || !ctx.audioWorklet) return
     const url = URL.createObjectURL(new Blob([ENGINE_WORKLET], { type: "application/javascript" }))
@@ -140,27 +160,52 @@ class SoundEngine {
     }
   }
 
+  // Recorded engine loops: one file per layer, or one sprite with every loop
+  // and one-shot (pops, crackles, gear shift) cut from it.
+  private sprite: AudioBuffer | null = null
+  private shots: Record<string, Slice[]> = {}
   private async loadRecordings(ctx: AudioContext, out: AudioNode) {
-    const add = (buffer: AudioBuffer, rpm: number, on: boolean) => {
+    const add = (buffer: AudioBuffer, rpm: number, on: boolean, db = 0, slice?: Slice) => {
       const src = ctx.createBufferSource()
       src.buffer = buffer
       src.loop = true
+      if (slice) { src.loopStart = slice.start; src.loopEnd = slice.start + slice.dur }
       const gain = ctx.createGain()
       gain.gain.value = 0
       src.connect(gain).connect(out)
-      src.start(0, Math.random() * buffer.duration)
-      this.layers.push({ rpm, on, src, gain })
+      src.start(0, slice ? slice.start + Math.random() * slice.dur : Math.random() * buffer.duration)
+      this.layers.push({ rpm, on, level: 10 ** (db / 20), src, gain })
     }
-    const manifest = (await fetch("/audio/engine/engine.json").then((r) => (r.ok ? r.json() : null)).catch(() => null)) as { layers?: { file: string; rpm: number; load?: string }[] } | null
-    if (manifest?.layers?.length) {
+    const manifest = (await fetch("/audio/engine/engine.json").then((r) => (r.ok ? r.json() : null)).catch(() => null)) as Manifest | null
+    if (manifest?.sprite && manifest.layers?.length) {
+      this.sprite = await fetchAudio(ctx, ...[manifest.sprite].flat().map((f) => `/audio/engine/${f}`))
+      if (this.sprite) {
+        for (const l of manifest.layers) add(this.sprite, l.rpm, l.load !== "off", l.db, { start: l.start ?? 0, dur: l.dur ?? 1 })
+        this.shots = manifest.shots ?? {}
+      }
+    } else if (manifest?.layers?.length) {
       const buffers = await Promise.all(manifest.layers.map((l) => fetchAudio(ctx, `/audio/engine/${l.file}`)))
-      manifest.layers.forEach((l, i) => { const b = buffers[i]; if (b) add(b, l.rpm, l.load !== "off") })
+      manifest.layers.forEach((l, i) => { const b = buffers[i]; if (b) add(b, l.rpm, l.load !== "off", l.db) })
     }
     if (!this.layers.length) {
       const single = await fetchAudio(ctx, "/audio/engine-loop.mp3")
       if (single) add(single, 10500, true)
     }
     return this.layers.length > 0
+  }
+
+  // A recorded one-shot from the sprite (exhaust pop, crackle, gear shift).
+  private shot(kind: string, t: number, gain: number) {
+    const list = this.shots[kind]
+    if (!this.sprite || !list?.length) return false
+    const s = list[Math.floor(Math.random() * list.length)]
+    const src = this.ctx!.createBufferSource()
+    src.buffer = this.sprite
+    const g = this.ctx!.createGain()
+    g.gain.value = gain
+    src.connect(g).connect(this.distance!)
+    src.start(t, s.start, s.dur)
+    return true
   }
 
   // Fire the engine up: the starter motor turns it over, it catches, flares
@@ -172,7 +217,7 @@ class SoundEngine {
       const src = ctx.createBufferSource()
       src.buffer = this.startClip
       const g = ctx.createGain()
-      g.gain.value = 0.9
+      g.gain.value = 0.5
       src.connect(g).connect(this.master)
       src.start(t)
       this.startLen = this.startClip.duration
@@ -210,6 +255,7 @@ class SoundEngine {
   }
 
   private pop(t: number, peak: number) {
+    if (this.shot(Math.random() < 0.3 ? "crackle" : "pop", t, peak * 8)) return
     const ctx = this.ctx!
     const src = ctx.createBufferSource()
     src.buffer = this.noise
@@ -240,7 +286,7 @@ class SoundEngine {
       const k = hi === lo ? 1 : Math.min(1, Math.max(0, (rpm - lo.rpm) / (hi.rpm - lo.rpm)))
       for (const l of set) {
         const w = l === hi ? Math.sin((k * Math.PI) / 2) : l === lo ? Math.cos((k * Math.PI) / 2) : 0
-        l.gain.gain.setTargetAtTime(w * loadW, t, 0.04)
+        l.gain.gain.setTargetAtTime(w * loadW * l.level, t, 0.04)
         l.src.playbackRate.setTargetAtTime(Math.max(0.25, rpm / l.rpm), t, 0.03)
       }
     }
@@ -254,13 +300,18 @@ class SoundEngine {
     const talking = useEngineerState.getState().status === "talking"
     const v = telemetry.speed
 
-    // Music: the garage and the grid; it fades out once the cars are moving.
-    if (this.theme) {
-      const want = !this.muted && !(onTrack && v > 1)
-      this.music.gain.setTargetAtTime(want ? (talking ? 0.1 : 0.32) : 0, t, 0.6)
-      if (want && this.theme.paused) void this.theme.play().catch(() => {})
-      if (!want && !this.theme.paused && this.music.gain.value < 0.01) this.theme.pause()
+    // Music: "Limit 70" while you explore the car, "Apex" on the race grid;
+    // both fade out once the cars are moving, and dip under Lena's voice.
+    const moving = onTrack && (v > 1 || telemetry.wheelspin > 0.1)
+    const fade = (track: typeof this.theme, want: boolean, level: number) => {
+      if (!track) return
+      track.gain.gain.setTargetAtTime(want ? (talking ? level * 0.35 : level) : 0, t, want ? 0.5 : 0.8)
+      if (want && track.el.paused) { if (track === this.grid) track.el.currentTime = 0; void track.el.play().catch(() => {}) }
+      if (!want && !track.el.paused && track.gain.gain.value < 0.005) track.el.pause()
     }
+    this.music.gain.value = 1
+    fade(this.theme, !this.muted && garage.mode === "studio", 0.3)
+    fade(this.grid, !this.muted && garage.mode === "race" && !moving, 0.4)
 
     if (onTrack && !this.wasOnTrack) this.engineStart(t)
     this.wasOnTrack = onTrack
@@ -278,7 +329,7 @@ class SoundEngine {
       if (scripted !== null) { rpm = scripted; throttle = sinceStart > 1.05 && sinceStart < 1.4 ? 1 : 0.25 }
     }
 
-    if (onTrack && gear > this.lastGear) { this.shiftUntil = t + 0.03; this.pop(t, 0.05) }
+    if (onTrack && gear > this.lastGear) { this.shiftUntil = t + 0.03; if (!this.shot("shift", t, 0.6)) this.pop(t, 0.05) }
     if (onTrack && gear < this.lastGear) this.pop(t + 0.03, 0.035)
     this.lastGear = gear
     const cut = t < this.shiftUntil
@@ -299,7 +350,7 @@ class SoundEngine {
     // Lena stays clear over the engine.
     // A recorded start-up plays on its own; the running engine fades in after it.
     const recordingStart = starting && this.startClip !== null && sinceStart < this.startLen - 0.3
-    const level = onTrack && !recordingStart ? 0.22 * near * (talking ? 0.35 : 1) * (0.6 + 0.4 * throttle) : 0
+    const level = onTrack && !recordingStart ? (this.layers.length ? 0.6 : 0.22) * near * (talking ? 0.35 : 1) * (0.6 + 0.4 * throttle) : 0
     this.engine.gain.setTargetAtTime(level, t, 0.08)
   }
 }
