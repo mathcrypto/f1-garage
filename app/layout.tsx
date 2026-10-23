@@ -15,8 +15,10 @@ export const viewport: Viewport = { themeColor: "#08090c" }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
-      <body>{children}</body>
+    // suppressHydrationWarning: browser extensions (e.g. Grammarly) inject
+    // attributes onto <html>/<body> before React hydrates.
+    <html lang="en" suppressHydrationWarning>
+      <body suppressHydrationWarning>{children}</body>
     </html>
   )
 }

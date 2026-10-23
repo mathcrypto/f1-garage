@@ -5,6 +5,7 @@ import { partById } from "@/lib/parts"
 import { startShowcase, stopShowcase, useShowcase } from "@/lib/showcase"
 import { sound } from "@/lib/sound"
 import { useGarage, type CameraPreset, type TrackCam } from "@/lib/store"
+import { voice } from "@/lib/voice"
 import { openRaceSetup } from "./RaceUI"
 
 const ICONS = {
@@ -55,7 +56,7 @@ export function ToolRail() {
   return (
     <div className="rail" role="toolbar" aria-label="View controls">
       <RailButton icon={showcase ? "stop" : "play"} label={showcase ? "Stop showcase" : "Showcase"} primary on={showcase} onClick={() => (showcase ? stopShowcase() : startShowcase())} />
-      <RailButton icon="drive" label="Drive a lap (burnout and launch)" onClick={() => { sound.unlock(); setMode("drive") }} />
+      <RailButton icon="drive" label="Guided systems lap (aero, battery, overtake)" onClick={() => { sound.unlock(); voice.unlock(); setMode("drive") }} />
       <RailButton icon="flag" label="Race" onClick={openRaceSetup} />
       <RailButton icon="explode" label={exploded ? "Put it back together" : "Take it apart"} on={exploded} onClick={() => setExploded(!exploded)} />
       <RailButton icon="xray" label="X-ray view" on={technical} onClick={() => setTechnical(!technical)} />

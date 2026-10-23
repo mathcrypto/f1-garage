@@ -51,7 +51,7 @@ export const LESSONS: Lesson[] = [
       { say: "In the corners the car runs in Z-mode: the wing flaps are closed for maximum downforce and grip.", highlights: [{ id: "front-wing", note: "Z-mode: flaps closed" }, { id: "rear-wing", note: "Z-mode: flaps closed" }] },
       { say: "On the straights the driver switches to X-mode: the flaps open, drag drops, and top speed goes up. Watch the HUD flip between the two.", highlights: [{ id: "front-wing", note: "X-mode: flaps open" }, { id: "rear-wing", note: "X-mode: flaps open" }] },
       { say: "This replaces DRS. Instead of a wing slot only for the attacking car, every driver uses low-drag mode on the straights. To help overtaking, a car close behind gets extra electrical energy in overtake mode.", highlights: [{ id: "power-unit", note: "Overtake mode: extra energy" }] },
-      { say: "So the 2026 overtake is less about a wing flap and more about energy management. Clever stuff.", highlights: [], mode: "studio", camera: "hero" },
+      { say: "So the 2026 overtake is less about a wing flap and more about energy management.", highlights: [], mode: "studio", camera: "hero" },
     ],
   },
   {
@@ -87,7 +87,7 @@ export const LESSONS: Lesson[] = [
       { say: "Wishbones locate the wheel, and a push rod or pull rod transfers the load to springs and dampers inside the chassis.", part: "front-suspension", highlights: [{ id: "front-suspension", note: "Wishbones and push rod" }] },
       { say: "The arms are shaped like small wings, so they also guide the airflow. At the back, the suspension mounts on the gearbox casing.", part: "rear-suspension", highlights: [{ id: "rear-suspension", note: "Mounted on the gearbox" }] },
       { say: "Teams tune anti-dive and anti-squat geometry so the nose doesn't drop too much under braking. Too much movement and the floor loses its seal.", part: null, highlights: [{ id: "floor", note: "Needs a stable platform" }], camera: "side" },
-      { say: "So when someone says a car has a great platform, they mean the suspension keeps the aero happy. Over to you.", highlights: [], camera: "hero" },
+      { say: "So when someone says a car has a great platform, they mean the suspension keeps the aero happy.", highlights: [], camera: "hero" },
     ],
   },
 ]

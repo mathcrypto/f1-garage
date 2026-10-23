@@ -7,6 +7,7 @@ export const cleanSpeech = (text: string) =>
     .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
     .replace(/^#+\s*/gm, "")
     .replace(/^[-*•]\s+/gm, "")
+    .replace(/^\s*Copy(?: that)?[.!]?\s*/i, "")
     .replace(/km\/h/g, "kilometres per hour")
     .replace(/\bkW\b/g, "kilowatts")
     .replace(/\bMJ\b/g, "megajoules")
@@ -26,42 +27,33 @@ export const endSentence = (s: string) => { const t = s.trim(); return !t || /[.
 
 const words = (s: string) => s.split(/\s+/).filter(Boolean).length
 
-// Text longer than maxWords is spoken in parts, split at sentence ends and
-// commas and packed back together so each part is as full as it can be.
-export function splitLong(text: string, maxWords = 14): string[] {
+/** Only split very long briefings — each Edge request is one continuous take. */
+export const GROUP_WORDS = 70
+export const MAX_WORDS = 90
+
+export function splitLong(text: string, maxWords = MAX_WORDS): string[] {
   if (words(text) <= maxWords) return [text]
-  const pieces = text.split(/(?<=[,;:—.!?])\s+/)
+  const pieces = text.split(/(?<=[.!?])\s+/)
   const parts: string[] = []
   let current = ""
   for (const piece of pieces) {
     const next = current ? `${current} ${piece}` : piece
-    if (current && words(next) > maxWords && words(current) >= 4) { parts.push(current); current = piece }
-    else current = next
+    if (current && words(next) > maxWords) {
+      parts.push(current)
+      current = piece
+    } else current = next
   }
-  if (current) parts.length && words(current) < 4 ? (parts[parts.length - 1] += ` ${current}`) : parts.push(current)
+  if (current) parts.push(current)
   return parts
 }
 
-// Every chunk the voice requests for a line of text. The first sentence goes
-// out on its own (split at a comma if long) so she's heard at once; after
-// that sentences are grouped into fuller chunks of about 18 words or more,
-// so an explanation flows naturally instead of stopping after every sentence.
-export const GROUP_WORDS = 18
-export const MAX_WORDS = 34
+/** Prefer a single TTS take so there are no joins mid-sentence. */
 export function speechChunks(text: string): string[] {
-  const all = sentences(cleanSpeech(text))
-  if (!all.length) return []
-  const [head, ...rest] = all
-  const first = splitLong(head, 12)
-  const out = [first[0]]
-  let group = first.slice(1).join(" ")
-  for (const s of rest) {
-    group = group ? `${group} ${s}` : s
-    if (words(group) >= GROUP_WORDS) { out.push(...splitLong(group, MAX_WORDS)); group = "" }
-  }
-  // A short tail joins the chunk before it rather than trailing on its own.
-  if (group) out.length > 1 && words(group) < 8 ? (out[out.length - 1] += ` ${group}`) : out.push(group)
-  return out
+  const cleaned = cleanSpeech(text)
+  if (!cleaned) return []
+  const joined = sentences(cleaned).join(" ")
+  if (words(joined) <= MAX_WORDS) return [joined]
+  return splitLong(joined, MAX_WORDS)
 }
 
 export const wordCount = words

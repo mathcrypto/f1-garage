@@ -1,3 +1,7 @@
+/**
+ * @file Technical.tsx
+ * @description The technical effect component that renders the technical information.
+ */
 "use client"
 
 import { Html, Line } from "@react-three/drei"

@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react"
 import { Lena, ENGINEER } from "./Lena"
 import { LESSONS, lessonById, type LessonStep } from "@/lib/lessons"
+import { useProgress } from "@/lib/progress"
 import { useEngineerState, useGarage } from "@/lib/store"
 import { voice } from "@/lib/voice"
 
@@ -24,6 +25,7 @@ export function applyStep(step: LessonStep) {
 export function startLesson(id: string) {
   if (!lessonById(id)) return
   useEngineerState.getState().setLesson({ id, step: 0, playing: true })
+  useProgress.getState().markLesson(id)
 }
 
 // Plays the active lesson: applies each step to the car, speaks it (or waits
@@ -48,9 +50,13 @@ function useLessonRunner() {
       const cur = useEngineerState.getState().lesson
       if (!cur || cur.id !== lesson.id || cur.step !== lesson.step || !cur.playing) return
       if (cur.step + 1 < data.steps.length) useEngineerState.getState().setLesson({ ...cur, step: cur.step + 1 })
-      else useEngineerState.getState().setLesson({ ...cur, playing: false })
+      else {
+        useEngineerState.getState().setLesson({ ...cur, playing: false })
+        useProgress.getState().markLesson(cur.id)
+      }
     }
     if (voice.enabled && voice.supported) {
+      voice.unlock()
       // Have the next steps ready before they're needed.
       voice.prefetch(data.steps.slice(lesson.step + 1, lesson.step + 3).map((s) => s.say))
       voice.say(step.say, () => { timer.current = setTimeout(next, 250) })

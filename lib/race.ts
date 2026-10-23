@@ -1,12 +1,27 @@
 import { create } from "zustand"
 import { newMotion, type Motion } from "./motion"
 import { teamById } from "./teams"
-import { ROAD_WIDTH, track } from "./track"
+import { ROAD_WIDTH, WALL_LAT, WALL_THICK, track } from "./track"
 
 const L = track.length
 const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v))
 const EDGE = ROAD_WIDTH / 2 - 1.1 // car centre at the white line
-const RUNOFF = ROAD_WIDTH / 2 + 3
+/** Hitbox in track space (metres along s / across lat). */
+const CAR_LEN = 4.6
+const CAR_WID = 2.05
+/** Inner face of Armco, then car half-width — body never crosses the slab. */
+const WALL_INNER = WALL_LAT - WALL_THICK / 2
+const WALL_HIT = WALL_INNER - CAR_WID / 2 - 0.08
+
+/** Ideal racing-line lateral offset from curvature (shared with OnTrack guide line). */
+export function idealLat(curvature: number) {
+  return clamp(-Math.sign(curvature) * Math.min(4, Math.abs(curvature) * 700), -4, 4)
+}
+
+/** Battery delta for one frame: overtake drain, brake harvest, or idle trickle. */
+export function batteryStep(dt: number, boosting: boolean, braking: boolean) {
+  return (boosting ? -0.2 : braking ? 0.1 : 0.012) * dt
+}
 
 // ── Shared driving model ────────────────────────────────────────────────────
 // Follows the track's speed profile with traction and braking limits, and
@@ -202,6 +217,20 @@ const gapSeconds = (c: RaceCar) => {
 }
 const totalTime = (c: RaceCar) => (c.finishTime ?? 0) + c.penalty
 
+/** Mark a car classified once past race distance. Idempotent — safe after contacts push `s`. */
+function tryFinish(c: RaceCar) {
+  if (c.finished || race.phase !== "racing") return
+  const line = race.laps * L
+  if (c.s < line) return
+  // Backdate the exact crossing if we overshot (drive step or contact shove).
+  const finishTime = Math.max(0, race.time - (c.s - line) / Math.max(1, c.v))
+  c.finished = true
+  c.finishTime = finishTime
+  if (race.leaderFinishedAt === null) race.leaderFinishedAt = finishTime
+  const pos = race.cars.filter((o) => o.finished).sort((a, b) => totalTime(a) - totalTime(b)).indexOf(c) + 1
+  race.events.finish?.(c.teamId, pos)
+}
+
 const gapText = (c: RaceCar, leader: RaceCar) => {
   if (c === leader) return c.finished ? lapTime(totalTime(c)) : "LEADER"
   const lapsDown = Math.floor((leader.s - c.s) / L)
@@ -274,10 +303,21 @@ export function stepRace(dt: number) {
     stepCars(dt)
     rank()
     const leader = race.order[0]
-    if (!race.finalLapCalled && leader && leader.s >= (race.laps - 1) * L) { race.finalLapCalled = true; race.events.finalLap?.() }
+    // Single-lap races are already the "last lap" — don't call it at lights out.
+    if (!race.finalLapCalled && race.laps > 1 && leader && leader.s >= (race.laps - 1) * L) {
+      race.finalLapCalled = true
+      race.events.finalLap?.()
+    }
     if (race.cars.every((c) => c.finished || (race.leaderFinishedAt !== null && race.time > race.leaderFinishedAt + 14))) {
       // Anyone still running when the cars are called in is classified where they are.
-      for (const c of race.cars) if (!c.finished) { c.finished = true; c.finishTime = race.time + (race.laps * L - c.s) / Math.max(20, c.v) }
+      for (const c of race.cars) {
+        if (c.finished) continue
+        if (c.s >= race.laps * L) tryFinish(c)
+        else {
+          c.finished = true
+          c.finishTime = race.time + (race.laps * L - c.s) / Math.max(20, c.v)
+        }
+      }
       rank()
       race.phase = "finished"
       race.events.end?.()
@@ -327,14 +367,14 @@ function drivePlayer(c: RaceCar, dt: number, cap: number) {
   }
   // Steering moves the car across the track; full assist also follows the racing line.
   if (input.steer) c.latTarget = c.lat + input.steer * 3
-  else if (auto) c.latTarget = clamp(-Math.sign(k) * Math.min(4, Math.abs(k) * 700), -4, 4)
+  else if (auto) c.latTarget = idealLat(k)
   c.s += c.v * dt
   fillMotion(c, prev, dt, c.v > track.vmax * 0.85 && throttle > 0, input.steer)
   // The engine note follows your foot, smoothed.
   c.motion.throttle += ((brake > 0 ? 0 : throttle) - c.motion.throttle) * (1 - Math.exp(-14 * dt))
 
   // Overtake mode drains the battery; braking harvests energy back.
-  c.battery = clamp(c.battery + (c.boosting ? -0.2 : brake > 0 ? 0.1 : 0.012) * dt, 0, 1)
+  c.battery = clamp(c.battery + batteryStep(dt, c.boosting, brake > 0), 0, 1)
   if (c.boosting) c.motion.ers = 1
 }
 
@@ -352,7 +392,7 @@ function stepCars(dt: number) {
     const launch = race.time - reaction
     m.wheelspin = launch < 1 ? 0.75 * (1 - launch) : 0
 
-    // Traffic: look for the car directly ahead in roughly the same line.
+    // Traffic: car ahead in an overlapping lane (same racing line or side-by-side).
     let cap = Infinity
     let pace = c.pace + Math.sin(race.time * 0.35 + c.seed) * 0.002
     let ahead: RaceCar | null = null
@@ -360,11 +400,17 @@ function stepCars(dt: number) {
     for (const o of cars) {
       if (o === c) continue
       const ds = o.s - c.s
-      if (ds > 0 && ds < aheadGap && Math.abs(o.lat - c.lat) < 2.1) { ahead = o; aheadGap = ds }
+      if (ds > 0 && ds < aheadGap && Math.abs(o.lat - c.lat) < CAR_WID) {
+        ahead = o
+        aheadGap = ds
+      }
     }
     if (c.player) {
-      // No driving through other cars: tuck in behind, with a small bump on contact.
-      if (ahead && aheadGap < 4.6) cap = Math.max(0, ahead.v - (aheadGap < 4 ? 1.5 : 0))
+      // Hold behind overlapping traffic — hard contacts are resolved after the move.
+      if (ahead && aheadGap < CAR_LEN + 1.2) {
+        const bump = aheadGap < CAR_LEN ? 4 : aheadGap < CAR_LEN + 0.6 ? 2 : 0.4
+        cap = Math.max(0, ahead.v - bump)
+      }
     } else if (ahead) {
       // Slipstream on the straights, and Overtake mode when close.
       const straight = track.targetSpeed(c.s) > 80
@@ -373,18 +419,16 @@ function stepCars(dt: number) {
       if (c.boosting) pace *= 1.01
       if (aheadGap < 14 && (pace > ahead.pace + 0.002 || c.v > ahead.v + 0.5 || ahead.moment > 0 || ahead.offTrack)) {
         // Pull out to the side with room, else sit behind.
-        const side = ahead.lat >= 0 ? -3 : 3
-        const blocked = cars.some((o) => o !== c && Math.abs(o.s - c.s) < 9 && Math.abs(o.lat - side) < 2)
+        const side = ahead.lat >= 0 ? -3.2 : 3.2
+        const blocked = cars.some((o) => o !== c && Math.abs(o.s - c.s) < CAR_LEN + 4 && Math.abs(o.lat - side) < CAR_WID)
         if (!blocked) c.latTarget = side
-        else if (aheadGap < 7.5) cap = Math.max(0, ahead.v - 0.4)
-      } else if (aheadGap < 7.5) cap = Math.max(0, ahead.v - 0.2)
+        else if (aheadGap < CAR_LEN + 2.5) cap = Math.max(0, ahead.v - 0.5)
+      } else if (aheadGap < CAR_LEN + 2.5) cap = Math.max(0, ahead.v - 0.25)
     } else {
       c.boosting = false
-      // Clear road: drift back onto the racing line when nobody is alongside.
-      const alongside = cars.some((o) => o !== c && Math.abs(o.s - c.s) < 7 && Math.abs(o.lat) < 2)
+      const alongside = cars.some((o) => o !== c && Math.abs(o.s - c.s) < CAR_LEN + 2 && Math.abs(o.lat - c.lat) < CAR_WID)
       if (!alongside) c.latTarget *= Math.exp(-0.6 * dt)
     }
-    const before = c.s
     if (c.player) {
       drivePlayer(c, dt, c.finished ? Math.min(cap, 42) : cap)
     } else {
@@ -393,12 +437,13 @@ function stepCars(dt: number) {
       else if (m.braking > 0.5 && Math.random() < 0.1 * dt) c.moment = 0.5 + Math.random() * 0.6
       if (c.finished) cap = Math.min(cap, 42) // cool-down lap
       drive(c, dt, pace, cap)
-      c.battery = clamp(c.battery + (c.boosting ? -0.2 : m.braking > 0 ? 0.1 : 0.012) * dt, 0, 1)
+      c.battery = clamp(c.battery + batteryStep(dt, c.boosting, m.braking > 0), 0, 1)
     }
-    // Lateral movement.
-    c.latTarget = clamp(c.latTarget, c.player ? -RUNOFF : -4.6, c.player ? RUNOFF : 4.6)
+    // Lateral movement (hard stop at Armco — see resolveWallContacts).
+    const latMax = c.player ? WALL_HIT : 4.6
+    c.latTarget = clamp(c.latTarget, -latMax, latMax)
     const rate = (c.player ? 6 : 2.4) * dt
-    c.lat = clamp(c.lat + clamp(c.latTarget - c.lat, -rate, rate), -RUNOFF, RUNOFF)
+    c.lat = clamp(c.lat + clamp(c.latTarget - c.lat, -rate, rate), -WALL_HIT, WALL_HIT)
 
     // Track limits for the player: all four wheels over the white line.
     if (c.player) {
@@ -435,12 +480,69 @@ function stepCars(dt: number) {
         if (lap > 1) race.events.message?.(`Fastest lap · ${teamById(c.teamId).code} ${lapTime(time)}`, "purple")
       }
     }
-    if (!c.finished && before < race.laps * L && c.s >= race.laps * L) {
-      c.finished = true
-      c.finishTime = race.time
-      if (race.leaderFinishedAt === null) race.leaderFinishedAt = race.time
-      const pos = cars.filter((o) => o.finished).sort((a, b) => totalTime(a) - totalTime(b)).indexOf(c) + 1
-      race.events.finish?.(c.teamId, pos)
+    // Finish is also checked after contacts — a shove can push you over the line.
+    tryFinish(c)
+  }
+
+  // Solid bodies: push cars apart so you can't drive through someone.
+  resolveCarContacts()
+  // Armco — keep cars inside the barriers.
+  resolveWallContacts()
+  // Contacts can shove a car past race distance after the drive-step check.
+  for (const c of cars) tryFinish(c)
+}
+
+/** Keep car centres inside the Armco; scrub speed and bounce inward on impact. */
+function resolveWallContacts() {
+  for (const c of race.cars) {
+    if (Math.abs(c.lat) <= WALL_HIT) continue
+    const sign = Math.sign(c.lat)
+    const pen = Math.abs(c.lat) - WALL_HIT
+    c.lat = sign * WALL_HIT
+    c.latTarget = sign * (WALL_HIT - Math.min(1.2, 0.4 + pen))
+    c.v *= Math.max(0.45, 1 - 0.55 * Math.min(1, pen + 0.2))
+    c.motion.brake = Math.max(c.motion.brake, 0.7)
+  }
+}
+
+/** AABB resolve in (s, lat) — stops ghosting through during overtakes. */
+function resolveCarContacts() {
+  const cars = race.cars
+  for (let i = 0; i < cars.length; i++) {
+    for (let j = i + 1; j < cars.length; j++) {
+      const a = cars[i], b = cars[j]
+      const ds = a.s - b.s
+      const dLat = a.lat - b.lat
+      const overlapS = CAR_LEN - Math.abs(ds)
+      const overlapLat = CAR_WID - Math.abs(dLat)
+      if (overlapS <= 0 || overlapLat <= 0) continue
+
+      // Separate on the shallow axis (side-swipe vs rear-end).
+      if (overlapLat <= overlapS) {
+        const sign = dLat === 0 ? (a.teamId > b.teamId ? 1 : -1) : Math.sign(dLat)
+        const push = overlapLat * 0.5 + 0.04
+        a.lat += sign * push
+        b.lat -= sign * push
+        a.latTarget = a.lat
+        b.latTarget = b.lat
+        // Scrub a bit of speed on a side contact.
+        a.v *= 0.98
+        b.v *= 0.98
+      } else {
+        const sign = ds === 0 ? 1 : Math.sign(ds)
+        const push = overlapS * 0.5 + 0.06
+        a.s += sign * push
+        b.s -= sign * push
+        // Rear-end: trailing car loses speed, lead car gets a small shove.
+        const behind = a.s < b.s ? a : b
+        const lead = a.s < b.s ? b : a
+        const share = (behind.v + lead.v) * 0.5
+        behind.v = Math.min(behind.v, share * 0.88)
+        lead.v = Math.min(track.vmax, Math.max(lead.v, share * 0.96))
+      }
+
+      a.lat = clamp(a.lat, -WALL_HIT, WALL_HIT)
+      b.lat = clamp(b.lat, -WALL_HIT, WALL_HIT)
     }
   }
 }

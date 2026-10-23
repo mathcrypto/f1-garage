@@ -1,18 +1,23 @@
+/**
+ * @file Scene.tsx
+ * @description The main scene component that renders the 3D garage and track circuit.
+ */
 "use client"
 
-import { CameraControls, ContactShadows, Environment, Lightformer, MeshReflectorMaterial } from "@react-three/drei"
+import { CameraControls, ContactShadows, Environment, MeshReflectorMaterial } from "@react-three/drei"
 import { Canvas, useFrame, useThree } from "@react-three/fiber"
-import { Bloom, EffectComposer, Vignette } from "@react-three/postprocessing"
+import { Bloom, EffectComposer, SSAO, Vignette } from "@react-three/postprocessing"
+import { BlendFunction } from "postprocessing"
 import { Suspense, useCallback, useEffect, useMemo, useRef } from "react"
 import * as THREE from "three"
 import { race, useRace } from "@/lib/race"
 import { partCentres, useGarage, type CameraPreset } from "@/lib/store"
 import { teamById } from "@/lib/teams"
-import { Car } from "./Car"
-import { Circuit } from "./Circuit"
-import { DriveSession, RaceSession, TrackCamera } from "./OnTrack"
-import { Smoke } from "./Smoke"
-import { Airflow, Blueprint } from "./Technical"
+import { TeamCar } from "./car/TeamCar"
+import { Circuit } from "./track/Circuit"
+import { DriveSession, RaceSession, TrackCamera } from "./track/OnTrack"
+import { Smoke } from "./fx/Smoke"
+import { Airflow, Blueprint } from "./fx/Technical"
 
 const PRESETS: Record<CameraPreset, [number, number, number, number, number, number]> = {
   hero: [7.2, 2.9, 7.6, 0, 0.3, -0.2],
@@ -90,16 +95,16 @@ function Studio() {
         <circleGeometry args={[14, 64]} />
         <MeshReflectorMaterial
           blur={[400, 120]}
-          resolution={1024}
+          resolution={512}
           mixBlur={1}
-          mixStrength={18}
-          roughness={0.85}
-          depthScale={1.1}
+          mixStrength={8}
+          roughness={0.92}
+          depthScale={0.9}
           minDepthThreshold={0.4}
-          maxDepthThreshold={1.3}
-          color="#101115"
-          metalness={0.6}
-          mirror={0.6}
+          maxDepthThreshold={1.2}
+          color="#0a0b0f"
+          metalness={0.35}
+          mirror={0.28}
         />
       </mesh>
     </>
@@ -134,30 +139,37 @@ export default function Scene() {
     <Canvas
       shadows
       dpr={[1, 2]}
-      camera={{ position: [7.2, 2.9, 7.6], fov: 32, near: 0.1, far: 900 }}
-      gl={{ antialias: true, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.05 }}
+      camera={{ position: [7.2, 2.9, 7.6], fov: 32, near: 0.1, far: 2800 }}
+      gl={{ antialias: true, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 0.95 }}
       onPointerMissed={() => useGarage.getState().select(null)}
     >
-      <color attach="background" args={[technical ? "#0b0303" : onTrack ? "#020305" : "#08090c"]} />
-      <fog attach="fog" args={[technical ? "#0b0303" : onTrack ? "#020305" : "#08090c", onTrack ? 60 : 16, onTrack ? 420 : 32]} />
-      <ambientLight intensity={onTrack ? 0.35 : 0.25} />
-      {/* Studio key light with shadows; on track the floodlights' wash, shadows drawn per car */}
-      <directionalLight position={[5, 9, 4]} intensity={onTrack ? 1.4 : 2.2} castShadow={!onTrack} shadow-mapSize={[2048, 2048]} shadow-camera-left={-5} shadow-camera-right={5} shadow-camera-top={5} shadow-camera-bottom={-5} />
-      {onTrack && <hemisphereLight args={["#c9d6ff", "#0b0c10", 0.35]} />}
-      <spotLight position={[-6, 5, -6]} intensity={40} angle={0.5} penumbra={1} color={team.livery.primary} />
-
-      {/* Studio softboxes, used only for reflections on the paint */}
-      <Environment resolution={256} frames={1}>
-        <Lightformer form="rect" intensity={3} position={[0, 6, 0]} rotation={[Math.PI / 2, 0, 0]} scale={[10, 4, 1]} />
-        <Lightformer form="rect" intensity={2} position={[-6, 2, 0]} rotation={[0, Math.PI / 2, 0]} scale={[12, 2, 1]} />
-        <Lightformer form="rect" intensity={2} position={[6, 2, 0]} rotation={[0, -Math.PI / 2, 0]} scale={[12, 2, 1]} />
-        <Lightformer form="rect" intensity={1.2} position={[0, 2, 7]} scale={[10, 2, 1]} />
-        <Lightformer form="ring" intensity={1.5} color={team.livery.primary} position={[0, 3, -8]} scale={4} />
-      </Environment>
+      <color attach="background" args={[technical ? "#0b0303" : onTrack ? "#87b5d9" : "#08090c"]} />
+      <fog attach="fog" args={[technical ? "#0b0303" : onTrack ? "#a8c8e0" : "#08090c", onTrack ? 140 : 16, onTrack ? 1100 : 32]} />
+      <ambientLight intensity={onTrack ? 0.55 : 0.32} />
+      {/* Studio: soft key/fill. Track: daylight sun + sky. */}
+      <directionalLight
+        position={onTrack ? [60, 90, 40] : [4, 10, 3]}
+        intensity={onTrack ? 1.85 : 0.95}
+        color={onTrack ? "#fff4e0" : "#ffffff"}
+        castShadow={!onTrack}
+        shadow-mapSize={[2048, 2048]}
+        shadow-bias={-0.0002}
+        shadow-camera-left={-5}
+        shadow-camera-right={5}
+        shadow-camera-top={5}
+        shadow-camera-bottom={-5}
+      />
+      {!onTrack && <directionalLight position={[-6, 5, -2]} intensity={0.5} color="#d0d8e8" />}
+      {!onTrack && <directionalLight position={[1, 3, -7]} intensity={0.35} color="#ffe8d0" />}
+      {onTrack && <hemisphereLight args={["#cfe6ff", "#6b8f4e", 0.55]} />}
+      {onTrack && <directionalLight position={[-40, 30, -50]} intensity={0.35} color="#a8c4e0" />}
+      <spotLight position={[-6, 5, -6]} intensity={onTrack ? 0 : 8} angle={0.55} penumbra={1} color={team.livery.primary} />
+      {!onTrack && <spotLight position={[4, 8, 5]} intensity={7} angle={0.65} penumbra={1} color="#f4f6fa" />}
 
       <Suspense fallback={null}>
-        {/* The circuit is built once and kept, so going out on track is instant. */}
-        <group visible={onTrack}><Circuit /></group>
+        <Environment files="/models/studio.hdr" resolution={512} background={false} blur={0.85} environmentIntensity={onTrack ? 0.45 : 0.28} />
+        {/* key forces a clean remount if HMR left stale scenery in the scene graph. */}
+        <group visible={onTrack}><Circuit key="circuit-monza-no-trees" /></group>
         {onTrack ? (
           <>
             {mode === "drive" ? <DriveSession onTarget={setFollowed} /> : <RaceSession key={raceId} onTarget={setFollowed} />}
@@ -165,12 +177,12 @@ export default function Scene() {
           </>
         ) : (
           <>
-            <Car team={team} />
+            <TeamCar team={team} />
             <Studio />
             <Ring color={team.livery.primary} />
             <Airflow />
             <Blueprint />
-            <ContactShadows position={[0, 0.004, 0]} opacity={0.75} scale={9} blur={2.2} far={1.4} resolution={512} />
+            <ContactShadows position={[0, 0.004, 0]} opacity={0.55} scale={10} blur={3.2} far={1.8} resolution={1024} frames={1} />
           </>
         )}
         <Smoke />
@@ -178,9 +190,22 @@ export default function Scene() {
 
       {!onTrack && <CameraRig reducedMotion={reducedMotion} />}
 
-      <EffectComposer multisampling={4}>
-        <Bloom mipmapBlur intensity={0.7} radius={0.55} luminanceThreshold={0.9} luminanceSmoothing={0.15} />
-        <Vignette offset={0.25} darkness={0.75} />
+      <EffectComposer multisampling={4} enableNormalPass={!onTrack}>
+        {!onTrack && (
+          <SSAO
+            blendFunction={BlendFunction.MULTIPLY}
+            samples={24}
+            radius={0.14}
+            intensity={22}
+            luminanceInfluence={0.35}
+            worldDistanceThreshold={12}
+            worldDistanceFalloff={4}
+            worldProximityThreshold={0.4}
+            worldProximityFalloff={0.15}
+          />
+        )}
+        <Bloom mipmapBlur intensity={onTrack ? 0.06 : 0.12} radius={0.3} luminanceThreshold={1.25} luminanceSmoothing={0.35} />
+        <Vignette offset={0.28} darkness={onTrack ? 0.28 : 0.5} />
       </EffectComposer>
     </Canvas>
   )

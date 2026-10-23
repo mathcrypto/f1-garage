@@ -1,17 +1,24 @@
+/**
+ * @file OnTrack.tsx
+ * @description The on-track component that renders the cars and the track camera.
+ */
 "use client"
 
 import { useFrame } from "@react-three/fiber"
 import { useEffect, useMemo, useRef } from "react"
 import * as THREE from "three"
-import { BURNOUT, driveLaps, ENGINE_START, telemetry } from "@/lib/drive"
+import { BURNOUT, DRIVE_TOUR, driveLaps, driveTourState, ENGINE_START, telemetry } from "@/lib/drive"
+import { phaseAt, phaseIndex, TOUR_LINES } from "@/lib/driveTour"
+import { useShowcase } from "@/lib/showcase"
+import { voice } from "@/lib/voice"
 import { newMotion, type Motion } from "@/lib/motion"
-import { drive, race, stepRace, type Driven } from "@/lib/race"
-import { useGarage, type TrackCam } from "@/lib/store"
+import { drive, idealLat, race, stepRace, type Driven } from "@/lib/race"
+import { useEngineerState, useGarage, type TrackCam } from "@/lib/store"
 import { teamById } from "@/lib/teams"
 import { placeOnTrack, track } from "@/lib/track"
-import { Car } from "./Car"
-import { MotionContext, PlainParts } from "./CarMotion"
-import { smokeSources } from "./Smoke"
+import { TeamCar } from "../car/TeamCar"
+import { MotionContext, PlainParts } from "../car/CarMotion"
+import { smokeSources } from "../fx/Smoke"
 
 function shadowTexture() {
   const c = document.createElement("canvas")
@@ -50,7 +57,7 @@ export function TrackCar({ teamId, car }: { teamId: string; car: Driven & { lat?
     <group ref={group}>
       <PlainParts.Provider value={true}>
         <MotionContext.Provider value={car.motion}>
-          <Car team={team} />
+          <TeamCar team={team} />
         </MotionContext.Provider>
       </PlainParts.Provider>
       {/* Soft contact shadow that travels with the car */}
@@ -72,31 +79,66 @@ const copyToTelemetry = (m: Motion) => {
   telemetry.throttle = m.throttle
 }
 
-// Free drive: a burnout on the grid, a launch, then flying laps.
+// Guided systems lap: burnout, X/Z aero, ERS deploy/harvest, Overtake — Lena teaches on radio.
 export function DriveSession({ onTarget }: { onTarget: (t: { s: number; lat: number }) => void }) {
   const teamId = useGarage((s) => s.teamId)
-  const car = useMemo(() => ({ s: -8, v: 0, lat: 0, motion: newMotion(), t: 0 }), [])
-  useEffect(() => { Object.assign(driveLaps, { lap: 0, last: null, best: null, start: null, s: -8 }) }, [car])
+  const car = useMemo(() => ({ s: -8, v: 0, lat: 0, motion: newMotion(), t: 0, done: false }), [])
+  useEffect(() => {
+    Object.assign(driveLaps, { lap: 0, last: null, best: null, start: null, s: -8 })
+    Object.assign(driveTourState, { battery: 1, boosting: false, phase: -1, title: "", hint: "", focus: null })
+    voice.unlock()
+    // Warm the TTS cache so each mode line starts with the HUD, not after a fetch.
+    voice.prefetch(TOUR_LINES)
+  }, [car])
   useEffect(() => onTarget(car), [car, onTarget])
   useFrame((_, raw) => {
     const dt = step(raw)
     car.t += dt
+    if (car.t >= DRIVE_TOUR) {
+      if (!car.done) {
+        car.done = true
+        car.motion.speed = 0
+        car.motion.throttle = 0
+        car.motion.wheelspin = 0
+        copyToTelemetry(car.motion)
+        useGarage.getState().setMode("studio")
+      }
+      return
+    }
+
+    const phase = phaseAt(car.t)
+    const idx = phaseIndex(car.t)
+    if (phase) {
+      driveTourState.title = phase.title ?? ""
+      driveTourState.hint = phase.hint ?? ""
+      driveTourState.focus = phase.focus ?? null
+      if (idx !== driveTourState.phase) {
+        driveTourState.phase = idx
+        if (phase.cam) useGarage.getState().setTrackCam(phase.cam)
+        // Caption + speech start with this HUD beat (say replaces the previous line).
+        if (phase.say && !useShowcase.getState().running) {
+          useEngineerState.getState().setCaption(phase.say)
+          voice.say(phase.say)
+        }
+      }
+    }
+
     if (car.t < ENGINE_START) {
-      // Standing still while the engine is fired up.
       car.motion.wheelspin = 0
       car.motion.speed = 0
       car.motion.throttle = 0
+      car.motion.ers = 0
+      car.motion.braking = 0
     } else if (car.t < ENGINE_START + BURNOUT) {
       car.motion.wheelspin = Math.min(1, (car.t - ENGINE_START) / 0.3)
       car.motion.speed = 0
       car.motion.throttle = 1
-      car.motion.aero = "straight"
+      car.motion.ers = phase?.ers ?? 0.15
     } else {
       const before = car.s
       drive(car, dt)
       const launch = car.t - ENGINE_START - BURNOUT
       car.motion.wheelspin = launch < 1.3 ? 1 - launch / 1.3 : 0
-      // Lap timing for the engineer's radio calls.
       if (driveLaps.start === null) driveLaps.start = car.t
       if (Math.floor(car.s / track.length) > Math.floor(before / track.length) && car.s > 0) {
         const time = car.t - driveLaps.start
@@ -105,7 +147,17 @@ export function DriveSession({ onTarget }: { onTarget: (t: { s: number; lat: num
         driveLaps.last = time
         driveLaps.best = driveLaps.best === null ? time : Math.min(driveLaps.best, time)
       }
+      if (phase?.boosting) car.motion.throttle = Math.max(car.motion.throttle, 0.95)
     }
+
+    // Teaching always wins: wings / ERS follow the lesson, not the track.
+    if (phase?.aero) car.motion.aero = phase.aero
+    if (phase?.ers != null) car.motion.ers = phase.ers
+
+    if (phase?.batteryRate) {
+      driveTourState.battery = Math.min(1, Math.max(0.05, driveTourState.battery + phase.batteryRate * dt))
+    }
+    driveTourState.boosting = Boolean(phase?.boosting)
     driveLaps.s = car.s
     copyToTelemetry(car.motion)
   }, SIMULATE)
@@ -145,8 +197,7 @@ function RacingLine() {
       const d = 6 + i * LINE_STEP
       const s = me.s + d
       // Fade the line from the car's line toward the ideal line further ahead.
-      const k = track.curvature(s)
-      const ideal = Math.max(-4, Math.min(4, -Math.sign(k) * Math.min(4, Math.abs(k) * 700)))
+      const ideal = idealLat(track.curvature(s))
       const lat = me.lat + (ideal - me.lat) * Math.min(1, d / 60)
       placeOnTrack(o, s, lat, 0.035)
       o.rotation.x = -Math.PI / 2

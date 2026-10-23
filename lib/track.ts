@@ -1,49 +1,71 @@
 import * as THREE from "three"
+import monza from "./circuits/monza.json"
 
-// A closed night circuit: a long main straight (start/finish at s = 0, heading
-// +z), a hairpin, a fast esses section and a long sweeper back onto the
-// straight. Everything is sampled every metre with a speed profile computed
-// from curvature, so any car can drive it with realistic braking points.
+/**
+ * Active circuit: Autodromo Nazionale Monza at near-FIA length (~5.8 km).
+ * Centerline from open bacinger/f1-circuits GeoJSON (not affiliated with F1/FIA).
+ * Mild parkland elevation is synthesised — the source outline is 2D.
+ */
 
-const SCALE = 0.8
-const CONTROL: [number, number][] = [
-  [0, -260], [0, 0], [0, 260], [25, 330], [90, 352], [140, 312], [150, 240], [205, 172], [262, 150],
-  [302, 90], [292, 10], [332, -60], [352, -150], [300, -232], [210, -252], [150, -322], [70, -346], [14, -318],
-]
+export type CircuitDef = {
+  id: string
+  name: string
+  control: [number, number][]
+}
+
+export const ACTIVE_CIRCUIT: CircuitDef = {
+  id: monza.id,
+  name: monza.name,
+  control: monza.control as [number, number][],
+}
 
 export const ROAD_WIDTH = 14
-const VMAX = 92 // m/s, about 330 km/h
-const A_LAT = 42 // m/s² cornering
-const A_BRAKE = 48 // m/s² braking
-const accel = (v: number) => 4 + 12 * (1 - v / VMAX) // m/s² traction-limited at low speed, drag-limited at high
+/** Armco lateral offset from centerline — must match Circuit wall ribbons. */
+export const WALL_LAT = ROAD_WIDTH / 2 + 4.5
+/** Armco slab thickness — Circuit walls and race hitbox must match. */
+export const WALL_THICK = 0.55
+const VMAX = 95 // m/s — Monza is a power circuit
+const A_LAT = 40
+const A_BRAKE = 48
+const accel = (v: number) => 4 + 13 * (1 - v / VMAX)
 
 const curve = new THREE.CatmullRomCurve3(
-  CONTROL.map(([x, z]) => new THREE.Vector3(x * SCALE, 0, z * SCALE)),
+  ACTIVE_CIRCUIT.control.map(([x, z]) => new THREE.Vector3(x, 0, z)),
   true,
   "centripetal",
 )
 export const LENGTH = Math.round(curve.getLength())
-const N = LENGTH // one sample per metre
+const N = LENGTH
 
 const pos: THREE.Vector3[] = []
 const tan: THREE.Vector3[] = []
-const kappa = new Float32Array(N) // signed curvature, 1/m
+const kappa = new Float32Array(N)
 const vmax = new Float32Array(N)
 
-// Start/finish on the main straight at z = 0.
+// Start on the main straight near the origin, travelling +Z.
 const startU = (() => {
   let best = 0, bestD = Infinity
   for (let i = 0; i < 4000; i++) {
-    const p = curve.getPointAt(i / 4000)
-    const d = Math.abs(p.z) + Math.abs(p.x) * 4
-    if (p.z > -50 && p.z < 50 && d < bestD) { bestD = d; best = i / 4000 }
+    const u = i / 4000
+    const p = curve.getPointAt(u)
+    const t = curve.getTangentAt(u)
+    const d = Math.hypot(p.x, p.z) * 0.35 + Math.abs(p.x) * 2.5 + (t.z > 0.75 ? 0 : 50)
+    if (d < bestD) {
+      bestD = d
+      best = u
+    }
   }
   return best
 })()
 
+/** Soft Monza-like undulation (metres) — keep amplitude small so scenery stays clear. */
+const elev = (u: number) => 0.55 * Math.sin(u * Math.PI * 2) + 0.25 * Math.sin(u * Math.PI * 4 + 0.9)
+
 for (let i = 0; i < N; i++) {
   const u = (startU + i / N) % 1
-  pos.push(curve.getPointAt(u))
+  const p = curve.getPointAt(u)
+  p.y = elev(u)
+  pos.push(p)
   tan.push(curve.getTangentAt(u).normalize())
 }
 for (let i = 0; i < N; i++) {
@@ -51,7 +73,6 @@ for (let i = 0; i < N; i++) {
   const cross = a.x * b.z - a.z * b.x
   kappa[i] = Math.asin(Math.max(-1, Math.min(1, cross))) / 6
 }
-// Smooth curvature, then speed limits: corner speed, then braking (backward) and traction (forward) passes.
 const smooth = Float32Array.from(kappa, (_, i) => {
   let sum = 0
   for (let k = -6; k <= 6; k++) sum += kappa[(i + k + N) % N]
@@ -77,13 +98,14 @@ const lerpIdx = (s: number) => {
 }
 
 export const track = {
+  id: ACTIVE_CIRCUIT.id,
+  name: ACTIVE_CIRCUIT.name,
   length: LENGTH,
   vmax: VMAX,
   accel,
   brake: A_BRAKE,
   curvature: (s: number) => smooth[idx(s)],
   targetSpeed: (s: number) => vmax[idx(s)],
-  // The fastest a car can take the curve at s, ignoring braking zones.
   grip: (s: number) => Math.min(VMAX, Math.sqrt(A_LAT / Math.max(1e-5, Math.abs(smooth[idx(s)])))),
   point(s: number, out = new THREE.Vector3()) {
     const { i, j, f } = lerpIdx(s)
@@ -93,7 +115,6 @@ export const track = {
     const { i, j, f } = lerpIdx(s)
     return out.copy(tan[i]).lerp(tan[j], f).normalize()
   },
-  // Unit vector to the left of the direction of travel.
   left(s: number, out = new THREE.Vector3()) {
     const t = this.tangent(s, out)
     return out.set(t.z, 0, -t.x)
@@ -101,13 +122,12 @@ export const track = {
   samples: { pos, tan, curvature: smooth },
 }
 
-// Place an object on the track at distance s with a lateral offset.
 const tmpT = new THREE.Vector3(), tmpL = new THREE.Vector3()
 export function placeOnTrack(obj: THREE.Object3D, s: number, lateral: number, y = 0) {
   track.point(s, obj.position)
   track.left(s, tmpL)
   obj.position.addScaledVector(tmpL, lateral)
-  obj.position.y = y
+  obj.position.y += y
   track.tangent(s, tmpT)
   obj.rotation.set(0, Math.atan2(tmpT.x, tmpT.z), 0)
 }

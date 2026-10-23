@@ -20,6 +20,18 @@ export const driveLaps = { lap: 0, last: null as number | null, best: null as nu
 
 // Before that, the engine is fired up with the car standing still.
 export const ENGINE_START = 3.2
+// Guided systems lap length (phases in lib/driveTour.ts) — then back to garage.
+export const DRIVE_TOUR = 72
+
+/** Extra drive-tour telemetry for the HUD (battery / overtake / lesson card). */
+export const driveTourState = {
+  battery: 1,
+  boosting: false,
+  phase: -1,
+  title: "",
+  hint: "",
+  focus: null as null | "aero" | "ers" | "battery" | "brake",
+}
 
 // 8-speed gearbox: up at about 11,900 rpm, landing near 10,300.
 const TOPS = [95, 135, 170, 205, 240, 272, 302, 340] // km/h at the top of each gear

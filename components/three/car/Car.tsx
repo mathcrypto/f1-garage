@@ -2,7 +2,7 @@
 
 import { Decal, Html } from "@react-three/drei"
 import { useFrame } from "@react-three/fiber"
-import { useMemo, useRef } from "react"
+import { useLayoutEffect, useMemo, useRef } from "react"
 import * as THREE from "three"
 import type { Team } from "@/lib/teams"
 import { liveryFor } from "@/lib/liveries"
@@ -16,85 +16,262 @@ import { Part } from "./Part"
 
 function carbonTexture() {
   const c = document.createElement("canvas")
-  c.width = c.height = 64
+  c.width = c.height = 128
   const g = c.getContext("2d")!
-  g.fillStyle = "#18191c"
-  g.fillRect(0, 0, 64, 64)
-  // 2×2 twill weave
-  for (let y = 0; y < 8; y++)
-    for (let x = 0; x < 8; x++) {
+  g.fillStyle = "#16171a"
+  g.fillRect(0, 0, 128, 128)
+  // Finer 2×2 twill with a slight highlight thread.
+  for (let y = 0; y < 16; y++)
+    for (let x = 0; x < 16; x++) {
       const on = (x + y) % 4 < 2
-      g.fillStyle = on ? "#2a2c31" : "#141518"
+      g.fillStyle = on ? "#2c2e34" : "#121316"
       g.fillRect(x * 8, y * 8, 8, 8)
+      g.fillStyle = on ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.12)"
+      g.fillRect(x * 8, y * 8, 8, 1)
     }
   const t = new THREE.CanvasTexture(c)
   t.wrapS = t.wrapT = THREE.RepeatWrapping
-  t.repeat.set(10, 10)
+  t.repeat.set(14, 14)
+  t.anisotropy = 8
   t.colorSpace = THREE.SRGBColorSpace
+  return t
+}
+
+/** Twill bump for carbon — reads as weave under studio light. */
+function carbonNormalMap() {
+  const s = 128
+  const c = document.createElement("canvas")
+  c.width = c.height = s
+  const g = c.getContext("2d")!
+  const img = g.createImageData(s, s)
+  for (let y = 0; y < s; y++)
+    for (let x = 0; x < s; x++) {
+      const on = ((x >> 3) + (y >> 3)) % 4 < 2
+      const h = on ? 170 : 90
+      const i = (y * s + x) * 4
+      img.data[i] = h
+      img.data[i + 1] = h
+      img.data[i + 2] = 255
+      img.data[i + 3] = 255
+    }
+  g.putImageData(img, 0, 0)
+  const t = new THREE.CanvasTexture(c)
+  t.wrapS = t.wrapT = THREE.RepeatWrapping
+  t.repeat.set(18, 18)
+  t.anisotropy = 8
+  return t
+}
+
+/** Soft orange-peel noise on paint so clearcoat isn’t a flat mirror. */
+function paintNormalMap() {
+  const s = 256
+  const c = document.createElement("canvas")
+  c.width = c.height = s
+  const g = c.getContext("2d")!
+  const img = g.createImageData(s, s)
+  for (let y = 0; y < s; y++)
+    for (let x = 0; x < s; x++) {
+      const n = (Math.sin(x * 0.37) * Math.cos(y * 0.29) + Math.sin((x + y) * 0.11)) * 0.5 + 0.5
+      const h = 118 + Math.floor(n * 28)
+      const i = (y * s + x) * 4
+      img.data[i] = h
+      img.data[i + 1] = h
+      img.data[i + 2] = 255
+      img.data[i + 3] = 255
+    }
+  g.putImageData(img, 0, 0)
+  const t = new THREE.CanvasTexture(c)
+  t.wrapS = t.wrapT = THREE.RepeatWrapping
+  t.repeat.set(6, 6)
+  t.anisotropy = 4
   return t
 }
 
 const liveryCache = new Map<string, THREE.Texture>()
 function cachedLivery(id: string, design: ReturnType<typeof liveryFor>) {
-  let t = liveryCache.get(id)
-  if (!t) { t = paintLivery(design); liveryCache.set(id, t) }
+  const key = `${id}:${design.style}:${design.base}:${design.rear ?? ""}:${design.lower}:${design.stripe}:${design.finish}`
+  let t = liveryCache.get(key)
+  if (!t) { t = paintLivery(design); liveryCache.set(key, t) }
   return t
+}
+
+function finishParams(finish: "gloss" | "matte" | "satin") {
+  // Tuned toward product-shot refs: soft satin body, readable colour, no chrome.
+  if (finish === "matte") {
+    return {
+      metalness: 0.04,
+      roughness: 0.72,
+      clearcoat: 0.08,
+      clearcoatRoughness: 0.65,
+      reflectivity: 0.12,
+      envMapIntensity: 0.28,
+      sheen: 0.2,
+      sheenRoughness: 0.8,
+      sheenColor: new THREE.Color("#b8b8bc"),
+    }
+  }
+  if (finish === "satin") {
+    return {
+      metalness: 0.08,
+      roughness: 0.48,
+      clearcoat: 0.22,
+      clearcoatRoughness: 0.35,
+      reflectivity: 0.22,
+      envMapIntensity: 0.4,
+      sheen: 0.06,
+      sheenRoughness: 0.6,
+      sheenColor: new THREE.Color("#b8b8bc"),
+    }
+  }
+  // “Gloss” still kept restrained — soft automotive, not wet mirror.
+  return {
+    metalness: 0.1,
+    roughness: 0.38,
+    clearcoat: 0.4,
+    clearcoatRoughness: 0.18,
+    reflectivity: 0.28,
+    envMapIntensity: 0.45,
+    sheen: 0,
+    sheenRoughness: 0.5,
+    sheenColor: new THREE.Color("#b8b8bc"),
+  }
 }
 
 function useMaterials(team: Team) {
   const carbonMap = useMemo(() => (typeof document === "undefined" ? null : carbonTexture()), [])
+  const carbonNormal = useMemo(() => (typeof document === "undefined" ? null : carbonNormalMap()), [])
+  const paintNormal = useMemo(() => (typeof document === "undefined" ? null : paintNormalMap()), [])
   const design = liveryFor(team.id)
   // Painted once per team and kept, so switching teams or modes is instant.
   const liveryMap = useMemo(() => cachedLivery(team.id, design), [team.id, design])
   return useMemo(() => {
+    const finish = finishParams(design.finish)
     const paint = (color: string) =>
-      new THREE.MeshPhysicalMaterial({ color, metalness: 0.35, roughness: 0.32, clearcoat: 1, clearcoatRoughness: 0.06 })
-    const matte = design.finish === "matte"
+      new THREE.MeshPhysicalMaterial({
+        color,
+        metalness: finish.metalness,
+        roughness: finish.roughness,
+        clearcoat: finish.clearcoat,
+        clearcoatRoughness: finish.clearcoatRoughness,
+        reflectivity: finish.reflectivity,
+        envMapIntensity: finish.envMapIntensity,
+        sheen: finish.sheen,
+        sheenRoughness: finish.sheenRoughness,
+        sheenColor: finish.sheenColor,
+        normalMap: paintNormal,
+        normalScale: new THREE.Vector2(0.18, 0.18),
+      })
     return {
-      // Bodywork: the painted livery, gloss or satin depending on the team.
+      // Bodywork: full-side wrap with clearcoat matching the team's finish.
       livery: new THREE.MeshPhysicalMaterial({
         map: liveryMap,
-        metalness: matte ? 0.15 : 0.3,
-        roughness: matte ? 0.5 : 0.28,
-        clearcoat: matte ? 0.25 : 1,
-        clearcoatRoughness: matte ? 0.5 : 0.05,
+        metalness: finish.metalness,
+        roughness: finish.roughness * 0.95,
+        clearcoat: finish.clearcoat,
+        clearcoatRoughness: finish.clearcoatRoughness,
+        reflectivity: finish.reflectivity,
+        envMapIntensity: finish.envMapIntensity,
+        sheen: finish.sheen,
+        sheenRoughness: finish.sheenRoughness,
+        sheenColor: finish.sheenColor,
+        normalMap: paintNormal,
+        normalScale: new THREE.Vector2(0.14, 0.14),
       }),
-      paint: paint(team.livery.primary),
-      paint2: paint(team.livery.secondary),
-      accent: paint(team.livery.accent),
-      carbon: new THREE.MeshPhysicalMaterial({ color: "#1b1c20", map: carbonMap, roughness: 0.42, metalness: 0.25, clearcoat: 0.7, clearcoatRoughness: 0.2 }),
-      // Satin carbon for big flat surfaces, which would mirror the studio lights.
-      floorCarbon: new THREE.MeshStandardMaterial({ color: "#141518", map: carbonMap, roughness: 0.7, metalness: 0.15 }),
-      matte: new THREE.MeshStandardMaterial({ color: "#121316", roughness: 0.7, metalness: 0.1 }),
-      inlet: new THREE.MeshStandardMaterial({ color: "#040405", roughness: 0.9 }),
-      rubber: new THREE.MeshStandardMaterial({ color: "#151517", roughness: 0.88, metalness: 0 }),
-      rim: new THREE.MeshStandardMaterial({ color: "#2c2e33", roughness: 0.3, metalness: 0.9 }),
-      metal: new THREE.MeshStandardMaterial({ color: "#a8adb4", roughness: 0.25, metalness: 1 }),
-      titanium: new THREE.MeshStandardMaterial({ color: "#5d6066", roughness: 0.35, metalness: 0.9 }),
-      brass: new THREE.MeshStandardMaterial({ color: "#b8925a", roughness: 0.3, metalness: 1 }),
-      plank: new THREE.MeshStandardMaterial({ color: "#8a6a43", roughness: 0.8 }),
-      pirelli: new THREE.MeshStandardMaterial({ color: "#e4002b", roughness: 0.5, emissive: "#e4002b", emissiveIntensity: 0.15 }),
-      brake: new THREE.MeshStandardMaterial({ color: "#2a1a12", roughness: 0.6, emissive: "#ff6a1a", emissiveIntensity: 0 }),
-      ers: new THREE.MeshStandardMaterial({ color: "#0b2a33", roughness: 0.4, emissive: "#22d3ee", emissiveIntensity: 0.4 }),
-      rain: new THREE.MeshStandardMaterial({ color: "#300", emissive: "#ff1a1a", emissiveIntensity: 0.6 }),
-      helmet: paint(team.livery.secondary),
-      visor: new THREE.MeshPhysicalMaterial({ color: "#0a0a0c", roughness: 0.05, metalness: 0.6, clearcoat: 1 }),
+      paint: paint(design.base),
+      paint2: paint(design.lower),
+      accent: paint(design.stripe),
+      carbon: new THREE.MeshPhysicalMaterial({
+        color: "#1a1b1f",
+        map: carbonMap,
+        normalMap: carbonNormal,
+        normalScale: new THREE.Vector2(0.55, 0.55),
+        roughness: 0.48,
+        metalness: 0.28,
+        clearcoat: 0.4,
+        clearcoatRoughness: 0.28,
+        envMapIntensity: 0.4,
+      }),
+      floorCarbon: new THREE.MeshPhysicalMaterial({
+        color: "#121316",
+        map: carbonMap,
+        normalMap: carbonNormal,
+        normalScale: new THREE.Vector2(0.4, 0.4),
+        roughness: 0.7,
+        metalness: 0.15,
+        clearcoat: 0.2,
+        clearcoatRoughness: 0.5,
+        envMapIntensity: 0.25,
+      }),
+      // Thin dark seams between panels — sell the volume.
+      seam: new THREE.MeshStandardMaterial({ color: "#050506", roughness: 0.95, metalness: 0 }),
+      // Wings / floor / suspension — matte carbon like the reference renders.
+      aeroCarbon: new THREE.MeshPhysicalMaterial({
+        color: "#141518",
+        map: carbonMap,
+        normalMap: carbonNormal,
+        normalScale: new THREE.Vector2(0.7, 0.7),
+        roughness: 0.78,
+        metalness: 0.12,
+        clearcoat: 0.12,
+        clearcoatRoughness: 0.55,
+        envMapIntensity: 0.22,
+      }),
+      // Halo colour from livery (Ferrari 2026 show car = black; others often white).
+      halo: new THREE.MeshPhysicalMaterial({
+        color: design.halo ?? "#f2f2f4",
+        roughness: 0.5,
+        metalness: 0.12,
+        clearcoat: 0.18,
+        clearcoatRoughness: 0.42,
+        envMapIntensity: 0.32,
+      }),
+      matte: new THREE.MeshStandardMaterial({ color: "#121316", roughness: 0.78, metalness: 0.06 }),
+      inlet: new THREE.MeshStandardMaterial({ color: "#030304", roughness: 0.95, metalness: 0 }),
+      rubber: new THREE.MeshPhysicalMaterial({
+        color: "#0e0e10",
+        roughness: 0.92,
+        metalness: 0.02,
+        clearcoat: 0.06,
+        clearcoatRoughness: 0.75,
+        sheen: 0.25,
+        sheenRoughness: 0.9,
+        sheenColor: new THREE.Color("#2a2a2e"),
+        envMapIntensity: 0.2,
+      }),
+      rim: new THREE.MeshPhysicalMaterial({ color: "#2a2c32", roughness: 0.32, metalness: 0.85, clearcoat: 0.3, clearcoatRoughness: 0.28, envMapIntensity: 0.55 }),
+      metal: new THREE.MeshStandardMaterial({ color: "#b0b5bc", roughness: 0.32, metalness: 0.9, envMapIntensity: 0.55 }),
+      titanium: new THREE.MeshPhysicalMaterial({ color: "#6a6e75", roughness: 0.35, metalness: 0.85, clearcoat: 0.25, clearcoatRoughness: 0.35 }),
+      brass: new THREE.MeshStandardMaterial({ color: "#b8925a", roughness: 0.35, metalness: 0.9 }),
+      plank: new THREE.MeshStandardMaterial({ color: "#8a6a43", roughness: 0.85 }),
+      pirelli: new THREE.MeshStandardMaterial({ color: "#e4002b", roughness: 0.55, emissive: "#e4002b", emissiveIntensity: 0.08 }),
+      brake: new THREE.MeshStandardMaterial({ color: "#2a1a12", roughness: 0.6, emissive: "#ff6a1a", emissiveIntensity: 0, envMapIntensity: 0.35 }),
+      ers: new THREE.MeshStandardMaterial({ color: "#0b2a33", roughness: 0.45, emissive: "#22d3ee", emissiveIntensity: 0.25 }),
+      rain: new THREE.MeshStandardMaterial({ color: "#300", emissive: "#ff1a1a", emissiveIntensity: 0.35 }),
+      helmet: paint(design.stripe),
+      visor: new THREE.MeshPhysicalMaterial({
+        color: "#050508",
+        roughness: 0.15,
+        metalness: 0.7,
+        clearcoat: 0.5,
+        clearcoatRoughness: 0.12,
+        envMapIntensity: 0.6,
+      }),
     }
-  }, [team, carbonMap, liveryMap, design])
+  }, [team, carbonMap, carbonNormal, paintNormal, liveryMap, design])
 }
 type Mats = ReturnType<typeof useMaterials>
 
 // ── Geometry, built once ─────────────────────────────────────────────────────
 
 const mirrorX = (s: Section[]) => s.map((p) => ({ ...p, x: -(p.x ?? 0) }))
-// Wide, boxy inlet that sweeps down and in toward the floor (downwash).
+// 2026 show-car undercut: tall inlet lip, then deep carve toward the coke-bottle.
 const SIDEPOD: Section[] = [
-  { z: 0.42, x: 0.47, w: 0.4, h: 0.32, y: 0.47, n: 5 },
-  { z: 0.3, x: 0.48, w: 0.46, h: 0.38, y: 0.46, n: 5 },
-  { z: -0.2, x: 0.46, w: 0.48, h: 0.34, y: 0.42, n: 4.5 },
-  { z: -0.8, x: 0.4, w: 0.4, h: 0.24, y: 0.34, n: 4 },
-  { z: -1.3, x: 0.3, w: 0.26, h: 0.16, y: 0.27, n: 3.5 },
-  { z: -1.65, x: 0.22, w: 0.1, h: 0.08, y: 0.23, n: 3 },
+  { z: 0.52, x: 0.4, w: 0.34, h: 0.38, y: 0.52, n: 5 },
+  { z: 0.3, x: 0.52, w: 0.52, h: 0.42, y: 0.5, n: 5 },
+  { z: 0.0, x: 0.54, w: 0.5, h: 0.28, y: 0.38, n: 4.5 },
+  { z: -0.5, x: 0.42, w: 0.34, h: 0.18, y: 0.3, n: 4 },
+  { z: -1.0, x: 0.28, w: 0.22, h: 0.14, y: 0.26, n: 3.5 },
+  { z: -1.55, x: 0.16, w: 0.1, h: 0.09, y: 0.22, n: 3 },
 ]
 
 function useGeometry() {
@@ -116,37 +293,37 @@ function useGeometry() {
     ]
     return {
       nose: sideUV(loft([
-        { z: 2.55, w: 0.1, h: 0.07, y: 0.2, n: 2.2 },
-        { z: 2.3, w: 0.18, h: 0.13, y: 0.24 },
-        { z: 1.9, w: 0.28, h: 0.22, y: 0.32 },
-        { z: 1.5, w: 0.36, h: 0.3, y: 0.4 },
-        { z: 1.12, w: 0.42, h: 0.36, y: 0.46, n: 3 },
+        { z: 2.62, w: 0.08, h: 0.06, y: 0.18, n: 2.2 },
+        { z: 2.35, w: 0.16, h: 0.12, y: 0.22 },
+        { z: 1.95, w: 0.26, h: 0.2, y: 0.3 },
+        { z: 1.5, w: 0.34, h: 0.28, y: 0.38 },
+        { z: 1.12, w: 0.4, h: 0.34, y: 0.45, n: 3 },
       ])),
       chassis: sideUV(loft([
-        { z: 1.15, w: 0.42, h: 0.36, y: 0.46, n: 3 },
-        { z: 0.7, w: 0.56, h: 0.46, y: 0.5, n: 3 },
-        { z: 0.2, w: 0.7, h: 0.52, y: 0.5, n: 3.2 },
-        { z: -0.42, w: 0.76, h: 0.56, y: 0.5, n: 3.4 },
+        { z: 1.15, w: 0.4, h: 0.34, y: 0.45, n: 3 },
+        { z: 0.7, w: 0.52, h: 0.44, y: 0.48, n: 3 },
+        { z: 0.15, w: 0.66, h: 0.5, y: 0.48, n: 3.2 },
+        { z: -0.42, w: 0.7, h: 0.52, y: 0.48, n: 3.4 },
       ])),
       cover: sideUV(loft([
-        { z: -0.36, w: 0.76, h: 0.56, y: 0.5, n: 3.4 },
-        { z: -0.9, w: 0.62, h: 0.58, y: 0.52, n: 3 },
-        { z: -1.5, w: 0.38, h: 0.44, y: 0.48, n: 2.6 },
-        { z: -2.0, w: 0.2, h: 0.28, y: 0.44 },
-        { z: -2.32, w: 0.09, h: 0.13, y: 0.42 },
+        { z: -0.36, w: 0.7, h: 0.52, y: 0.48, n: 3.4 },
+        { z: -0.85, w: 0.55, h: 0.54, y: 0.5, n: 3 },
+        { z: -1.4, w: 0.32, h: 0.4, y: 0.46, n: 2.6 },
+        { z: -1.95, w: 0.16, h: 0.24, y: 0.42 },
+        { z: -2.28, w: 0.08, h: 0.12, y: 0.4 },
       ])),
       airbox: sideUV(loft([
-        { z: -0.26, w: 0.22, h: 0.2, y: 0.93 },
-        { z: -0.5, w: 0.25, h: 0.26, y: 0.9 },
-        { z: -0.95, w: 0.17, h: 0.24, y: 0.82 },
-        { z: -1.45, w: 0.05, h: 0.1, y: 0.7 },
+        { z: -0.22, w: 0.2, h: 0.18, y: 0.95 },
+        { z: -0.48, w: 0.24, h: 0.26, y: 0.92 },
+        { z: -0.95, w: 0.16, h: 0.24, y: 0.84 },
+        { z: -1.5, w: 0.05, h: 0.1, y: 0.72 },
       ])),
-      fin: sideUV(profile([[-0.7, 0.98], [-2.1, 0.66], [-2.1, 0.52], [-1.0, 0.8]], 0.012)),
+      fin: sideUV(profile([[-0.65, 1.0], [-2.05, 0.68], [-2.05, 0.54], [-0.95, 0.82]], 0.012)),
       sidepodL: sideUV(loft(SIDEPOD)),
       sidepodR: sideUV(loft(mirrorX(SIDEPOD))),
       floor: plate([[0.22, 1.32], [0.5, 0.98], [0.84, 0.62], [0.93, 0.2], [0.93, -1.05], [0.8, -1.35], [0.56, -1.5], [0.53, -2.05]], 0.022),
-      halo: tube([[-0.27, 0.78, -0.36], [-0.25, 0.93, -0.08], [-0.13, 0.97, 0.16], [0, 0.97, 0.24], [0.13, 0.97, 0.16], [0.25, 0.93, -0.08], [0.27, 0.78, -0.36]], 0.03),
-      haloPillar: tube([[0, 0.97, 0.24], [0, 0.9, 0.36], [0, 0.78, 0.46]], 0.026, 16),
+      halo: tube([[-0.28, 0.76, -0.38], [-0.26, 0.94, -0.08], [-0.14, 0.99, 0.16], [0, 0.99, 0.26], [0.14, 0.99, 0.16], [0.26, 0.94, -0.08], [0.28, 0.76, -0.38]], 0.034),
+      haloPillar: tube([[0, 0.99, 0.26], [0, 0.9, 0.38], [0, 0.76, 0.48]], 0.03, 16),
       fwMain: airfoil(1.8, 0.36, 0.09),
       fwFlap1: airfoil(1.62, 0.22, 0.1),
       fwFlap2: airfoil(1.5, 0.16, 0.12),
@@ -202,17 +379,14 @@ function Wheel({ geo, m, side, front }: { geo: Geo; m: Mats; side: 1 | -1; front
         <group ref={spin}>
           <mesh geometry={front ? geo.tyreFront : geo.tyreRear} material={m.rubber} />
           <mesh material={m.rim} rotation={[0, 0, Math.PI / 2]}>
-            <cylinderGeometry args={[0.232, 0.232, width * 0.9, 40]} />
+            <cylinderGeometry args={[0.232, 0.232, width * 0.85, 48]} />
           </mesh>
-          {/* Carbon wheel cover with a team-colour ring, and the Pirelli compound band */}
-          <mesh material={m.floorCarbon} rotation={[0, 0, Math.PI / 2]} position={[side * (half - 0.01), 0, 0]}>
-            <cylinderGeometry args={[0.218, 0.218, 0.012, 40]} />
+          {/* 2026-style flat aero wheel covers (show-car look) */}
+          <mesh material={m.aeroCarbon} rotation={[0, 0, Math.PI / 2]} position={[side * (half - 0.008), 0, 0]}>
+            <cylinderGeometry args={[0.215, 0.215, 0.014, 48]} />
           </mesh>
-          <mesh material={m.paint} rotation={[0, Math.PI / 2, 0]} position={[side * (half - 0.002), 0, 0]}>
-            <torusGeometry args={[0.2, 0.01, 8, 64]} />
-          </mesh>
-          <mesh material={m.rim} rotation={[0, 0, Math.PI / 2]} position={[side * (half - 0.002), 0, 0]}>
-            <cylinderGeometry args={[0.05, 0.05, 0.03, 16]} />
+          <mesh material={m.rim} rotation={[0, 0, Math.PI / 2]} position={[side * (half + 0.002), 0, 0]}>
+            <cylinderGeometry args={[0.048, 0.048, 0.028, 20]} />
           </mesh>
           <mesh material={m.pirelli} rotation={[0, Math.PI / 2, 0]} position={[side * (half + 0.004), 0, 0]}>
             <torusGeometry args={[0.295, 0.008, 8, 64]} />
@@ -238,8 +412,9 @@ function Flap({ geometry, material, position, corner, straight }: { geometry: TH
   const ref = useRef<THREE.Mesh>(null!)
   const motion = useMotion()
   useFrame((_, dt) => {
+    // X-mode (straight) = flaps open/flat; Z-mode (corner) = flaps up for downforce.
     const open = motion !== null && motion.aero === "straight"
-    ref.current.rotation.x = THREE.MathUtils.damp(ref.current.rotation.x, open ? straight : corner, 7, dt)
+    ref.current.rotation.x = THREE.MathUtils.damp(ref.current.rotation.x, open ? straight : corner, 14, dt)
   })
   return <mesh ref={ref} geometry={geometry} material={material} position={position} rotation={[corner, 0, 0]} />
 }
@@ -301,7 +476,7 @@ function PuLabels() {
 function Badge({ map, position, rotation, scale }: { map: THREE.Texture; position: THREE.Vector3Tuple; rotation: THREE.Vector3Tuple; scale: THREE.Vector3Tuple }) {
   return (
     <Decal position={position} rotation={rotation} scale={scale}>
-      <meshPhysicalMaterial map={map} transparent polygonOffset polygonOffsetFactor={-6} depthWrite={false} roughness={0.35} clearcoat={0.8} metalness={0.1} />
+      <meshPhysicalMaterial map={map} transparent polygonOffset polygonOffsetFactor={-6} depthWrite={false} roughness={0.4} clearcoat={0.45} clearcoatRoughness={0.2} metalness={0.06} envMapIntensity={0.5} />
     </Decal>
   )
 }
@@ -316,18 +491,33 @@ export function Car({ team }: { team: Team }) {
   const body = useRef<THREE.Group>(null!)
   const motion = useMotion()
 
+  // Real-time shadows need cast/receive on every mesh (groups don’t inherit).
+  useLayoutEffect(() => {
+    body.current?.traverse((o) => {
+      const mesh = o as THREE.Mesh
+      if (!mesh.isMesh) return
+      mesh.castShadow = true
+      mesh.receiveShadow = true
+    })
+  }, [team.id, m])
+
   return (
     <group ref={body}>
+      {/* Panel gaps — catch SSAO / soft light so the body doesn’t read as one blob */}
+      <mesh material={m.seam} position={[0, 0.52, 0.35]}><boxGeometry args={[0.72, 0.006, 0.01]} /></mesh>
+      <mesh material={m.seam} position={[0, 0.48, -0.38]}><boxGeometry args={[0.7, 0.006, 0.01]} /></mesh>
+      <mesh material={m.seam} position={[0.52, 0.42, -0.2]} rotation={[0, 0, 0.05]}><boxGeometry args={[0.008, 0.28, 1.0]} /></mesh>
+      <mesh material={m.seam} position={[-0.52, 0.42, -0.2]} rotation={[0, 0, -0.05]}><boxGeometry args={[0.008, 0.28, 1.0]} /></mesh>
+      <mesh material={m.seam} position={[0, 0.62, -0.9]}><boxGeometry args={[0.4, 0.005, 0.01]} /></mesh>
+
       <Part id="front-wing" explode={[0, 0.07, 1.38]}>
-        <mesh geometry={geo.fwMain} material={m.accent} position={[0, 0.09, 2.7]} rotation={[0.08, 0, 0]}>
-          <Badge map={brand.sponsor ?? word} position={[0, 0.02, -0.17]} rotation={[-Math.PI / 2, 0, 0]} scale={[0.9, 0.15, 0.08]} />
-        </mesh>
-        <Flap geometry={geo.fwFlap1} material={m.accent} position={[0, 0.13, 2.42]} corner={0.38} straight={0.12} />
-        <Flap geometry={geo.fwFlap2} material={m.paint2} position={[0, 0.19, 2.26]} corner={0.6} straight={0.2} />
-        <Flap geometry={geo.fwFlap3} material={m.accent} position={[0, 0.26, 2.14]} corner={0.82} straight={0.32} />
-        {[1, -1].map((s) => <mesh key={s} geometry={geo.fwEndplate} material={m.livery} position={[0.9 * s, 0, 0]} />)}
+        <mesh geometry={geo.fwMain} material={m.aeroCarbon} position={[0, 0.08, 2.72]} rotation={[0.1, 0, 0]} />
+        <Flap geometry={geo.fwFlap1} material={m.aeroCarbon} position={[0, 0.125, 2.44]} corner={0.72} straight={0.02} />
+        <Flap geometry={geo.fwFlap2} material={m.aeroCarbon} position={[0, 0.185, 2.28]} corner={0.95} straight={0.06} />
+        <Flap geometry={geo.fwFlap3} material={m.aeroCarbon} position={[0, 0.255, 2.16]} corner={1.18} straight={0.12} />
+        {[1, -1].map((s) => <mesh key={s} geometry={geo.fwEndplate} material={m.aeroCarbon} position={[0.92 * s, 0, 0]} />)}
         {[1, -1].map((s) => (
-          <mesh key={s} material={m.carbon} position={[0.06 * s, 0.15, 2.46]}><boxGeometry args={[0.012, 0.1, 0.12]} /></mesh>
+          <mesh key={s} material={m.aeroCarbon} position={[0.06 * s, 0.15, 2.46]}><boxGeometry args={[0.012, 0.1, 0.12]} /></mesh>
         ))}
       </Part>
 
@@ -342,10 +532,10 @@ export function Car({ team }: { team: Team }) {
       </Part>
 
       <Part id="front-suspension" explode={[0.65, 0.51, 0.29]}>
-        {geo.frontRodsL.map((g, i) => <mesh key={i} geometry={g} material={m.carbon} />)}
+        {geo.frontRodsL.map((g, i) => <mesh key={i} geometry={g} material={m.aeroCarbon} />)}
       </Part>
       <Part id="front-suspension" explode={[-0.65, 0.51, 0.29]} label={false}>
-        {geo.frontRodsR.map((g, i) => <mesh key={i} geometry={g} material={m.carbon} />)}
+        {geo.frontRodsR.map((g, i) => <mesh key={i} geometry={g} material={m.aeroCarbon} />)}
       </Part>
 
       <Part id="cockpit" explode={[0, 0.8, 0.22]}>
@@ -353,13 +543,13 @@ export function Car({ team }: { team: Team }) {
         <mesh material={m.inlet} position={[0, 0.77, -0.06]} scale={[0.22, 0.05, 0.4]}><sphereGeometry args={[1, 32, 16]} /></mesh>
         <mesh material={m.helmet} position={[0, 0.84, -0.2]}><sphereGeometry args={[0.11, 32, 24]} /></mesh>
         <mesh material={m.visor} position={[0, 0.85, -0.13]} scale={[0.85, 0.35, 0.6]}><sphereGeometry args={[0.1, 24, 12]} /></mesh>
-        <mesh geometry={geo.halo} material={m.titanium} />
-        <mesh geometry={geo.haloPillar} material={m.titanium} />
-        <mesh geometry={geo.haloFin} material={m.carbon} position={[0, 0.995, 0.24]} rotation={[0.1, 0, 0]} />
+        <mesh geometry={geo.halo} material={m.halo} />
+        <mesh geometry={geo.haloPillar} material={m.halo} />
+        <mesh geometry={geo.haloFin} material={m.aeroCarbon} position={[0, 0.995, 0.24]} rotation={[0.1, 0, 0]} />
         {[1, -1].map((s) => (
           <group key={s}>
-            <mesh material={m.carbon} position={[0.37 * s, 0.8, 0.28]}><boxGeometry args={[0.13, 0.05, 0.03]} /></mesh>
-            <mesh material={m.carbon} geometry={rodCache(s)} />
+            <mesh material={m.aeroCarbon} position={[0.37 * s, 0.8, 0.28]}><boxGeometry args={[0.13, 0.05, 0.03]} /></mesh>
+            <mesh material={m.aeroCarbon} geometry={rodCache(s)} />
           </group>
         ))}
       </Part>
@@ -368,25 +558,25 @@ export function Car({ team }: { team: Team }) {
         <mesh geometry={geo.sidepodL} material={m.livery}>
           <Badge map={brand.main ?? word} position={[0.7, 0.43, -0.32]} rotation={[0, Math.PI / 2, 0]} scale={[0.82, 0.2, 0.25]} />
         </mesh>
-        <mesh material={m.inlet} position={[0.48, 0.47, 0.425]} scale={[0.17, 0.12, 0.012]}><sphereGeometry args={[1, 24, 12]} /></mesh>
+        <mesh material={m.inlet} position={[0.5, 0.5, 0.48]} scale={[0.15, 0.14, 0.012]}><sphereGeometry args={[1, 24, 12]} /></mesh>
       </Part>
       <Part id="sidepods" explode={[-0.94, 0.07, 0]} label={false}>
         <mesh geometry={geo.sidepodR} material={m.livery}>
           <Badge map={brand.main ?? word} position={[-0.7, 0.43, -0.32]} rotation={[0, -Math.PI / 2, 0]} scale={[0.82, 0.2, 0.25]} />
         </mesh>
-        <mesh material={m.inlet} position={[-0.48, 0.47, 0.425]} scale={[0.17, 0.12, 0.012]}><sphereGeometry args={[1, 24, 12]} /></mesh>
+        <mesh material={m.inlet} position={[-0.5, 0.5, 0.48]} scale={[0.15, 0.14, 0.012]}><sphereGeometry args={[1, 24, 12]} /></mesh>
       </Part>
 
       <Part id="floor" explode={[1.9, 0, 0]}>
         <mesh geometry={geo.floor} material={m.floorCarbon} position={[0, 0.075, 0]} />
         <mesh material={m.plank} position={[0, 0.046, -0.4]}><boxGeometry args={[0.3, 0.008, 2.6]} /></mesh>
         {[0.32, 0.45, 0.58].flatMap((x) => [x, -x]).map((x) => (
-          <mesh key={x} material={m.carbon} position={[x, 0.04, 1.0]} rotation={[0, x * 0.25, 0]}><boxGeometry args={[0.01, 0.07, 0.42]} /></mesh>
+          <mesh key={x} material={m.aeroCarbon} position={[x, 0.04, 1.0]} rotation={[0, x * 0.25, 0]}><boxGeometry args={[0.01, 0.07, 0.42]} /></mesh>
         ))}
         {[1, -1].map((s) => (
           <group key={s}>
-            <mesh material={m.carbon} position={[0.97 * s, 0.11, -0.45]} rotation={[0, 0, -0.35 * s]}><boxGeometry args={[0.09, 0.006, 0.55]} /></mesh>
-            <mesh material={m.carbon} position={[0.93 * s, 0.055, -0.4]}><boxGeometry args={[0.006, 0.05, 1.25]} /></mesh>
+            <mesh material={m.aeroCarbon} position={[0.97 * s, 0.11, -0.45]} rotation={[0, 0, -0.35 * s]}><boxGeometry args={[0.09, 0.006, 0.55]} /></mesh>
+            <mesh material={m.aeroCarbon} position={[0.93 * s, 0.055, -0.4]}><boxGeometry args={[0.006, 0.05, 1.25]} /></mesh>
             <mesh material={m.inlet} position={[0.42 * s, 0.05, 1.18]}><boxGeometry args={[0.2, 0.045, 0.02]} /></mesh>
           </group>
         ))}
@@ -415,34 +605,30 @@ export function Car({ team }: { team: Team }) {
       </Part>
 
       <Part id="rear-suspension" explode={[0, 0.43, -0.8]}>
-        <mesh geometry={geo.gearbox} material={m.carbon} />
-        {[...geo.rearRodsL, ...geo.rearRodsR].map((g, i) => <mesh key={i} geometry={g} material={m.carbon} />)}
+        <mesh geometry={geo.gearbox} material={m.aeroCarbon} />
+        {[...geo.rearRodsL, ...geo.rearRodsR].map((g, i) => <mesh key={i} geometry={g} material={m.aeroCarbon} />)}
       </Part>
 
       <Part id="diffuser" explode={[0, 0.05, -1.25]}>
-        <mesh material={m.carbon} position={[0, 0.18, -2.1]} rotation={[0.38, 0, 0]}><boxGeometry args={[1.04, 0.015, 0.66]} /></mesh>
+        <mesh material={m.aeroCarbon} position={[0, 0.18, -2.1]} rotation={[0.38, 0, 0]}><boxGeometry args={[1.04, 0.015, 0.66]} /></mesh>
         {[-0.4, -0.18, 0.18, 0.4].map((x) => (
-          <mesh key={x} material={m.carbon} position={[x, 0.22, -2.12]} rotation={[0.38, 0, 0]}><boxGeometry args={[0.01, 0.12, 0.6]} /></mesh>
+          <mesh key={x} material={m.aeroCarbon} position={[x, 0.22, -2.12]} rotation={[0.38, 0, 0]}><boxGeometry args={[0.01, 0.12, 0.6]} /></mesh>
         ))}
         <mesh material={m.rain} position={[0, 0.36, -2.42]} userData={{ keepEmissive: true }}><boxGeometry args={[0.12, 0.05, 0.02]} /></mesh>
       </Part>
 
       <Part id="beam-wing" explode={[0, 0.36, -1.23]}>
-        <mesh geometry={geo.beam1} material={m.carbon} position={[0, 0.4, -2.28]} rotation={[0.3, 0, 0]} />
-        <mesh geometry={geo.beam2} material={m.carbon} position={[0, 0.48, -2.42]} rotation={[0.45, 0, 0]} />
+        <mesh geometry={geo.beam1} material={m.aeroCarbon} position={[0, 0.4, -2.28]} rotation={[0.3, 0, 0]} />
+        <mesh geometry={geo.beam2} material={m.aeroCarbon} position={[0, 0.48, -2.42]} rotation={[0.45, 0, 0]} />
       </Part>
 
       <Part id="rear-wing" explode={[0, 0.87, -1.45]}>
-        <mesh geometry={geo.rwMain} material={m.accent} position={[0, 0.88, -2.42]} rotation={[0.18, 0, 0]}>
-          <Badge map={brand.sponsor ?? word} position={[0, 0.02, -0.16]} rotation={[-Math.PI / 2, 0, Math.PI]} scale={[0.82, 0.2, 0.06]} />
-        </mesh>
-        <Flap geometry={geo.rwFlap} material={m.paint} position={[0, 0.98, -2.68]} corner={0.65} straight={0.08} />
+        <mesh geometry={geo.rwMain} material={m.aeroCarbon} position={[0, 0.88, -2.42]} rotation={[0.18, 0, 0]} />
+        <Flap geometry={geo.rwFlap} material={m.aeroCarbon} position={[0, 0.98, -2.68]} corner={1.05} straight={-0.12} />
         {[1, -1].map((s) => (
-          <mesh key={s} geometry={geo.rwEndplate} material={m.livery} position={[0.51 * s, 0, 0]}>
-            <Badge map={word} position={[0.009 * s, 0.94, -2.66]} rotation={[0, (Math.PI / 2) * s, 0]} scale={[0.5, 0.12, 0.012]} />
-          </mesh>
+          <mesh key={s} geometry={geo.rwEndplate} material={m.aeroCarbon} position={[0.51 * s, 0, 0]} />
         ))}
-        <mesh geometry={geo.swanNeck} material={m.carbon} />
+        <mesh geometry={geo.swanNeck} material={m.aeroCarbon} />
         <mesh material={m.matte} position={[0, 0.93, -2.56]} rotation={[Math.PI / 2, 0, 0]}><capsuleGeometry args={[0.024, 0.18, 4, 12]} /></mesh>
         {[1, -1].flatMap((s) => [0, 1, 2].map((i) => (
           <mesh key={`${s}${i}`} material={m.inlet} position={[0.52 * s, 0.82 + i * 0.035, -2.5]}><boxGeometry args={[0.02, 0.008, 0.16]} /></mesh>

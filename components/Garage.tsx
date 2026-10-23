@@ -14,7 +14,7 @@ import { voice } from "@/lib/voice"
 import { lines } from "@/lib/voiceLines"
 import { useEngineerRadio } from "@/lib/engineerRadio"
 import { PaddockPanel } from "./Paddock"
-import { telemetry } from "@/lib/drive"
+import { driveTourState, telemetry } from "@/lib/drive"
 import { PARTS } from "@/lib/parts"
 import { useEngineerState, useGarage } from "@/lib/store"
 import { TEAMS, teamById } from "@/lib/teams"
@@ -40,21 +40,63 @@ function hasWebGL() {
 }
 
 function DriveHud() {
-  const [t, setT] = useState({ speed: 0, aero: "corner", ers: 0, braking: 0 })
+  const [t, setT] = useState({
+    speed: 0,
+    aero: "corner" as string,
+    ers: 0,
+    braking: 0,
+    battery: 1,
+    boosting: false,
+    title: "",
+    hint: "",
+    focus: null as null | "aero" | "ers" | "battery" | "brake",
+  })
   useEffect(() => {
-    const id = setInterval(() => setT({ speed: telemetry.speed, aero: telemetry.aero, ers: telemetry.ers, braking: telemetry.braking }), 70)
+    const id = setInterval(() => setT({
+      speed: telemetry.speed,
+      aero: telemetry.aero,
+      ers: telemetry.ers,
+      braking: telemetry.braking,
+      battery: driveTourState.battery,
+      boosting: driveTourState.boosting,
+      title: driveTourState.title,
+      hint: driveTourState.hint,
+      focus: driveTourState.focus,
+    }), 70)
     return () => clearInterval(id)
   }, [])
   return (
     <div className="hud" aria-hidden>
       <div className="hud-speed"><span>{Math.round(t.speed)}</span><small>km/h</small></div>
       <div className="hud-block">
-        <div className={`hud-aero ${t.aero}`}>
-          <b>{t.aero === "straight" ? "X-MODE" : "Z-MODE"}</b>
-          <small>{t.aero === "straight" ? "Wings open · low drag" : "Wings closed · max grip"}</small>
+        {t.title && (
+          <div className="hud-lesson">
+            <b>{t.title}</b>
+            {t.hint ? <small>{t.hint}</small> : null}
+          </div>
+        )}
+        <div className={`hud-aero ${t.aero}${t.boosting ? " boost" : ""}${t.focus === "aero" ? " focus" : ""}`}>
+          <b>{t.boosting ? "OVERTAKE" : t.aero === "straight" ? "X-MODE" : "Z-MODE"}</b>
+          <small>
+            {t.boosting
+              ? "Spending battery for speed"
+              : t.aero === "straight"
+                ? "Wings open · less drag"
+                : "Wings closed · more grip"}
+          </small>
         </div>
-        <div className="hud-bar"><small>ERS deploy</small><div><i style={{ width: `${Math.round(t.ers * 100)}%` }} /></div></div>
-        <div className="hud-bar brake"><small>Brake</small><div><i style={{ width: `${Math.round(t.braking * 100)}%` }} /></div></div>
+        <div className={`hud-bar${t.focus === "ers" ? " focus" : ""}`}>
+          <small>Power from battery</small>
+          <div><i style={{ width: `${Math.round(t.ers * 100)}%` }} /></div>
+        </div>
+        <div className={`hud-bar${t.focus === "battery" ? " focus" : ""}`}>
+          <small>Battery {Math.round(t.battery * 100)}%</small>
+          <div><i style={{ width: `${Math.round(t.battery * 100)}%` }} /></div>
+        </div>
+        <div className={`hud-bar brake${t.focus === "brake" ? " focus" : ""}`}>
+          <small>Brake</small>
+          <div><i style={{ width: `${Math.round(t.braking * 100)}%` }} /></div>
+        </div>
       </div>
     </div>
   )
@@ -113,7 +155,12 @@ export function Garage() {
       const lena = useEngineerState.getState()
       if (!lena.lesson && !showcase) {
         // voice.say shows the caption itself, in sync with her voice.
-        voice.say(line)
+        if (voice.enabled && voice.supported) voice.say(line)
+        else {
+          lena.setCaption(line)
+          lena.setStatus("talking")
+          setTimeout(() => useEngineerState.getState().setStatus("idle"), 3500)
+        }
       }
     }
     setTeam(id)
@@ -178,7 +225,6 @@ export function Garage() {
         <div className="tab-body" hidden={tab !== "part"}><PartCard onAsk={ask} /></div>
         <div className="tab-body flush" hidden={tab !== "engineer"}><EngineerPanel engineer={{ ...engineer, ask }} /></div>
         <div className="tab-body" hidden={tab !== "paddock"}>{tab === "paddock" && <PaddockPanel />}</div>
-        <p className="model-badge">Nemotron on Nebius · live data from FIA, OpenF1, Jolpica-F1</p>
       </aside>
       <RaceSetup />
     </div>

@@ -1,6 +1,5 @@
 "use client"
 
-import { useEffect, useState } from "react"
 import { liveryFor } from "@/lib/liveries"
 import { useEngineerState } from "@/lib/store"
 import { teamById } from "@/lib/teams"
@@ -12,8 +11,8 @@ export const ENGINEER = { name: "Lena Moreau", role: "Race engineer" }
 // follows the words she speaks. The kit animates in on every team change.
 export function Lena({ size = 120, teamId }: { size?: number; teamId: string }) {
   const status = useEngineerState((s) => s.status)
-  const mouth = useEngineerState((s) => s.mouth)
-  const [open, setOpen] = useState(0)
+  const mouthOpen = useEngineerState((s) => s.mouthOpen)
+  const mouthShape = useEngineerState((s) => s.mouthShape)
   const team = teamById(teamId)
   const kit = liveryFor(teamId)
   const shirt = kit.base
@@ -21,19 +20,10 @@ export function Lena({ size = 120, teamId }: { size?: number; teamId: string }) 
   const trim = kit.lower
   const ink = kit.wordmarkColor === kit.base ? kit.lower : kit.wordmarkColor
 
-  // Each spoken word opens the mouth briefly; a light flutter keeps it alive
-  // on voices that don't report word boundaries.
-  useEffect(() => {
-    if (status !== "talking") { setOpen(0); return }
-    setOpen(1 + (mouth % 2))
-    const t = setTimeout(() => setOpen(0), 130)
-    return () => clearTimeout(t)
-  }, [mouth, status])
-  useEffect(() => {
-    if (status !== "talking") return
-    const id = setInterval(() => setOpen((o) => (o ? 0 : 1 + Math.round(Math.random()))), 150)
-    return () => clearInterval(id)
-  }, [status])
+  // Audio2Face-style drive: continuous jaw from voice analyser (store.mouthOpen).
+  const talking = status === "talking"
+  const open = talking ? mouthOpen : 0
+  const shape = talking ? mouthShape : 0
 
   const look = status === "thinking" ? { x: 2.2, y: -2.2 } : { x: 0, y: 0 }
   const skin = "#e9b994"
@@ -96,13 +86,19 @@ export function Lena({ size = 120, teamId }: { size?: number; teamId: string }) 
           {/* Nose */}
           <path d="M100 102 Q97 114 101 117 Q104 118 106 116" stroke={skinShade} strokeWidth="2.2" fill="none" strokeLinecap="round" />
 
-          {/* Mouth */}
-          {open === 0 ? (
+          {/* Mouth — jaw + viseme from live audio (A2F-style) */}
+          {open < 0.06 ? (
             <path d={status === "thinking" ? "M90 130 Q100 131 109 128" : "M88 128 Q100 137 112 128"} stroke="#a2453f" strokeWidth="3" fill="none" strokeLinecap="round" />
           ) : (
             <g>
-              <ellipse cx="100" cy="131" rx={open === 2 ? 10 : 8} ry={open === 2 ? 7 : 4.5} fill="#6e2622" />
-              <rect x="93" y={open === 2 ? 125 : 127} width="14" height="3" rx="1.5" fill="#fff" opacity="0.9" />
+              <ellipse
+                cx="100"
+                cy={130.5 + open * 2}
+                rx={shape === 1 ? 5.5 + open * 2 : shape === 2 ? 9 + open * 3 : 7.5 + open * 4}
+                ry={2.2 + open * (shape === 3 ? 7.5 : shape === 1 ? 3.5 : 5.5)}
+                fill="#6e2622"
+              />
+              <rect x={100 - (5 + open * 3)} y={126.5 + open} width={10 + open * 6} height={2.2 + open} rx="1.2" fill="#fff" opacity="0.9" />
             </g>
           )}
 

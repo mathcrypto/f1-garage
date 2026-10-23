@@ -33,29 +33,52 @@ export function startRace(o: RaceOptions) {
   useMessages.setState({ items: [] })
   voice.stop()
   setupRace(o, {
-    lightsOut: () => radio(lines.lightsOut(Boolean(o.player)), true),
+    light: (n) => sound.lightBeep(n),
+    lightsOut: () => {
+      sound.lightsOut()
+      radio(lines.lightsOut(Boolean(o.player)), "critical")
+    },
     position: (teamId, from, to) => {
       if (teamId !== race.follow || from === to) return
-      radio(to < from ? lines.gained(to) : lines.lost(to))
+      // Call overtakes; stay quiet on small losses (HUD already shows position).
+      if (to < from) radio(lines.gained(to), to === 1 ? "critical" : "hard")
+      else if (to <= 3) radio(lines.lost(to), "soft")
     },
-    finalLap: () => { message("Final lap", "info"); radio(lines.finalLap, true) },
-    finish: (teamId, pos) => {
-      if (teamId !== race.follow) return
-      radio(lines.finish(pos), true)
+    finalLap: () => { message("Final lap", "info"); radio(lines.finalLap, "critical") },
+    finish: () => {},
+    end: () => {
+      if (!o.player) return
+      const me = race.cars.find((c) => c.teamId === o.player)
+      if (!me || me.finishTime === null) return
+      // Crossing order ignores time penalties; classification adds them.
+      const byCrossing = [...race.cars]
+        .filter((c) => c.finishTime !== null)
+        .sort((a, b) => a.finishTime! - b.finishTime!)
+      const trackPos = byCrossing.findIndex((c) => c.teamId === o.player) + 1
+      const finalPos = race.order.findIndex((c) => c.teamId === o.player) + 1
+      if (trackPos <= 0 || finalPos <= 0) return
+      if (me.penalty > 0 && trackPos !== finalPos) {
+        radio(lines.crossed(trackPos), "critical")
+        radio(lines.classifiedPenalty(finalPos, me.penalty), "critical")
+      } else {
+        radio(lines.finish(finalPos), "critical")
+      }
     },
     message: (text, tone) => {
       message(text, tone)
       if (!race.player) return
-      if (text.startsWith("Track limits")) radio(lines.trackLimits, true)
-      else if (text.startsWith("5 second")) radio(lines.penalty, true)
-      else if (tone === "purple" && text.includes(teamById(race.player).code)) radio(lines.fastest, true)
+      // Track limits: HUD only the first few times; voice once in a while.
+      if (text.startsWith("Track limits")) radio(lines.trackLimits, "soft")
+      else if (text.startsWith("5 second")) radio(lines.penalty, "critical")
+      else if (tone === "purple" && text.includes(teamById(race.player).code)) radio(lines.fastest, "hard")
     },
   })
   g.setTrackCam("chase")
   g.setMode("race")
   sound.unlock()
+  voice.unlock()
   const slot = o.order.indexOf(o.player ?? o.order[0]) + 1
-  setTimeout(() => radio(o.player ? lines.gridCheck(slot) : lines.gridWatch(o.order.length), true), 400)
+  setTimeout(() => radio(o.player ? lines.gridCheck(slot) : lines.gridWatch(o.order.length), "hard"), 400)
 }
 
 export function endRace() {
@@ -145,7 +168,7 @@ export function RaceSetup() {
             </div>
             <div className="opt">
               <span className="opt-label">Race distance</span>
-              <div className="seg">{[3, 5, 10].map((n) => <button key={n} className={laps === n ? "on" : ""} onClick={() => setLaps(n)}>{n} laps</button>)}</div>
+              <div className="seg">{[1, 3, 5, 10].map((n) => <button key={n} className={laps === n ? "on" : ""} onClick={() => setLaps(n)}>{n} {n === 1 ? "lap" : "laps"}</button>)}</div>
             </div>
             <div className="opt">
               <span className="opt-label">AI difficulty <b>{difficulty} · {difficultyName(difficulty)}</b></span>

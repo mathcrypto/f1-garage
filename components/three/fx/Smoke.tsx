@@ -1,3 +1,7 @@
+/**
+ * @file Smoke.tsx
+ * @description The smoke effect component that renders the smoke particles.
+ */
 "use client"
 
 import { useFrame } from "@react-three/fiber"

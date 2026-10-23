@@ -1,4 +1,4 @@
-import { getCalendar, getLastResult, getLiveSession, getStandings } from "@/lib/f1data"
+import { getCalendar, getLastResult, getStandings } from "@/lib/f1data"
 import { teamNews } from "@/lib/search"
 import { teamById } from "@/lib/teams"
 
@@ -8,15 +8,14 @@ export const runtime = "nodejs"
 // Each block is null when its source is unavailable.
 export async function GET(req: Request) {
   const team = teamById(new URL(req.url).searchParams.get("team") ?? "ferrari")
-  const [calendar, lastResult, standings, live, news] = await Promise.all([
+  const [calendar, lastResult, standings, news] = await Promise.all([
     getCalendar(),
     getLastResult(),
     getStandings(),
-    getLiveSession(),
-    teamNews(team.name),
+    teamNews(team.id),
   ])
   return Response.json(
-    { calendar, lastResult, standings, live, news },
+    { calendar, lastResult, standings, news },
     { headers: { "Cache-Control": "public, s-maxage=60, stale-while-revalidate=300" } },
   )
 }

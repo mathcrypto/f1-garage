@@ -50,17 +50,28 @@ export async function getLastResult() {
   }
 }
 
-export async function getStandings() {
+/** Season path segment for Jolpica: a year like 2025, or "current". */
+export function standingsSeasonPath(season?: number | string | null): string {
+  if (season == null || season === "" || season === "current") return "current"
+  const y = Number(season)
+  if (Number.isFinite(y) && y >= 1950 && y <= 2100) return String(y)
+  return "current"
+}
+
+export async function getStandings(season?: number | string | null) {
   type C = { position?: string; positionText: string; points: string; wins: string; Constructor: { name: string; constructorId: string } }
   type D = { position?: string; positionText: string; points: string; Driver: { givenName: string; familyName: string; code?: string }; Constructors: { name: string }[] }
+  const path = standingsSeasonPath(season)
   const [c, d] = await Promise.all([
-    getJson<{ MRData: { StandingsTable: { StandingsLists: { round: string; ConstructorStandings: C[] }[] } } }>(`${JOLPICA}/current/constructorStandings.json`, 900),
-    getJson<{ MRData: { StandingsTable: { StandingsLists: { DriverStandings: D[] }[] } } }>(`${JOLPICA}/current/driverStandings.json`, 900),
+    getJson<{ MRData: { StandingsTable: { season: string; StandingsLists: { round: string; ConstructorStandings: C[] }[] } } }>(`${JOLPICA}/${path}/constructorStandings.json`, 900),
+    getJson<{ MRData: { StandingsTable: { season: string; StandingsLists: { DriverStandings: D[] }[] } } }>(`${JOLPICA}/${path}/driverStandings.json`, 900),
   ])
   const cl = c?.MRData.StandingsTable.StandingsLists[0]
   const dl = d?.MRData.StandingsTable.StandingsLists[0]
   if (!cl && !dl) return null
+  const seasonYear = c?.MRData.StandingsTable.season ?? d?.MRData.StandingsTable.season ?? (path === "current" ? null : path)
   return {
+    season: seasonYear ? Number(seasonYear) : null,
     afterRound: cl ? Number(cl.round) : null,
     constructors: (cl?.ConstructorStandings ?? []).map((s) => ({ position: s.positionText, team: s.Constructor.name, id: s.Constructor.constructorId, points: Number(s.points), wins: Number(s.wins) })),
     drivers: (dl?.DriverStandings ?? []).slice(0, 10).map((s) => ({ position: s.positionText, driver: `${s.Driver.givenName} ${s.Driver.familyName}`, code: s.Driver.code, team: s.Constructors[0]?.name, points: Number(s.points) })),

@@ -2,12 +2,21 @@
 
 Everything here is free to use on this site. Sources and licences:
 
-## Music
+## Beds (primary)
+
+| File | When |
+| --- | --- |
+| `music.mp3` | Garage background — pauses while Lena speaks |
+| `radio.mp3` | Short open before Lena speaks |
+| `engine.mp3` | Short Drive tour (burnout → modes → back to garage) |
+| `race.mp3` | Race mode loop |
+
+## Music (fallback / grid)
 
 | File | Track | Artist | Licence | Source |
 | --- | --- | --- | --- | --- |
-| `theme.mp3` (garage, while you explore the car) | Limit 70 | Kevin MacLeod | Public domain (CC0) | [FreePD](https://freepd.com) |
-| `grid.mp3` (race grid, before lights out; first 75 s with a fade) | Apex | Alexander Nakarada | Public domain (CC0) | [FreePD](https://freepd.com) |
+| `theme.mp3` | Limit 70 (fallback if `music.mp3` missing) | Kevin MacLeod | Public domain (CC0) | [FreePD](https://freepd.com) |
+| `grid.mp3` (race grid, before lights out) | Apex | Alexander Nakarada | Public domain (CC0) | [FreePD](https://freepd.com) |
 
 Both were taken from the [SoundSafari CC0-1.0 Music](https://github.com/SoundSafari/CC0-1.0-Music) collection of FreePD's public-domain catalogue, loudness-normalised and re-encoded at 112 kbps. No attribution is required; it's given here anyway.
 

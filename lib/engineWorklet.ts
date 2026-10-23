@@ -1,39 +1,9 @@
-// A physically informed model of the 1.6-litre V6 turbo hybrid, run as an
-// AudioWorklet. Each cylinder fires every 720° of crank rotation (120° apart)
-// and pushes a pressure pulse into the exhaust; the pipe's reflections give
-// the note its resonance, and cycle-to-cycle variation in every combustion
-// gives the raw, raspy texture of a real engine instead of a clean tone.
-// Based on Baldan, Lachambre, Delle Monache & Boussard, "Physically informed
-// car engine sound synthesis for virtual and augmented environments" (2015).
+// Smoother game-style V6 hybrid note: RPM-locked harmonics with a soft
+// exhaust thump, heavily low-passed so it sits under Lena instead of
+// buzzing. Not a studio recording — just less fatiguing than the old model.
 export const ENGINE_PROCESSOR = "v6-engine"
 
 export const ENGINE_WORKLET = /* js */ `
-const CYL = 6
-const TAU = Math.PI * 2
-
-class Delay {
-  constructor(n) { this.b = new Float32Array(n); this.i = 0 }
-  read(d) { const n = this.b.length; return this.b[(this.i - d + n) % n] }
-  write(v) { this.b[this.i] = v; this.i = (this.i + 1) % this.b.length }
-}
-
-// A pipe: pressure travels to the open end, part of it reflects back
-// inverted and slightly dulled. Returns what radiates from the open end.
-class Pipe {
-  constructor(len, reflect, damp) {
-    this.len = len; this.reflect = reflect; this.damp = damp
-    this.out = new Delay(len + 2); this.back = new Delay(len + 2); this.lp = 0
-  }
-  step(input) {
-    const atEnd = this.out.read(this.len)
-    this.lp += (atEnd - this.lp) * this.damp
-    const returned = this.back.read(this.len)
-    this.out.write(input + returned * 0.55)
-    this.back.write(-this.reflect * this.lp)
-    return atEnd * (1 - this.reflect * 0.5)
-  }
-}
-
 class V6 extends AudioWorkletProcessor {
   static get parameterDescriptors() {
     return [
@@ -44,71 +14,51 @@ class V6 extends AudioWorkletProcessor {
   }
   constructor() {
     super()
-    const sr = sampleRate
-    this.crank = 0 // in cycles (one cycle = 720°)
-    this.amp = new Float32Array(CYL).fill(1)
-    this.last = new Float32Array(CYL).fill(1)
-    this.seed = 12345
-    // Exhaust primaries of slightly different lengths merge into a short tail
-    // pipe; the intake is a short trumpet in the airbox above the driver.
-    const m = (metres) => Math.max(8, Math.round((metres / 343) * sr))
-    this.primaries = [0.62, 0.66, 0.7, 0.64, 0.68, 0.72].map((l) => new Pipe(m(l), 0.62, 0.55))
-    this.tail = new Pipe(m(0.55), 0.5, 0.35)
-    this.intake = new Pipe(m(0.24), 0.7, 0.6)
-    this.hp = 0; this.hpIn = 0; this.block = 0; this.rpm = 0; this.load = 0.3
+    this.phase = 0
+    this.rpm = 0
+    this.load = 0.3
+    this.lp = 0
+    this.lp2 = 0
+    this.hp = 0
+    this.seed = 1
   }
   rand() { this.seed = (this.seed * 1664525 + 1013904223) >>> 0; return this.seed / 4294967296 }
-  gauss() { return (this.rand() + this.rand() + this.rand() - 1.5) * 1.15 }
   process(_in, outputs, params) {
     const out = outputs[0][0]
     if (!out) return true
     const targetRpm = params.rpm[0], targetLoad = params.load[0], cut = params.cut[0]
     const sr = sampleRate
     for (let n = 0; n < out.length; n++) {
-      this.rpm += (targetRpm - this.rpm) * 0.004
+      this.rpm += (targetRpm - this.rpm) * 0.003
       this.load += (targetLoad - this.load) * 0.002
       const rpm = this.rpm
-      if (rpm < 50) { out[n] = 0; continue }
-      const prev = this.crank
-      this.crank += rpm / 120 / sr
-      const wrapped = this.crank >= 1
-      if (wrapped) this.crank -= 1
-      let exhaust = 0, intake = 0, mech = 0
-      for (let c = 0; c < CYL; c++) {
-        // Even firing every 120° of crank.
-        let a = this.crank - c / CYL
-        if (a < 0) a += 1
-        let pa = prev - c / CYL
-        if (pa < 0) pa += 1
-        if (a < pa) {
-          // New combustion: its strength varies a little every cycle.
-          const fired = cut > 0.5 ? 0.04 : 1
-          this.last[c] = this.amp[c]
-          this.amp[c] = fired * (0.25 + 0.75 * this.load) * (1 + 0.07 * this.gauss())
-        }
-        const amp = this.amp[c]
-        // Exhaust valve open for ~250°: sharp blowdown, then a decaying push.
-        const w = 250 / 720
-        if (a < w) {
-          const x = a / w
-          const pulse = Math.pow(x, 0.25) * Math.pow(1 - x, 2.2) * 2.6
-          const blow = Math.exp(-x * 26) * (this.rand() * 2 - 1) * 0.5
-          exhaust += this.primaries[c].step(amp * (pulse + blow))
-        } else exhaust += this.primaries[c].step(0)
-        // Intake valve open for ~240°, a quarter-cycle later: a gentler suck.
-        const ia = a - 0.4 < 0 ? a + 0.6 : a - 0.4
-        if (ia < 0.33) intake -= Math.sin((ia / 0.33) * Math.PI) * (0.3 + 0.7 * this.load) * 0.35
-        // Combustion knock through the block.
-        if (a < 0.02) mech += amp * (1 - a / 0.02)
-      }
-      let y = this.tail.step(exhaust * 0.4)
-      const ia = this.intake.step(intake * 0.5 + (this.rand() - 0.5) * 0.05 * this.load)
-      this.block += (mech - this.block) * 0.08
-      // Radiation from an open pipe end: the high end comes through.
-      const mix = y * 1.0 + ia * 0.45 + this.block * 0.25
-      this.hp = 0.995 * (this.hp + mix - this.hpIn)
-      this.hpIn = mix
-      out[n] = Math.tanh(this.hp * 1.15) * 0.85
+      if (rpm < 80) { out[n] = 0; this.lp = this.lp2 = 0; continue }
+
+      // Firing rate for a 4-stroke V6: 3 combustions per crank rev.
+      const fireHz = (rpm / 60) * 3
+      this.phase += fireHz / sr
+      if (this.phase >= 1) this.phase -= 1
+      const p = this.phase * Math.PI * 2
+
+      const load = cut > 0.5 ? 0.05 : this.load
+      // Soft harmonic stack (game engine), no pipe noise or crackle.
+      const fund = Math.sin(p)
+      const h2 = Math.sin(p * 2) * 0.55
+      const h3 = Math.sin(p * 3) * 0.28
+      const h4 = Math.sin(p * 4) * 0.12
+      const thump = Math.pow(Math.max(0, Math.sin(p * 0.5)), 4) * 0.35
+      // Very light grain so it isn't a pure synth tone.
+      const grain = (this.rand() * 2 - 1) * 0.02 * load
+
+      let y = (fund + h2 + h3 + h4 + thump) * (0.22 + 0.55 * load) + grain
+      // Darken with RPM: high revs stay smooth, not screechy.
+      const bright = 0.08 + Math.min(0.35, rpm / 28000)
+      this.lp += (y - this.lp) * bright
+      this.lp2 += (this.lp - this.lp2) * (bright * 0.85)
+      // Gentle DC block.
+      const hp = this.lp2 - this.hp
+      this.hp += hp * 0.002
+      out[n] = Math.tanh(hp * 1.4) * 0.55
     }
     for (let ch = 1; ch < outputs[0].length; ch++) outputs[0][ch].set(out)
     return true

@@ -17,8 +17,12 @@ export function SoundMenu() {
     setMuted(m)
     sound.setMuted(m)
     voice.setEnabled(!m)
-    // Browsers only allow audio after a user gesture: the first click unlocks it.
-    const unlock = () => { if (!sound.muted) sound.unlock() }
+    // Browsers only allow audio after a user gesture: unlock engine + Lena together.
+    const unlock = () => {
+      if (sound.muted) return
+      sound.unlock()
+      voice.unlock()
+    }
     window.addEventListener("pointerdown", unlock)
     window.addEventListener("keydown", unlock)
     return () => { window.removeEventListener("pointerdown", unlock); window.removeEventListener("keydown", unlock) }
@@ -29,7 +33,10 @@ export function SoundMenu() {
     setMuted(m)
     sound.setMuted(m)
     voice.setEnabled(!m)
-    if (!m) sound.unlock()
+    if (!m) {
+      sound.unlock()
+      voice.unlock()
+    }
     save("f1-garage:muted", m ? "on" : "off")
   }
 

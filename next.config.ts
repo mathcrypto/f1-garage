@@ -3,8 +3,8 @@ import { fileURLToPath } from "node:url"
 import type { NextConfig } from "next"
 
 const nextConfig: NextConfig = {
-  // The local voice model runs on native onnxruntime; keep it out of the bundle.
-  serverExternalPackages: ["kokoro-js", "@huggingface/transformers", "onnxruntime-node", "phonemizer"],
+  // Edge TTS uses a native WebSocket client; keep it out of the bundle.
+  serverExternalPackages: ["node-edge-tts", "ws"],
   turbopack: { root: path.dirname(fileURLToPath(import.meta.url)) },
 }
 

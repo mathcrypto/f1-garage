@@ -74,12 +74,17 @@ export const partCentres = new Map<string, [number, number, number]>()
 type EngineerState = {
   status: "idle" | "thinking" | "talking"
   caption: string
-  // Toggled by speech boundaries so the mouth moves with the words.
+  // Legacy tick — still bumped for browser TTS word boundaries.
   mouth: number
+  /** 0..1 jaw open from live audio (Audio2Face-style amplitude). */
+  mouthOpen: number
+  /** 0 closed · 1 narrow · 2 wide · 3 open — coarse viseme from spectrum. */
+  mouthShape: 0 | 1 | 2 | 3
   lesson: { id: string; step: number; playing: boolean } | null
   setStatus: (s: EngineerState["status"]) => void
   setCaption: (c: string) => void
   bumpMouth: () => void
+  setMouth: (open: number, shape?: 0 | 1 | 2 | 3) => void
   setLesson: (l: EngineerState["lesson"]) => void
 }
 
@@ -87,9 +92,17 @@ export const useEngineerState = create<EngineerState>((set) => ({
   status: "idle",
   caption: "",
   mouth: 0,
+  mouthOpen: 0,
+  mouthShape: 0,
   lesson: null,
-  setStatus: (status) => set({ status }),
+  setStatus: (status) => set({ status, ...(status === "idle" ? { mouthOpen: 0, mouthShape: 0 as const } : {}) }),
   setCaption: (caption) => set({ caption }),
-  bumpMouth: () => set((s) => ({ mouth: s.mouth + 1 })),
+  bumpMouth: () => set((s) => ({ mouth: s.mouth + 1, mouthOpen: Math.min(1, 0.35 + (s.mouth % 3) * 0.2), mouthShape: ((s.mouth % 3) + 1) as 1 | 2 | 3 })),
+  setMouth: (open, shape) =>
+    set((s) => ({
+      mouthOpen: open,
+      mouthShape: shape ?? s.mouthShape,
+      ...(open > 0.08 ? { mouth: s.mouth + 1 } : {}),
+    })),
   setLesson: (lesson) => set({ lesson }),
 }))

@@ -1,8 +1,7 @@
 import { LESSONS } from "./lessons"
 import { TEAMS } from "./teams"
 
-// Lena's fixed lines in one place. The server generates all of them ahead of
-// time, so they play the instant they're needed.
+// Lena's fixed lines. Race radio stays short and flat — information, not hype.
 const P = (n: number) => `P${n}`
 
 export const lines = {
@@ -15,34 +14,53 @@ export const lines = {
     "X-ray. Wheelbase thirty-four hundred, width nineteen hundred. Bang on the limits.",
     "Putting her back together.",
     "Car's ready. Out on track.",
-    "Burnout. Get some heat in those rears.",
-    "Launch, launch! Good start.",
+    "Burnout. Heat in the rears.",
+    "Launch. Good start.",
     "Straight-line mode. Wings open, full deployment.",
     "Corner mode. Wings closed. Hit your marks.",
-    "Good job. That's the car. Over to you.",
+    "That's the car. Over to you.",
   ],
-  gridCheck: (slot: number) => `Radio check. ${P(slot)} on the grid. Wait for the lights, then go.`,
+  gridCheck: (slot: number) => `Radio check. ${P(slot)} on the grid. Hold for the lights.`,
   gridWatch: (cars: number) => `Radio check. ${cars} cars on the grid.`,
-  lightsOut: (driving: boolean) => (driving ? "Lights out. Go, go, go!" : "Lights out and away we go!"),
-  gained: (pos: number) => (pos === 1 ? "P1. You're leading the race." : `Good move. ${P(pos)}.`),
-  lost: (pos: number) => `${P(pos)}. Stay calm, we go again.`,
-  finalLap: "Final lap. Bring it home.",
-  driveCheck: "Radio check. Engine's running, all temperatures good. Build the tyre temperature on this out-lap.",
-  tyresIn: "Tyres are in the window now. Push this lap.",
+  // Start: factual, not a cheer.
+  lightsOut: (driving: boolean) => (driving ? "Lights out. Mode race." : "Lights out. They're away."),
+  gained: (pos: number) => (pos === 1 ? `You're ${P(1)}. Nice move.` : `Good move. ${P(pos)}.`),
+  lost: (pos: number) => `${P(pos)}. Keep your head down.`,
+  finalLap: "Last lap. Bring it home.",
+  driveCheck: "Radio check. Engine's live. Out-lap: aero, battery, Overtake.",
+  tyresIn: "Tyres are in the window. You can push.",
   tips: [
-    "Brake a touch later into the hairpin, you've got margin there.",
-    "Carry more speed through the esses, the car will take it.",
-    "Early on the throttle out of the last corner, it's a long straight.",
-    "Use all the kerb on the exit, it's free lap time.",
+    "Later on the brakes into the hairpin. You've got margin.",
+    "Carry more speed through the esses. The car will take it.",
+    "Early on the throttle out of the last corner. Long straight.",
+    "Use all the exit kerb. Free lap time.",
+    "Save the battery for the fight. Don't dump it lap one.",
+    "X-mode on the straight, Z before turn-in.",
   ],
-  cornerSlow: "Hairpin coming. Big stop, brake on the marker, and be patient on the exit.",
-  cornerMedium: "Medium-speed corner next. Brake early, get it turned, good exit.",
-  cornerFast: "Fast one coming. Trust the downforce, keep your foot in.",
-  batteryLow: "Battery's low. Lift and coast into the braking zones to harvest.",
-  trackLimits: "Track limits warning. Watch the exit kerbs.",
-  penalty: "That's a five second penalty. We need to build a gap to the car behind.",
-  fastest: "Fastest lap. Purple. Great job.",
-  finish: (pos: number) => (pos === 1 ? "Chequered flag. P1! Get in there!" : pos <= 3 ? `${P(pos)}. That's a podium. Great job.` : `${P(pos)}. Good effort. We go again.`),
+  cornerSlow: "Hairpin. Big stop. Brake on the marker.",
+  cornerMedium: "Medium coming. Brake early, prioritise exit.",
+  cornerFast: "Fast one. Trust the downforce.",
+  batteryLow: "Battery's low. Lift and coast to harvest.",
+  trackLimits: "Track limits. Mind the exits.",
+  penalty: "Five second penalty. Build a gap.",
+  fastest: "Purple. Fastest lap.",
+  // On-track crossing (ignores time penalties). Classified result comes after when needed.
+  crossed: (pos: number) =>
+    pos === 1
+      ? "Chequered flag. You finished P1."
+      : pos <= 3
+        ? `Chequered flag. You finished ${P(pos)}. That's a podium crossing.`
+        : `Chequered flag. You finished ${P(pos)}.`,
+  finish: (pos: number) =>
+    pos === 1
+      ? "Chequered flag. P1. Job done."
+      : pos <= 3
+        ? `Chequered flag. ${P(pos)}. That's a podium.`
+        : `Chequered flag. ${P(pos)}. Good effort.`,
+  classifiedPenalty: (pos: number, seconds: number) => {
+    const pen = seconds === 1 ? "one second" : `${seconds} second`
+    return `Final result ${P(pos)}. ${pen} track limits penalty.`
+  },
 }
 
 export function fixedLines(): string[] {
@@ -52,6 +70,9 @@ export function fixedLines(): string[] {
   ]
   for (const t of TEAMS) out.push(lines.greeting(t.name, t.car), ...lines.showcase(t.car))
   for (const l of LESSONS) for (const s of l.steps) out.push(s.say)
-  for (let p = 1; p <= TEAMS.length; p++) out.push(lines.gridCheck(p), lines.gridWatch(p), lines.gained(p), lines.lost(p), lines.finish(p))
+  for (let p = 1; p <= TEAMS.length; p++) {
+    out.push(lines.gridCheck(p), lines.gridWatch(p), lines.gained(p), lines.lost(p), lines.finish(p), lines.crossed(p))
+    for (const s of [5, 10]) out.push(lines.classifiedPenalty(p, s))
+  }
   return [...new Set(out)]
 }
