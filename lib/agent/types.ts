@@ -30,7 +30,6 @@ export type Source = { title: string; url: string }
 
 /** The agent's response stream, one JSON object per line (NDJSON). */
 export type AgentEvent =
-  | { type: "meta"; model: string; provider: string }
   | { type: "tool_start"; id: string; name: string; label: string }
   | { type: "tool_end"; id: string; ok: boolean; ms: number }
   | { type: "text"; text: string }

@@ -27,13 +27,13 @@ npm run dev                  # http://localhost:3002
 
 ## Where AI is used
 
-| Feature | What generates it | Shown in the UI as |
-|---------|-------------------|--------------------|
-| **Lena's chat answers** | **NVIDIA Nemotron** (open model) on **Nebius Token Factory**, as a tool-using agent | Green **AI** badge on every answer with the model name, plus the list of agent steps (each tool call, its status and time) and the model's reasoning |
-| **Lena controlling the 3D car** | The same agent, through tools (`focus_part`, `highlight_parts`, `set_view`, `start_lesson`, …) | Steps in the chat; the car moves |
-| **Lena's voice** | Microsoft neural text-to-speech (`en-GB-LibbyNeural`) | Her voice |
-| Team briefing (Explore) and Paddock news | **Not AI**: Tavily web search, quoted from FIA, F1 media and team sites | "Live web search … not AI-written" |
-| Lessons, showcase and race radio calls | **Not AI**: written lines, spoken in Lena's voice | |
+| Feature | What generates it |
+|---------|-------------------|
+| Lena's chat answers | NVIDIA Nemotron (open model) on Nebius Token Factory, as a tool-using agent (`lib/server/agent/`) |
+| Lena controlling the 3D car | The same agent, through tools (`focus_part`, `highlight_parts`, `set_view`, `start_lesson`, …) |
+| Lena's voice | Microsoft neural text-to-speech, `en-GB-LibbyNeural` (`lib/server/tts.ts`) |
+| Team briefing (Explore) and Paddock news | Not AI: Tavily web search, quoted from FIA, F1 media and team sites |
+| Lessons, showcase and race radio calls | Not AI: written lines, spoken in Lena's voice |
 
 ## The agent
 
@@ -42,7 +42,7 @@ Lena is a **single agent with tools**, not an orchestrator with sub-agents: one 
 1. The browser sends the conversation plus a structured **garage context** (team, selected part, mode, Deep analysis, learning progress, race state). The server validates it and builds the prompt text; the browser never sends prompt text.
 2. The server decides whether the question needs live data. Static car questions get only the garage tools and answer from the built-in handbook; anything that changes race to race also gets the live tools. Championship questions get a live standings snapshot pasted in.
 3. The model streams a step. Tool calls in a step run **in parallel**, each with a 15-second timeout; identical calls in one turn run once; results are capped in size. Up to two tool steps, then the model must answer in text.
-4. Everything streams to the browser as NDJSON events: `meta` (model), `tool_start`/`tool_end`, `text`, `reasoning`, `ui` (car commands), `sources`, `error`, `done`. Cancelling (a new question, clearing the chat, leaving the page) aborts the model call and tools on the server.
+4. Everything streams to the browser as NDJSON events: `tool_start`/`tool_end`, `text`, `reasoning`, `ui` (car commands), `sources`, `error`, `done`. Cancelling (a new question, clearing the chat, leaving the page) aborts the model call and tools on the server.
 
 Tool results are data. All behaviour rules (when to use which tool, how to answer after) are in the system prompt (`lib/server/agent/prompt.ts`).
 

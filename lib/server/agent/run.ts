@@ -17,8 +17,6 @@ import { isToolName, runTool, ToolError, toolDefinitions, toolLabel, type ToolCo
 // Loop: stream a step → run any tool calls in parallel → feed results back →
 // repeat, up to MAX_TOOL_STEPS. After that the model must answer in text.
 
-export const PROVIDER = "Nebius Token Factory"
-
 const MAX_TOOL_STEPS = 2
 const TOOL_TIMEOUT_MS = 15_000
 const MAX_TOOL_RESULT = 6_000 // characters per tool result sent back to the model
@@ -96,8 +94,6 @@ export async function runAgent(turns: ChatTurn[], emit: Emit, signal: AbortSigna
   const tools = toolDefinitions({ live })
   const deep = last.context.deep
   const ctx: ToolContext = { teamId: last.context.teamId, season, emit }
-
-  emit({ type: "meta", model: env.nebius.model, provider: PROVIDER })
 
   const messages: Message[] = [
     { role: "system", content: SYSTEM_PROMPT },

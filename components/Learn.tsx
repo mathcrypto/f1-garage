@@ -122,7 +122,6 @@ function TeamBriefing({ onAsk }: { onAsk?: (q: string) => void }) {
         </div>
         {story?.cached && <span className="pill muted">Cached</span>}
       </div>
-      <p className="source-note">Live web search (Tavily) of FIA, F1 media and the team&apos;s site. Quoted from sources, not AI-written.</p>
 
       {loading && <p className="muted small">Gathering FIA, media and team notes…</p>}
 

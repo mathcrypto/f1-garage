@@ -16,12 +16,11 @@ import { lines as said } from "@/lib/voiceLines"
 import { teamById } from "@/lib/teams"
 
 /** One agent step as shown in the chat: a tool the agent called. */
-type Step = { id: string; name: string; label: string; status: "running" | "done" | "failed"; ms?: number }
+type Step = { id: string; label: string; status: "running" | "done" | "failed" }
 
 type Message = ChatTurn & {
   sources?: { title: string; url: string }[]
   steps?: Step[]
-  model?: { name: string; provider: string }
   reasoning?: string
   error?: string
 }
@@ -177,9 +176,6 @@ export function useEngineer() {
           if (!line) continue
           const e = JSON.parse(line) as AgentEvent
           switch (e.type) {
-            case "meta":
-              update((m) => ({ ...m, model: { name: e.model, provider: e.provider } }))
-              break
             case "text": {
               update((m) => ({ ...m, content: m.content + e.text }))
               answer += e.text
@@ -194,7 +190,7 @@ export function useEngineer() {
               update((m) => ({ ...m, reasoning: (m.reasoning ?? "") + e.text }))
               break
             case "tool_start":
-              update((m) => ({ ...m, steps: [...(m.steps ?? []), { id: e.id, name: e.name, label: e.label, status: "running" }] }))
+              update((m) => ({ ...m, steps: [...(m.steps ?? []), { id: e.id, label: e.label, status: "running" }] }))
               if (!answer && !standingBy) {
                 standingBy = true
                 lena.setCaption(said.checking)
@@ -203,7 +199,7 @@ export function useEngineer() {
               }
               break
             case "tool_end":
-              update((m) => ({ ...m, steps: m.steps?.map((st) => (st.id === e.id ? { ...st, status: e.ok ? "done" : "failed", ms: e.ms } : st)) }))
+              update((m) => ({ ...m, steps: m.steps?.map((st) => (st.id === e.id ? { ...st, status: e.ok ? "done" : "failed" } : st)) }))
               break
             case "sources":
               update((m) => {
@@ -257,17 +253,6 @@ export function useEngineer() {
   }
 }
 
-/** Marks an answer as AI-generated and names the model that wrote it. */
-function AiAttribution({ model }: { model?: { name: string; provider: string } }) {
-  const name = model ? model.name.replace(/^nvidia\//i, "").replace(/^NVIDIA-/, "NVIDIA ") : "NVIDIA Nemotron"
-  return (
-    <p className="ai-attribution" title={model ? `${model.name} on ${model.provider}` : undefined}>
-      <span className="ai-badge">AI</span>
-      Written by {name}{model ? ` · ${model.provider}` : ""}
-    </p>
-  )
-}
-
 export function EngineerPanel({ engineer }: { engineer: ReturnType<typeof useEngineer> }) {
   const { messages, busy, ask, deep, setDeep, clear } = engineer
   const [input, setInput] = useState("")
@@ -300,9 +285,6 @@ export function EngineerPanel({ engineer }: { engineer: ReturnType<typeof useEng
           <strong>{ENGINEER.name}</strong>
           <small>
             {ENGINEER.role} · {team.name}
-          </small>
-          <small className="ai-note">
-            <span className="ai-badge">AI</span> Agent on NVIDIA Nemotron · Nebius Token Factory · live search by Tavily
           </small>
         </div>
         {messages.length > 0 && (
@@ -358,14 +340,11 @@ export function EngineerPanel({ engineer }: { engineer: ReturnType<typeof useEng
           const last = i === messages.length - 1
           return (
             <div key={i} className={`msg ${m.role}`}>
-              {m.role === "assistant" && <AiAttribution model={m.model} />}
               {m.role === "assistant" && (m.steps?.length || (busy && last)) ? (
                 <ol className="steps" aria-label="Agent steps">
                   {(m.steps ?? []).map((st) => (
                     <li key={st.id} className={st.status === "running" ? "live" : st.status}>
-                      <span>{st.label}</span>
-                      <code title="Tool the agent called">{st.name}</code>
-                      {st.ms !== undefined && <small>{(st.ms / 1000).toFixed(1)} s</small>}
+                      {st.label}
                     </li>
                   ))}
                   {busy && last && <li className="live">{m.content ? "Writing" : m.reasoning ? "Reasoning" : "Thinking"}…</li>}

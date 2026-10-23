@@ -157,7 +157,7 @@ export function PaddockPanel() {
       <section className="pcard news-card" aria-label={`${team.name} news`}>
         <div className="news-head">
           <div>
-            <span className="news-tag">From trusted F1 sources · web search, not AI-written</span>
+            <span className="news-tag">From trusted F1 sources</span>
             <h3 className="news-title">{team.name} news</h3>
           </div>
           <span className="muted small">Last month</span>
