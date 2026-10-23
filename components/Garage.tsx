@@ -9,7 +9,7 @@ import { PartCard } from "./Learn"
 import { EngineerPanel, useEngineer } from "./Engineer"
 import { SoundMenu } from "./SoundMenu"
 import { TeamPicker } from "./TeamPicker"
-import { useShowcase } from "@/lib/showcase"
+import { stopShowcase, useShowcase } from "@/lib/showcase"
 import { voice } from "@/lib/voice"
 import { lines } from "@/lib/voiceLines"
 import { useEngineerRadio } from "@/lib/engineerRadio"
@@ -151,8 +151,16 @@ export function Garage() {
       // Lena changes into the new team's kit and says hello.
       const next = teamById(id)
       const line = lines.greeting(next.name, next.car)
+      // The showcase only runs when the user starts it: a new team stops one in progress.
+      if (showcase) {
+        stopShowcase()
+        const g = useGarage.getState()
+        g.setExploded(false)
+        g.setTechnical(false)
+        g.setMode("studio")
+      }
       const lena = useEngineerState.getState()
-      if (!lena.lesson && !showcase) {
+      if (!lena.lesson) {
         // voice.say shows the caption itself, in sync with her voice.
         if (voice.enabled && voice.supported) voice.say(line)
         else {

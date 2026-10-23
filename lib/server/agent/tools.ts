@@ -194,10 +194,9 @@ const TOOLS = {
   },
   set_view: {
     kind: "garage",
-    description: "Change the 3D view: exploded view of every part, studio or drive mode (drive shows active aero and energy deployment), blueprint view, airflow, or a camera angle.",
+    description: "Change the 3D view in the garage: exploded view of every part, blueprint view, airflow, or a camera angle. The car only goes on track when the user starts the showcase, a drive or a race.",
     parameters: {
       exploded: { type: "boolean" },
-      mode: { type: "string", enum: ["studio", "drive"] },
       camera: { type: "string", enum: CAMERAS },
       technical: { type: "boolean", description: "Blueprint view with dimensions and specs" },
       airflow: { type: "boolean", description: "CFD-style airflow streamlines coloured by speed" },
@@ -207,7 +206,6 @@ const TOOLS = {
       const command: UiCommand = {
         action: "view",
         exploded: bool(a.exploded),
-        mode: oneOf(a.mode, ["studio", "drive"] as const),
         camera: oneOf(a.camera, CAMERAS),
         technical: bool(a.technical),
         airflow: bool(a.airflow),

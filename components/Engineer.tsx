@@ -56,7 +56,6 @@ function applyUi(c: UiCommand) {
     s.select(c.id)
     useProgress.getState().markPart(c.id)
   } else {
-    if (c.mode) s.setMode(c.mode)
     if (c.exploded !== undefined) s.setExploded(c.exploded)
     if (c.camera) s.setCamera(c.camera)
     if (c.technical !== undefined) s.setTechnical(c.technical)

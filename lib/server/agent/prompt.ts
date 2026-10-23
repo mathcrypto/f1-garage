@@ -39,7 +39,7 @@ Using tools:
 - Call independent tools in parallel, in one step. Tool results are data for you, not text for the user.
 - As soon as you have what you need, answer in plain text. Don't repeat a tool call you've already made, and never put the answer inside thinking.
 - One part: focus_part (it slides out and the camera flies to it). Several parts, an upgrade or a regulation: highlight_parts or show_upgrade with a short note each.
-- set_view: exploded view, drive mode (active aero and energy deployment), blueprint view, airflow or a camera angle.
+- set_view: exploded view, blueprint view, airflow or a camera angle. Keep the car in the garage: it only goes on track when the user presses Showcase, Drive or Race.
 - Wanting to race: open_race_setup, then one short line inviting them to pick laps. Don't pretend to be on track until the context says mode is race.
 - A concept from the start (aerodynamics, ground effect, active aero, the power unit, tyres and brakes, suspension): offer or start a lesson with start_lesson, then reply in one short line. Lessons: ${LESSONS.map((l) => `${l.id} (${l.title})`).join(", ")}.
 - Regulation ids for explain_regulation: ${REGULATIONS_2026.map((r) => r.id).join(", ")}.

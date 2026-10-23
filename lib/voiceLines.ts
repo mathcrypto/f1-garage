@@ -7,7 +7,7 @@ const P = (n: number) => `P${n}`
 export const lines = {
   copy: "Copy.",
   checking: "Stand by, checking that.",
-  greeting: (team: string, car: string) => `${team} pit wall, radio check. Let's have a look at the ${car}.`,
+  greeting: (team: string, car: string) => `${team} pit wall, radio check. This is the ${car}. Tap any part and I'll talk you through it.`,
   showcase: (car: string) => [
     `Radio check. This is the ${car}. Let's take her apart.`,
     "Front wing, nose, suspension. Bodywork, floor, power unit. All off, all accounted for.",

@@ -22,7 +22,7 @@ export type AgentRequest = { turns: ChatTurn[] }
 export type UiCommand =
   | { action: "highlight"; parts: { id: string; note: string }[] }
   | { action: "focus"; id: string }
-  | { action: "view"; exploded?: boolean; mode?: "studio" | "drive"; camera?: "hero" | "front" | "side" | "top" | "rear"; technical?: boolean; airflow?: boolean }
+  | { action: "view"; exploded?: boolean; camera?: "hero" | "front" | "side" | "top" | "rear"; technical?: boolean; airflow?: boolean }
   | { action: "lesson"; id: string }
   | { action: "race_setup" }
 
