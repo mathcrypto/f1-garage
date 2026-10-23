@@ -4,6 +4,8 @@ import { cleanSpeech, endSentence, GROUP_WORDS, MAX_WORDS, speechChunks, splitLo
 import { sound } from "./sound"
 import { useEngineerState } from "./store"
 
+const voiceUrl = (text: string, tone: LenaTone) => `/api/voice?${new URLSearchParams({ text, tone })}`
+
 // Lena: Edge en-GB-LibbyNeural only. No browser TTS. Tone (calm/race) changes delivery, not voice.
 
 const OVERLAP = 0.06
@@ -51,7 +53,7 @@ class Voice {
     if (!this.enabled || typeof window === "undefined") return
     void this.context().resume()
     void this.hasNeural().then((ok) => {
-      if (ok) void fetch("/api/voice", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text: "Stand by.", tone: "calm" }) }).catch(() => {})
+      if (ok) void fetch(voiceUrl("Stand by.", "calm")).catch(() => {})
     })
   }
 
@@ -187,11 +189,8 @@ class Voice {
     if (!(await this.hasNeural())) return null
     for (let attempt = 0; attempt < 3; attempt++) {
       try {
-        const r = await fetch("/api/voice", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ text, tone }),
-        })
+        // GET, so the browser's HTTP cache keeps every line it has heard.
+        const r = await fetch(voiceUrl(text, tone))
         if (r.ok) return await this.context().decodeAudioData(await r.arrayBuffer())
         if (r.status === 429 || r.status >= 500) await new Promise((r) => setTimeout(r, 200 * (attempt + 1)))
       } catch {}

@@ -1,4 +1,5 @@
-import { TEAMS, teamById } from "./teams"
+import "server-only"
+import { TEAMS, teamById } from "../teams"
 import { teamSite, STORY_MEDIA_DOMAINS } from "./teamSites"
 
 /**

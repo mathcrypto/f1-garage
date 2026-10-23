@@ -1,31 +1,26 @@
-import { edgeSpeak, LENA_VOICE, type LenaTone } from "@/lib/edgeVoice"
+import { LENA_VOICE, speak, type LenaTone } from "@/lib/server/tts"
 
-// Lena: en-GB-LibbyNeural only. `tone` changes delivery, never the voice.
+// GET /api/voice: Lena's voice (Microsoft neural voice en-GB-LibbyNeural).
+//   no query            → { provider, voice }
+//   ?text=…&tone=calm   → MP3 audio. The same text always gives the same audio,
+//                         so it's served with a long immutable cache lifetime.
 export const runtime = "nodejs"
 
-const cache = new Map<string, ArrayBuffer>()
-const remember = (key: string, audio: ArrayBuffer) => {
-  cache.set(key, audio)
-  if (cache.size > 300) cache.delete(cache.keys().next().value!)
-}
+const MAX_TEXT = 800
 
-export async function GET() {
-  return Response.json({ provider: "edge", voice: LENA_VOICE })
-}
-
-export async function POST(req: Request) {
-  const { text, tone } = (await req.json()) as { text?: string; tone?: LenaTone }
-  const clean = (text ?? "").trim().slice(0, 800)
-  if (!clean) return Response.json({ error: "Empty text" }, { status: 400 })
-  const delivery: LenaTone = tone === "race" ? "race" : "calm"
-  const key = `${delivery}:${clean}`
+export async function GET(req: Request) {
+  const params = new URL(req.url).searchParams
+  const text = params.get("text")?.trim()
+  if (!text) return Response.json({ provider: "edge", voice: LENA_VOICE })
+  if (text.length > MAX_TEXT) return Response.json({ error: `Text is limited to ${MAX_TEXT} characters.` }, { status: 400 })
+  const tone: LenaTone = params.get("tone") === "race" ? "race" : "calm"
   try {
-    const hit = cache.get(key)
-    if (hit) return new Response(hit, { headers: { "Content-Type": "audio/mpeg", "Cache-Control": "public, max-age=86400" } })
-    const audio = await edgeSpeak(clean, delivery)
-    remember(key, audio)
-    return new Response(audio, { headers: { "Content-Type": "audio/mpeg", "Cache-Control": "public, max-age=86400" } })
+    const audio = await speak(text, tone)
+    return new Response(audio, {
+      headers: { "Content-Type": "audio/mpeg", "Cache-Control": "public, max-age=31536000, immutable" },
+    })
   } catch (error) {
-    return Response.json({ error: error instanceof Error ? error.message : "TTS failed" }, { status: 502 })
+    console.error("[voice]", error instanceof Error ? error.message : error)
+    return Response.json({ error: "Speech synthesis failed." }, { status: 502 })
   }
 }

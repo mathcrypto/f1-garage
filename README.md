@@ -25,35 +25,70 @@ npm run dev                  # http://localhost:3002
 - **Liveries and sound.** Each 3D car is painted after its team's 2026 livery with its name on the sidepods, wings and nose. Sound is one button (on or off). In the garage you hear "Limit 70" (Kevin MacLeod) and on the race grid "Apex" (Alexander Nakarada), both public domain. On track the engine is a real Ferrari: a recorded Ferrari 812 V12 start-up, then recorded Ferrari 458 loops from idle to 9,000 rpm crossfaded by revs and throttle, with real exhaust pops and gear shifts. Lena's voice dips the music and engine. Sources and licences: `public/audio/README.md`.
 - **Paddock.** Next race with a countdown, last podium and constructors' standings (Jolpica-F1), and the selected team's news from the last week (Tavily).
 
+## Where AI is used
+
+| Feature | What generates it | Shown in the UI as |
+|---------|-------------------|--------------------|
+| **Lena's chat answers** | **NVIDIA Nemotron** (open model) on **Nebius Token Factory**, as a tool-using agent | Green **AI** badge on every answer with the model name, plus the list of agent steps (each tool call, its status and time) and the model's reasoning |
+| **Lena controlling the 3D car** | The same agent, through tools (`focus_part`, `highlight_parts`, `set_view`, `start_lesson`, …) | Steps in the chat; the car moves |
+| **Lena's voice** | Microsoft neural text-to-speech (`en-GB-LibbyNeural`) | Her voice |
+| Team briefing (Explore) and Paddock news | **Not AI**: Tavily web search, quoted from FIA, F1 media and team sites | "Live web search … not AI-written" |
+| Lessons, showcase and race radio calls | **Not AI**: written lines, spoken in Lena's voice | |
+
+## The agent
+
+Lena is a **single agent with tools**, not an orchestrator with sub-agents: one Nemotron model plans, calls tools and answers. For a chat that drives a 3D car this is faster and more predictable, and every step is visible.
+
+1. The browser sends the conversation plus a structured **garage context** (team, selected part, mode, Deep analysis, learning progress, race state). The server validates it and builds the prompt text; the browser never sends prompt text.
+2. The server decides whether the question needs live data. Static car questions get only the garage tools and answer from the built-in handbook; anything that changes race to race also gets the live tools. Championship questions get a live standings snapshot pasted in.
+3. The model streams a step. Tool calls in a step run **in parallel**, each with a 15-second timeout; identical calls in one turn run once; results are capped in size. Up to two tool steps, then the model must answer in text.
+4. Everything streams to the browser as NDJSON events: `meta` (model), `tool_start`/`tool_end`, `text`, `reasoning`, `ui` (car commands), `sources`, `error`, `done`. Cancelling (a new question, clearing the chat, leaving the page) aborts the model call and tools on the server.
+
+Tool results are data. All behaviour rules (when to use which tool, how to answer after) are in the system prompt (`lib/server/agent/prompt.ts`).
+
+| Tool | Kind | Does |
+|------|------|------|
+| `get_team_story` | live | Team briefing from the FIA, trusted media and the team's site (same feed as the Explore card). Needs `TAVILY_API_KEY`. |
+| `web_search` | live | Tavily. Scope `fia` = fia.com only, `news` = last month, `any` = general. Needs `TAVILY_API_KEY`. |
+| `get_live_timing` | live | OpenF1: latest session and race control messages. |
+| `get_standings`, `get_calendar` | live | Jolpica-F1: championships (any season), next races, last podium. |
+| `get_team_upgrades`, `show_upgrade` | garage | The curated development diary; highlights a package on the car. |
+| `explain_regulation` | garage | A 2026 regulation chapter, highlighted on the car. |
+| `focus_part`, `highlight_parts`, `set_view`, `start_lesson`, `open_race_setup` | garage | Control the 3D car, lessons and the race lobby. |
+
+Nemotron reasoning models return their reasoning separately (`reasoning_content`) or inline as `<think>…</think>`; both are shown in a collapsible "Engineer's reasoning" block. Deep analysis sends `chat_template_kwargs: { enable_thinking: true }`, retried without it if the deployment rejects it.
+
 ## Code map
 
 | Path | What |
 |------|------|
-| `components/three/Scene.tsx` | Canvas entry: studio lighting, track, camera, bloom. |
-| `components/three/car/` | Procedural car, parts, livery, geometry; optional Hunyuan `GltfCar`. |
-| `components/three/track/` | Circuit mesh, drive/race sessions, track camera. |
-| `components/three/fx/` | Smoke, airflow / blueprint overlays. |
-| `lib/drive.ts` | The scripted lap that drives speed, aero mode, ERS and braking in drive mode. |
-| `lib/store.ts` | Shared state between the 3D view, the panels and the engineer (Zustand). |
-| `components/Garage.tsx` | Page layout: team switcher, stage, part dock, HUD, tabs. |
-| `components/Engineer.tsx` / `components/Paddock.tsx` | Engineer chat and live data panel. |
-| `app/api/agent/route.ts` | Agent loop: streams NDJSON, runs tools in parallel, forwards 3D commands. |
-| `app/api/paddock/route.ts` | Data for the Paddock tab. |
-| `lib/agent.ts` | System prompt and tool definitions. |
-| `lib/f1data.ts` / `lib/search.ts` | OpenF1 and Jolpica-F1 clients; Tavily search scoped to fia.com, news or the general web. |
-| `lib/parts.ts` / `lib/teams.ts` / `lib/regulations.ts` | Part explanations, the 2026 grid and liveries, headline rule changes. |
+| `app/api/agent/route.ts` | `POST`: validates the request and streams the agent's events. |
+| `app/api/paddock/route.ts`, `app/api/team-story/route.ts` | `GET ?team=<id>`: Paddock data and the live team briefing (400 for unknown teams). |
+| `app/api/voice/route.ts` | `GET ?text=…&tone=calm\|race`: Lena's voice as MP3, cacheable forever. |
+| `lib/server/` | **Server only** (every module starts with `import "server-only"`). |
+| `lib/server/env.ts` | The only place that reads `process.env`. |
+| `lib/server/agent/` | `run.ts` agent loop, `tools.ts` tool registry, `prompt.ts` system prompt and context line, `validate.ts` request validation, `knowledge.ts` handbook, `text.ts` stream helpers. |
+| `lib/server/f1data.ts`, `search.ts`, `teamStory.ts`, `tts.ts` | OpenF1 / Jolpica-F1, Tavily search, team briefings, text-to-speech. |
+| `lib/server/cache.ts` | Caching helpers (below). |
+| `lib/agent/types.ts` | Types shared by browser and server: garage context, chat turns, agent events. |
+| `lib/storage.ts` | Every localStorage key, with guarded access. |
+| `lib/parts.ts`, `teams.ts`, `regulations.ts`, `upgrades.ts`, `lessons.ts` | Shared content: parts, the 2026 grid, rules, the diary, lessons. |
+| `components/Engineer.tsx` | The chat: sends questions, renders steps, AI attribution, sources. |
+| `components/three/` | The 3D scene: car, track, effects. |
 
-## The engineer's tools
+## Caching and stored data
 
-| Tool | Does |
-|------|------|
-| `get_team_story` | Live team briefing (FIA + trusted media + official team site). Same feed as the Explore paddock card. |
-| `web_search` | Tavily. Scope `fia` searches only fia.com (regulations, technical directives, the upgrade documents the FIA publishes each Grand Prix); `news` covers the last month; `any` prefers official and technical sources. Offered only when `TAVILY_API_KEY` is set. |
-| `get_live_timing` | OpenF1: latest session and race control messages. |
-| `get_standings`, `get_calendar` | Jolpica-F1: championships, next races, last podium. |
-| `focus_part`, `highlight_parts`, `set_view` | Control the user's 3D car. |
+| What | Where | How long |
+|------|-------|----------|
+| OpenF1 / Jolpica-F1 responses | Next's fetch cache (`next: { revalidate }`) | 15 s live timing … 1 h calendar |
+| Tavily searches and Paddock news | Next's Data Cache (`unstable_cache` in `lib/server/cache.ts`) | news 15 min, FIA 2 h, general 1 h |
+| Team briefings | Next's Data Cache | 45 min |
+| Lena's voice audio | Browser HTTP cache (immutable GET URLs) and a 32 MB per-server LRU | indefinitely / until evicted |
+| `/api/paddock`, `/api/team-story` responses | CDN (`Cache-Control: s-maxage`) | 1 min / 15 min |
+| Agent responses | Never cached (`no-store`) | |
+| Team, mute setting, chat history, learning progress | The user's browser (localStorage, `lib/storage.ts`) | until cleared |
 
-Nemotron reasoning models can return their reasoning separately (`reasoning_content`) or inline as `<think>…</think>`. Both are shown in a collapsible "Engineer's reasoning" block. Deep analysis sends `chat_template_kwargs: { enable_thinking: true }`; if the deployment rejects it, the request is retried without it.
+Failed lookups are never cached, so a temporary outage doesn't stick, and concurrent identical requests share one upstream call. Chat history stays in the user's browser; the server keeps no conversations.
 
 ## Choosing the model
 
@@ -67,7 +102,7 @@ Set it as `NEBIUS_MODEL`. For the best explanations and tool use, pick the large
 
 ## Lena's voice
 
-Lena uses one voice only: Microsoft Edge **`en-GB-LibbyNeural`** via `/api/voice` — free, no API key (`lib/edgeVoice.ts`). There is no browser TTS fallback. Garage uses a calm take; on track the same voice uses a race tone (slightly faster / brighter). Lines are spoken in longer takes, silence-trimmed and crossfaded so joins don’t chop.
+Lena uses one voice only: Microsoft Edge **`en-GB-LibbyNeural`** via `/api/voice` — free, no API key (`lib/server/tts.ts`). There is no browser TTS fallback. Garage uses a calm take; on track the same voice uses a race tone (slightly faster / brighter). Lines are spoken in longer takes, silence-trimmed and crossfaded so joins don’t chop.
 
 On track she talks like a real race engineer — mostly quiet. She calls the grid and lights out, then only when it matters: a fight under a second, purple lap, penalty, P1 / podium moves, last lap, and the flag. Routine lap chatter and every track-limits ping stay off the radio (HUD still shows them). Leaving the garage ends any explanation she was giving.
 

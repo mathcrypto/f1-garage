@@ -18,6 +18,7 @@ import { driveTourState, telemetry } from "@/lib/drive"
 import { PARTS } from "@/lib/parts"
 import { useEngineerState, useGarage } from "@/lib/store"
 import { TEAMS, teamById } from "@/lib/teams"
+import { readString, STORAGE_KEYS, write } from "@/lib/storage"
 
 const Scene = dynamic(() => import("./three/Scene"), {
   ssr: false,
@@ -120,11 +121,9 @@ export function Garage() {
 
   useEffect(() => {
     setWebgl(hasWebGL())
-    try {
-      const saved = localStorage.getItem("f1-garage:team")
-      if (saved && TEAMS.some((t) => t.id === saved)) setTeam(saved)
-      else setFirstVisit(true)
-    } catch {}
+    const saved = readString(STORAGE_KEYS.team)
+    if (saved && TEAMS.some((t) => t.id === saved)) setTeam(saved)
+    else setFirstVisit(true)
   }, [setTeam])
 
   useEffect(() => {
@@ -164,7 +163,7 @@ export function Garage() {
       }
     }
     setTeam(id)
-    try { localStorage.setItem("f1-garage:team", id) } catch {}
+    write(STORAGE_KEYS.team, id)
   }
   const ask = (q: string) => { setTab("engineer"); setPanelOpen(true); return engineer.ask(q) }
 

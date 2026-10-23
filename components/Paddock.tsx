@@ -77,14 +77,15 @@ export function PaddockPanel() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    let cancelled = false
+    // Switching team cancels the previous request.
+    const controller = new AbortController()
     setLoading(true)
-    fetch(`/api/paddock?team=${teamId}`)
-      .then((r) => r.json())
-      .then((d: Paddock) => { if (!cancelled) setData(d) })
-      .catch(() => { if (!cancelled) setData(null) })
-      .finally(() => { if (!cancelled) setLoading(false) })
-    return () => { cancelled = true }
+    fetch(`/api/paddock?team=${encodeURIComponent(teamId)}`, { signal: controller.signal })
+      .then((r) => (r.ok ? (r.json() as Promise<Paddock>) : null))
+      .then((d) => setData(d))
+      .catch(() => { if (!controller.signal.aborted) setData(null) })
+      .finally(() => { if (!controller.signal.aborted) setLoading(false) })
+    return () => controller.abort()
   }, [teamId])
 
   if (loading) return <div className="paddock"><div className="skeleton" /><div className="skeleton" /><div className="skeleton short" /></div>
@@ -156,7 +157,7 @@ export function PaddockPanel() {
       <section className="pcard news-card" aria-label={`${team.name} news`}>
         <div className="news-head">
           <div>
-            <span className="news-tag">From trusted F1 sources</span>
+            <span className="news-tag">From trusted F1 sources · web search, not AI-written</span>
             <h3 className="news-title">{team.name} news</h3>
           </div>
           <span className="muted small">Last month</span>

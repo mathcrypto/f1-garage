@@ -2,18 +2,17 @@
 
 import { useEffect, useState } from "react"
 import { sound } from "@/lib/sound"
+import { readString, STORAGE_KEYS, write } from "@/lib/storage"
 import { voice } from "@/lib/voice"
 
 // One button: sound on or off. Each sound plays by itself when it belongs
 // (the engine on track, Lena when she talks, music if a track is supplied).
-const load = (k: string, d: string) => { try { return localStorage.getItem(k) ?? d } catch { return d } }
-const save = (k: string, v: string) => { try { localStorage.setItem(k, v) } catch {} }
 
 export function SoundMenu() {
   const [muted, setMuted] = useState(false)
 
   useEffect(() => {
-    const m = load("f1-garage:muted", "off") === "on"
+    const m = readString(STORAGE_KEYS.muted) === "on"
     setMuted(m)
     sound.setMuted(m)
     voice.setEnabled(!m)
@@ -37,7 +36,7 @@ export function SoundMenu() {
       sound.unlock()
       voice.unlock()
     }
-    save("f1-garage:muted", m ? "on" : "off")
+    write(STORAGE_KEYS.muted, m ? "on" : "off")
   }
 
   return (

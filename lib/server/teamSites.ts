@@ -1,4 +1,5 @@
-import type { Team } from "./teams"
+import "server-only"
+import type { Team } from "../teams"
 
 /**
  * Official F1 team sites only (not parent road-car brands).

@@ -1,10 +1,16 @@
-import { tavily } from "@tavily/core"
-import { searchAvailable, type SearchHit } from "./search"
+import "server-only"
+import { cachedLoader } from "./cache"
+import { searchAvailable } from "./env"
+import { tavilyClient, type SearchHit } from "./search"
 import { isJunkSnippet, isRelevantTeamArticle, newsScore } from "./teamRelevance"
-import { teamById } from "./teams"
 import { storyAllowDomains, STORY_MEDIA_DOMAINS, teamSite } from "./teamSites"
+import { teamById } from "../teams"
 
-/** Live, sourced F1 team briefing for Explore + Lena. Cache ~45 min. */
+/**
+ * Live, sourced team briefing for Explore and Lena: FIA, trusted media and
+ * the team's own site via Tavily search. It's assembled from article
+ * snippets, not written by an AI model. Cached for 45 minutes.
+ */
 export type StorySource = { title: string; url: string; outlet: string; publishedDate?: string }
 
 export type StoryBullet = {
@@ -25,12 +31,8 @@ export type TeamStory = {
   officialSite?: string
 }
 
-const TTL_MS = 45 * 60_000
-const MAX_CACHE = 24
-const CACHE_VER = "f1-v6" // title must name this team
-
-type CacheEntry = { at: number; story: TeamStory }
-const cache = new Map<string, CacheEntry>()
+const STORY_TTL_S = 2700
+const FRESH_MS = 10_000 // younger than this counts as freshly fetched
 
 function outletOf(url: string): string {
   try {
@@ -111,7 +113,7 @@ function cleanSnippet(title: string, content?: string): string {
 }
 
 async function runQuery(query: string, domains: string[], opts?: { fiaOnly?: boolean; news?: boolean }): Promise<SearchHit[]> {
-  const client = tavily({ apiKey: process.env.TAVILY_API_KEY })
+  const client = tavilyClient()
   const include = opts?.fiaOnly ? ["fia.com"] : domains
   const { results } = await client.search(query, {
     searchDepth: "advanced",
@@ -171,86 +173,55 @@ function buildStory(teamId: string, hits: SearchHit[], cached: boolean): TeamSto
   }
 }
 
-export async function fetchTeamStory(teamId: string): Promise<TeamStory> {
+function unavailableStory(teamId: string): TeamStory {
   const team = teamById(teamId)
-  const id = team.id
-  const cacheKey = `${CACHE_VER}:${id}`
-
-  if (!searchAvailable()) {
-    return {
-      teamId: id,
-      teamName: team.name,
-      car: team.car,
-      fetchedAt: new Date().toISOString(),
-      cached: false,
-      available: false,
-      bullets: [],
-      sources: [],
-      officialSite: teamSite(id)?.home,
-    }
-  }
-
-  const hit = cache.get(cacheKey)
-  if (hit && Date.now() - hit.at < TTL_MS) {
-    return { ...hit.story, cached: true }
-  }
-
-  const site = teamSite(id)
-  const label = site?.searchAs ?? `${team.name} Formula 1`
-  const shortName = team.name.replace(/^Scuderia /, "")
-  const car = team.car
-  const media = [...STORY_MEDIA_DOMAINS]
-  const guard = '-SUV -sponsor -video -shop -memento -"best seats"'
-
-  try {
-    const [fia, newsA, newsB] = await Promise.all([
-      runQuery(`${shortName} Formula 1 upgrade OR technical directive ${guard}`, media, { fiaOnly: true }).catch(() => [] as SearchHit[]),
-      runQuery(
-        `${shortName} Formula 1 (upgrade OR "tech weekly" OR aero OR chassis OR preview OR qualifying) ${guard}`,
-        media,
-        { news: true },
-      ).catch(() => [] as SearchHit[]),
-      runQuery(
-        `("${label}" OR "${car}") F1 (upgrade OR development OR Grand Prix) ${guard}`,
-        media,
-        { news: true },
-      ).catch(() => [] as SearchHit[]),
-    ])
-    const story = buildStory(id, [...newsA, ...newsB, ...fia], false)
-    cache.set(cacheKey, { at: Date.now(), story: { ...story, cached: false } })
-    while (cache.size > MAX_CACHE) cache.delete(cache.keys().next().value!)
-    return story
-  } catch {
-    if (hit) return { ...hit.story, cached: true }
-    return {
-      teamId: id,
-      teamName: team.name,
-      car: team.car,
-      fetchedAt: new Date().toISOString(),
-      cached: false,
-      available: false,
-      bullets: [],
-      sources: [],
-      officialSite: teamSite(id)?.home,
-    }
+  return {
+    teamId: team.id,
+    teamName: team.name,
+    car: team.car,
+    fetchedAt: new Date().toISOString(),
+    cached: false,
+    available: false,
+    bullets: [],
+    sources: [],
+    officialSite: teamSite(team.id)?.home,
   }
 }
 
+async function loadTeamStory(teamId: string): Promise<TeamStory | null> {
+  const team = teamById(teamId)
+  const label = teamSite(team.id)?.searchAs ?? `${team.name} Formula 1`
+  const shortName = team.name.replace(/^Scuderia /, "")
+  const media = [...STORY_MEDIA_DOMAINS]
+  const guard = '-SUV -sponsor -video -shop -memento -"best seats"'
+  const results = await Promise.all([
+    runQuery(`${shortName} Formula 1 upgrade OR technical directive ${guard}`, media, { fiaOnly: true }).catch(() => null),
+    runQuery(`${shortName} Formula 1 (upgrade OR "tech weekly" OR aero OR chassis OR preview OR qualifying) ${guard}`, media, { news: true }).catch(() => null),
+    runQuery(`("${label}" OR "${team.car}") F1 (upgrade OR development OR Grand Prix) ${guard}`, media, { news: true }).catch(() => null),
+  ])
+  if (results.every((r) => r === null)) return null // search is down: don't cache an empty briefing
+  const [fia, newsA, newsB] = results.map((r) => r ?? [])
+  return buildStory(team.id, [...newsA, ...newsB, ...fia], false)
+}
+
+const cachedStory = cachedLoader(loadTeamStory, ["team-story", "v7"], { revalidate: STORY_TTL_S, tags: ["team-story"] })
+
+export async function fetchTeamStory(teamId: string): Promise<TeamStory> {
+  const id = teamById(teamId).id
+  if (!searchAvailable()) return unavailableStory(id)
+  const story = await cachedStory(id)
+  if (!story) return unavailableStory(id)
+  return { ...story, cached: Date.now() - new Date(story.fetchedAt).getTime() > FRESH_MS }
+}
+
+/** The briefing as data for the agent (behaviour rules are in its prompt). */
 export function formatTeamStory(story: TeamStory): string {
-  if (!story.available) {
-    return `Live team briefing unavailable (need TAVILY_API_KEY). Fall back to the development diary and say so briefly.`
-  }
-  if (!story.bullets.length) {
-    return `No fresh Formula 1 race/tech notes specifically about ${story.teamName} right now. Do not invent or talk about other teams. Say the paddock is quiet on them and offer the teaching diary or a part explanation instead.`
-  }
+  if (!story.available) return `Live team briefing unavailable (web search isn't configured). Use the development diary instead and say so briefly.`
+  if (!story.bullets.length) return `No fresh race or technical notes about ${story.teamName} right now.`
+  const tags: Record<StoryBullet["kind"], string> = { weekend: "Weekend", upgrade: "Upgrade", aero: "Aero", power: "Power unit", general: "Note" }
   const lines = story.bullets.map((b, i) => {
     const src = story.sources[b.sourceIndex]
-    const tag = b.kind === "weekend" ? "Weekend" : b.kind === "upgrade" ? "Upgrade" : b.kind === "aero" ? "Aero" : b.kind === "power" ? "Power unit" : "Note"
-    return `${i + 1}. [${tag}] ${b.text}${src ? ` (${src.outlet})` : ""}`
+    return `${i + 1}. [${tags[b.kind]}] ${b.text}${src ? ` (${src.outlet})` : ""}`
   })
-  return (
-    `Live Formula 1 briefing for ${story.teamName} only (${story.car}). Fetched ${story.fetchedAt}${story.cached ? " (cached)" : ""}.\n` +
-    `Stay on this team. Do not pad with other teams, sponsors, or road cars. Cite only these notes. Source chips are in the UI — do not read URLs aloud.\n\n` +
-    lines.join("\n")
-  )
+  return `Live briefing for ${story.teamName} (${story.car}), fetched ${story.fetchedAt}:\n${lines.join("\n")}`
 }

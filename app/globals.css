@@ -176,6 +176,15 @@ p { margin: 0; }
 .steps li { display: flex; gap: 8px; align-items: center; font-size: 12.5px; color: var(--muted); }
 .steps li::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--good); flex-shrink: 0; }
 .steps li.live::before { background: var(--lit); animation: pulse 1s ease-in-out infinite; }
+.steps li.failed::before { background: #ef4444; }
+.steps li code { font: 500 11px/1 ui-monospace, "SF Mono", Menlo, monospace; padding: 2px 5px; border-radius: 5px; background: rgba(255, 255, 255, 0.06); color: var(--muted); }
+.steps li small { margin-left: auto; font-variant-numeric: tabular-nums; opacity: 0.7; }
+
+/* Where AI is used: a consistent badge on anything a model generated */
+.ai-badge { display: inline-grid; place-items: center; min-width: 20px; height: 15px; padding: 0 4px; margin-right: 6px; border-radius: 4px; background: linear-gradient(135deg, #76b900, #3d8f00); color: #fff; font: 800 9.5px/1 var(--display); letter-spacing: 0.06em; vertical-align: 1px; }
+.ai-attribution { display: flex; align-items: center; margin: 0 0 8px; font-size: 11.5px; color: var(--muted); }
+.ai-note { display: flex !important; align-items: center; margin-top: 3px; font-size: 11px !important; color: var(--muted); }
+.source-note { display: flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--muted); }
 .reasoning { margin-bottom: 10px; border-radius: 10px; border: 1px solid var(--line); background: rgba(167, 139, 250, 0.05); }
 .reasoning summary { padding: 8px 12px; cursor: pointer; font: 600 12px/1 var(--display); letter-spacing: 0.06em; color: #c4b5fd; }
 .reasoning p { padding: 0 12px 12px; white-space: pre-wrap; font-size: 12.5px; color: var(--muted); max-height: 220px; overflow-y: auto; }

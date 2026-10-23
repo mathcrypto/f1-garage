@@ -9,7 +9,7 @@ import { REGULATIONS_2026 } from "@/lib/regulations"
 import { startShowcase } from "@/lib/showcase"
 import { useEngineerState, useGarage } from "@/lib/store"
 import { teamById } from "@/lib/teams"
-import type { TeamStory } from "@/lib/teamStory"
+import type { TeamStory } from "@/lib/server/teamStory"
 import { latestUpgrade, upgradesForPart, upgradesForTeam, type UpgradePackage } from "@/lib/upgrades"
 
 // Bite-sized learning: one idea on screen at a time, more on demand.
@@ -98,24 +98,17 @@ function TeamBriefing({ onAsk }: { onAsk?: (q: string) => void }) {
   const [openSrc, setOpenSrc] = useState(false)
 
   useEffect(() => {
-    let alive = true
+    // Switching team cancels the previous request.
+    const controller = new AbortController()
     setLoading(true)
     setOpenSrc(false)
     setStory(null)
-    fetch(`/api/team-story?team=${encodeURIComponent(teamId)}`)
-      .then((r) => r.json())
-      .then((data: TeamStory) => {
-        if (alive) setStory(data)
-      })
-      .catch(() => {
-        if (alive) setStory(null)
-      })
-      .finally(() => {
-        if (alive) setLoading(false)
-      })
-    return () => {
-      alive = false
-    }
+    fetch(`/api/team-story?team=${encodeURIComponent(teamId)}`, { signal: controller.signal })
+      .then((r) => (r.ok ? (r.json() as Promise<TeamStory>) : null))
+      .then((data) => setStory(data))
+      .catch(() => { if (!controller.signal.aborted) setStory(null) })
+      .finally(() => { if (!controller.signal.aborted) setLoading(false) })
+    return () => controller.abort()
   }, [teamId])
 
   return (
@@ -129,6 +122,7 @@ function TeamBriefing({ onAsk }: { onAsk?: (q: string) => void }) {
         </div>
         {story?.cached && <span className="pill muted">Cached</span>}
       </div>
+      <p className="source-note">Live web search (Tavily) of FIA, F1 media and the team&apos;s site. Quoted from sources, not AI-written.</p>
 
       {loading && <p className="muted small">Gathering FIA, media and team notes…</p>}
 

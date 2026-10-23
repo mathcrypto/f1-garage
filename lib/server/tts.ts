@@ -1,7 +1,9 @@
+import "server-only"
 import { mkdtemp, readFile, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { EdgeTTS } from "node-edge-tts"
+import { LruCache } from "./cache"
 
 /** Lena = Libby only. Same voice ID forever; `tone` only changes rate/pitch/volume. */
 export const LENA_VOICE = "en-GB-LibbyNeural"
@@ -34,7 +36,7 @@ function client(tone: LenaTone) {
   return tts
 }
 
-export async function edgeSpeak(text: string, tone: LenaTone = "calm"): Promise<ArrayBuffer> {
+async function synthesize(text: string, tone: LenaTone): Promise<ArrayBuffer> {
   const dir = await mkdtemp(join(tmpdir(), "lena-tts-"))
   const file = join(dir, "line.mp3")
   try {
@@ -44,4 +46,23 @@ export async function edgeSpeak(text: string, tone: LenaTone = "calm"): Promise<
   } finally {
     await rm(dir, { recursive: true, force: true }).catch(() => {})
   }
+}
+
+// Lena repeats many lines (greetings, lessons, radio calls). Keep recent audio
+// per server instance, up to 32 MB, and share concurrent identical requests.
+const audioCache = new LruCache<ArrayBuffer>(32 * 1024 * 1024, (a) => a.byteLength)
+const inFlight = new Map<string, Promise<ArrayBuffer>>()
+
+/** Speak one line in Lena's voice as MP3 audio. */
+export function speak(text: string, tone: LenaTone = "calm"): Promise<ArrayBuffer> {
+  const key = `${tone}:${text}`
+  const hit = audioCache.get(key)
+  if (hit) return Promise.resolve(hit)
+  const running = inFlight.get(key)
+  if (running) return running
+  const job = synthesize(text, tone)
+    .then((audio) => { audioCache.set(key, audio); return audio })
+    .finally(() => inFlight.delete(key))
+  inFlight.set(key, job)
+  return job
 }

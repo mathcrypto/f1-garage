@@ -5,42 +5,39 @@ import { LessonList, startLesson } from "./EngineerCam"
 import { ENGINEER, Lena } from "./Lena"
 import { Markdown } from "./Markdown"
 import { openRaceSetup } from "./RaceUI"
-import type { AgentEvent, ChatTurn, UiCommand } from "@/lib/agent"
+import type { AgentEvent, ChatTurn, GarageContext, UiCommand } from "@/lib/agent/types"
 import { partById } from "@/lib/parts"
 import { nextLearningStep, useProgress } from "@/lib/progress"
 import { race, useRace } from "@/lib/race"
 import { useEngineerState, useGarage } from "@/lib/store"
-import { formatTeamUpgradeDiary } from "@/lib/upgrades"
+import { readJson, remove, STORAGE_KEYS, write } from "@/lib/storage"
 import { voice } from "@/lib/voice"
 import { lines as said } from "@/lib/voiceLines"
 import { teamById } from "@/lib/teams"
 
+/** One agent step as shown in the chat: a tool the agent called. */
+type Step = { id: string; name: string; label: string; status: "running" | "done" | "failed"; ms?: number }
+
 type Message = ChatTurn & {
   sources?: { title: string; url: string }[]
-  steps?: string[]
+  steps?: Step[]
+  model?: { name: string; provider: string }
   reasoning?: string
   error?: string
 }
 
-const CHAT_KEY = "f1-garage:chat"
-
 function loadChat(): Message[] {
-  try {
-    const raw = localStorage.getItem(CHAT_KEY)
-    if (!raw) return []
-    const parsed = JSON.parse(raw) as Message[]
-    return Array.isArray(parsed) ? parsed.filter((m) => m.role === "user" || m.role === "assistant") : []
-  } catch {
-    return []
-  }
+  const parsed = readJson<Message[]>(STORAGE_KEYS.chat)
+  if (!Array.isArray(parsed)) return []
+  // Older saves stored steps as plain strings; drop those.
+  return parsed
+    .filter((m) => m.role === "user" || m.role === "assistant")
+    .map((m) => ({ ...m, steps: Array.isArray(m.steps) ? m.steps.filter((x) => typeof x === "object") : undefined }))
 }
 
 function saveChat(messages: Message[]) {
-  try {
-    // Drop empty streaming shells; keep a reasonable history.
-    const trim = messages.filter((m) => m.content || m.error).slice(-40)
-    localStorage.setItem(CHAT_KEY, JSON.stringify(trim))
-  } catch {}
+  // Drop empty streaming shells; keep a reasonable history.
+  write(STORAGE_KEYS.chat, messages.filter((m) => m.content || m.error).slice(-40))
 }
 
 function applyUi(c: UiCommand) {
@@ -68,21 +65,35 @@ function applyUi(c: UiCommand) {
   }
 }
 
-function raceContextLine(): string | null {
+function raceContext(): GarageContext["race"] {
   const phase = useRace.getState().phase
   if (phase === "idle") return null
   const player = race.cars.find((c) => c.player)
-  if (!player) return `race phase: ${phase}; spectating`
   const row = useRace.getState().rows.find((r) => r.player)
-  return [
-    `race phase: ${phase}`,
-    row ? `position: P${row.pos}` : null,
-    row?.gap ? `gap ahead: ${row.gap}` : null,
-    `battery: ${Math.round(player.battery * 100)}%`,
-    `lap: ${player.lap}/${race.laps}`,
-  ]
-    .filter(Boolean)
-    .join(", ")
+  return {
+    phase: player ? phase : `${phase} (spectating)`,
+    position: row?.pos ?? null,
+    gap: row?.gap ?? null,
+    battery: player ? player.battery : null,
+    lap: player ? player.lap : null,
+    laps: player ? race.laps : null,
+  }
+}
+
+/** What the user is looking at, sent with each question. The server turns it into prompt text. */
+function garageContext(deep: boolean): GarageContext {
+  const s = useGarage.getState()
+  const progress = useProgress.getState()
+  const next = progress.suggestNext()
+  return {
+    teamId: s.teamId,
+    selectedPartId: s.selected,
+    mode: s.mode,
+    deep,
+    progress: { parts: progress.parts.length, lessons: progress.lessons.length, regs: progress.regs.length },
+    suggestedNext: next ? { kind: next.kind, label: next.label } : null,
+    race: raceContext(),
+  }
 }
 
 export function useEngineer() {
@@ -90,6 +101,10 @@ export function useEngineer() {
   const [busy, setBusy] = useState(false)
   const [deep, setDeep] = useState(false)
   const hydrated = useRef(false)
+  const controllerRef = useRef<AbortController | null>(null)
+
+  // Leaving the page cancels an answer in progress.
+  useEffect(() => () => controllerRef.current?.abort(), [])
 
   useEffect(() => {
     useProgress.getState().hydrate()
@@ -108,32 +123,9 @@ export function useEngineer() {
     voice.setEnabled(true)
     voice.unlock()
     const s = useGarage.getState()
-    const team = teamById(s.teamId)
     const part = s.selected ? partById(s.selected) : undefined
     const progress = useProgress.getState()
-    const next = progress.suggestNext()
-    const raceLine = raceContextLine()
-    const diary = formatTeamUpgradeDiary(s.teamId)
-      .split("\n")
-      .slice(0, 6)
-      .join(" ")
-    const context = [
-      `team: ${team.name} (${team.id}, ${team.car}, ${team.powerUnit} power unit)`,
-      `selected part: ${part ? `${part.name} (${part.id}) — ${part.summary}` : "none"}`,
-      `mode: ${s.mode}`,
-      `deep analysis: ${deep ? "on — full technical briefing" : "off — explain for someone new to F1, plain language first"}`,
-      `today: ${new Date().toISOString().slice(0, 10)}`,
-      `learning progress: parts seen ${progress.parts.length}, lessons ${progress.lessons.length}/6, regs ${progress.regs.length}`,
-      next ? `suggested next: ${next.kind} "${next.label}"` : "suggested next: none — garage tour complete",
-      `diary snapshot: ${diary.slice(0, 280)}`,
-      raceLine,
-      s.mode === "studio"
-        ? "style: garage briefing — connected paragraphs, not tiny one-liners"
-        : "style: pit-wall radio — terse calls only, no teaching",
-      "live-check by default; handbook only for static how-the-car-works / diary / lesson questions",
-    ]
-      .filter(Boolean)
-      .join("; ")
+    const context = garageContext(deep)
     const history: Message[] = [...messages, { role: "user", content: question.trim(), context }]
     setMessages([...history, { role: "assistant", content: "" }])
     setBusy(true)
@@ -150,19 +142,28 @@ export function useEngineer() {
 
     const update = (fn: (m: Message) => Message) => setMessages((all) => [...all.slice(0, -1), fn(all[all.length - 1])])
 
+    // A new question, clearing the chat or leaving the page cancels the request;
+    // the server stops the model and tools too.
+    controllerRef.current?.abort()
+    const controller = new AbortController()
+    controllerRef.current = controller
+
     try {
       const res = await fetch("/api/agent", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        signal: controller.signal,
         body: JSON.stringify({
-          deep,
-          teamId: s.teamId,
           turns: history
             .filter((m) => m.content)
-            .map((m): ChatTurn => (m.role === "user" ? { role: "user", content: m.content, context: m.context } : { role: "assistant", content: m.content })),
+            // Chats saved before context became structured use the current context.
+            .map((m): ChatTurn => (m.role === "user" ? { role: "user", content: m.content, context: typeof m.context === "object" ? m.context : context } : { role: "assistant", content: m.content })),
         }),
       })
-      if (!res.body) throw new Error("No response")
+      if (!res.ok || !res.body) {
+        const detail = await res.json().then((d: { error?: string }) => d.error).catch(() => null)
+        throw new Error(detail ?? `Request failed (${res.status})`)
+      }
       const reader = res.body.getReader()
       const decoder = new TextDecoder()
       let pending = ""
@@ -175,39 +176,56 @@ export function useEngineer() {
         for (const line of lines) {
           if (!line) continue
           const e = JSON.parse(line) as AgentEvent
-          if (e.type === "text") {
-            update((m) => ({ ...m, content: m.content + e.text }))
-            answer += e.text
-            // Caption while she thinks/writes; full voice plays once the answer is complete
-            // (avoids /api/voice 502 storms from sentence-by-sentence streaming).
-            lena.setStatus("talking")
-            const sentences = answer.replace(/[*#`]/g, "").split(/(?<=[.!?])\s+/).filter(Boolean)
-            lena.setCaption(sentences.at(-1)?.slice(0, 220) ?? "")
-          } else if (e.type === "reasoning") {
-            reasoningBuf += e.text
-            update((m) => ({ ...m, reasoning: (m.reasoning ?? "") + e.text }))
-          } else if (e.type === "tool") {
-            update((m) => ({ ...m, steps: [...(m.steps ?? []), e.label] }))
-            if (!answer && !standingBy) {
-              standingBy = true
-              lena.setCaption(said.checking)
-              // One short stand-by line only — the full briefing is spoken in `finally`.
-              if (voice.enabled && voice.supported) voice.add(said.checking)
+          switch (e.type) {
+            case "meta":
+              update((m) => ({ ...m, model: { name: e.model, provider: e.provider } }))
+              break
+            case "text": {
+              update((m) => ({ ...m, content: m.content + e.text }))
+              answer += e.text
+              // Caption while she writes; the full answer is spoken once it's complete.
+              lena.setStatus("talking")
+              const sentences = answer.replace(/[*#`]/g, "").split(/(?<=[.!?])\s+/).filter(Boolean)
+              lena.setCaption(sentences.at(-1)?.slice(0, 220) ?? "")
+              break
             }
+            case "reasoning":
+              reasoningBuf += e.text
+              update((m) => ({ ...m, reasoning: (m.reasoning ?? "") + e.text }))
+              break
+            case "tool_start":
+              update((m) => ({ ...m, steps: [...(m.steps ?? []), { id: e.id, name: e.name, label: e.label, status: "running" }] }))
+              if (!answer && !standingBy) {
+                standingBy = true
+                lena.setCaption(said.checking)
+                // One short stand-by line only; the full briefing is spoken at the end.
+                if (voice.enabled && voice.supported) voice.add(said.checking)
+              }
+              break
+            case "tool_end":
+              update((m) => ({ ...m, steps: m.steps?.map((st) => (st.id === e.id ? { ...st, status: e.ok ? "done" : "failed", ms: e.ms } : st)) }))
+              break
+            case "sources":
+              update((m) => {
+                const seen = new Map((m.sources ?? []).map((x) => [x.url, x]))
+                for (const x of e.sources) seen.set(x.url, x)
+                return { ...m, sources: [...seen.values()] }
+              })
+              break
+            case "ui":
+              applyUi(e.command)
+              break
+            case "error":
+              update((m) => ({ ...m, error: e.text }))
+              break
           }
-          else if (e.type === "sources")
-            update((m) => {
-              const seen = new Map((m.sources ?? []).map((x) => [x.url, x]))
-              for (const x of e.sources) seen.set(x.url, x)
-              return { ...m, sources: [...seen.values()] }
-            })
-          else if (e.type === "ui") applyUi(e.command)
-          else if (e.type === "error") update((m) => ({ ...m, error: e.text }))
         }
       }
-    } catch {
-      update((m) => ({ ...m, error: "Couldn't reach the engineer. Check your connection and try again." }))
+    } catch (error) {
+      if (controller.signal.aborted) return
+      update((m) => ({ ...m, error: error instanceof Error && error.message !== "Failed to fetch" ? error.message : "Couldn't reach the engineer. Check your connection and try again." }))
     } finally {
+      if (controllerRef.current === controller) controllerRef.current = null
       let spoken = answer.trim()
       if (!spoken && reasoningBuf.trim().length > 60) spoken = reasoningBuf.trim()
       update((m) => ({ ...m, content: (m.content.trim() || spoken) }))
@@ -231,12 +249,23 @@ export function useEngineer() {
     deep,
     setDeep,
     clear: () => {
+      controllerRef.current?.abort()
+      setBusy(false)
       setMessages([])
-      try {
-        localStorage.removeItem(CHAT_KEY)
-      } catch {}
+      remove(STORAGE_KEYS.chat)
     },
   }
+}
+
+/** Marks an answer as AI-generated and names the model that wrote it. */
+function AiAttribution({ model }: { model?: { name: string; provider: string } }) {
+  const name = model ? model.name.replace(/^nvidia\//i, "").replace(/^NVIDIA-/, "NVIDIA ") : "NVIDIA Nemotron"
+  return (
+    <p className="ai-attribution" title={model ? `${model.name} on ${model.provider}` : undefined}>
+      <span className="ai-badge">AI</span>
+      Written by {name}{model ? ` · ${model.provider}` : ""}
+    </p>
+  )
 }
 
 export function EngineerPanel({ engineer }: { engineer: ReturnType<typeof useEngineer> }) {
@@ -271,6 +300,9 @@ export function EngineerPanel({ engineer }: { engineer: ReturnType<typeof useEng
           <strong>{ENGINEER.name}</strong>
           <small>
             {ENGINEER.role} · {team.name}
+          </small>
+          <small className="ai-note">
+            <span className="ai-badge">AI</span> Agent on NVIDIA Nemotron · Nebius Token Factory · live search by Tavily
           </small>
         </div>
         {messages.length > 0 && (
@@ -326,11 +358,14 @@ export function EngineerPanel({ engineer }: { engineer: ReturnType<typeof useEng
           const last = i === messages.length - 1
           return (
             <div key={i} className={`msg ${m.role}`}>
+              {m.role === "assistant" && <AiAttribution model={m.model} />}
               {m.role === "assistant" && (m.steps?.length || (busy && last)) ? (
-                <ol className="steps">
-                  {(m.steps ?? []).map((s, k) => (
-                    <li key={k} className="done">
-                      {s}
+                <ol className="steps" aria-label="Agent steps">
+                  {(m.steps ?? []).map((st) => (
+                    <li key={st.id} className={st.status === "running" ? "live" : st.status}>
+                      <span>{st.label}</span>
+                      <code title="Tool the agent called">{st.name}</code>
+                      {st.ms !== undefined && <small>{(st.ms / 1000).toFixed(1)} s</small>}
                     </li>
                   ))}
                   {busy && last && <li className="live">{m.content ? "Writing" : m.reasoning ? "Reasoning" : "Thinking"}…</li>}

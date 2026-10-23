@@ -1,5 +1,9 @@
-// Live and reference data from public F1 APIs. Every function resolves to
-// null on failure so a slow or unavailable API never breaks a page or the agent.
+import "server-only"
+
+// Live and reference data from public F1 APIs (Jolpica-F1, OpenF1). Responses
+// are cached by Next's fetch cache with per-endpoint revalidation. Every
+// function resolves to null on failure, so a slow or unavailable API never
+// breaks a page or the agent.
 
 const JOLPICA = "https://api.jolpi.ca/ergast/f1"
 const OPENF1 = "https://api.openf1.org/v1"
@@ -9,7 +13,8 @@ async function getJson<T>(url: string, revalidate: number): Promise<T | null> {
     const res = await fetch(url, { next: { revalidate }, signal: AbortSignal.timeout(8000) })
     if (!res.ok) return null
     return (await res.json()) as T
-  } catch {
+  } catch (error) {
+    console.error(`[f1data] ${url} failed:`, error instanceof Error ? error.message : error)
     return null
   }
 }

@@ -1,6 +1,7 @@
-import { CAR_SPECS, PARTS } from "./parts"
-import { REGULATIONS_2026 } from "./regulations"
-import { upgradeDiaryIndex } from "./upgrades"
+import "server-only"
+import { CAR_SPECS, PARTS } from "../../parts"
+import { REGULATIONS_2026 } from "../../regulations"
+import { upgradeDiaryIndex } from "../../upgrades"
 
 // Static garage handbook — shipped with the app. Only pre-written car-tech
 // topics are "stale". Everything else gets live data tools by default.

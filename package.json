@@ -2,7 +2,7 @@
   "name": "f1-garage",
   "version": "0.1.0",
   "private": true,
-  "description": "Interactive F1 car explorer with a Claude race-engineer agent for upgrades and FIA regulations.",
+  "description": "Interactive F1 car explorer with an AI race-engineer agent (NVIDIA Nemotron on Nebius Token Factory) for upgrades and FIA regulations.",
   "scripts": {
     "dev": "next dev -p 3002",
     "build": "next build",
@@ -23,6 +23,7 @@
     "postprocessing": "6.39.5",
     "react": "19.3.0",
     "react-dom": "19.3.0",
+    "server-only": "^0.0.1",
     "three": "0.186.1",
     "zustand": "5.0.15"
   },

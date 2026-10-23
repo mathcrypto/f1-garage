@@ -4,8 +4,8 @@ import { create } from "zustand"
 import { LESSONS } from "./lessons"
 import { PARTS } from "./parts"
 import { REGULATIONS_2026 } from "./regulations"
+import { readJson, STORAGE_KEYS, write } from "./storage"
 
-const KEY = "f1-garage:progress"
 
 export type LearningHint = { kind: "lesson" | "part" | "reg"; id: string; label: string }
 
@@ -21,25 +21,15 @@ export type Progress = {
   hydrate: () => void
 }
 
+const strings = (v: unknown) => (Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : [])
+
 function load(): Pick<Progress, "parts" | "lessons" | "regs"> {
-  try {
-    const raw = localStorage.getItem(KEY)
-    if (!raw) return { parts: [], lessons: [], regs: [] }
-    const j = JSON.parse(raw) as { parts?: string[]; lessons?: string[]; regs?: string[] }
-    return {
-      parts: Array.isArray(j.parts) ? j.parts : [],
-      lessons: Array.isArray(j.lessons) ? j.lessons : [],
-      regs: Array.isArray(j.regs) ? j.regs : [],
-    }
-  } catch {
-    return { parts: [], lessons: [], regs: [] }
-  }
+  const j = readJson<{ parts?: unknown; lessons?: unknown; regs?: unknown }>(STORAGE_KEYS.progress)
+  return { parts: strings(j?.parts), lessons: strings(j?.lessons), regs: strings(j?.regs) }
 }
 
 function save(s: Pick<Progress, "parts" | "lessons" | "regs">) {
-  try {
-    localStorage.setItem(KEY, JSON.stringify({ parts: s.parts, lessons: s.lessons, regs: s.regs }))
-  } catch {}
+  write(STORAGE_KEYS.progress, { parts: s.parts, lessons: s.lessons, regs: s.regs })
 }
 
 /** Stable for React: call from useMemo on parts/lessons/regs, never as a Zustand selector result. */
