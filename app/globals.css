@@ -659,15 +659,6 @@ p { margin: 0; }
 .lesson-chip { display: grid; gap: 8px; align-content: start; min-height: 92px; padding: 12px; border-radius: 12px; text-align: left; background: var(--raised); border: 1px solid var(--line); color: var(--team); transition: border-color 0.2s, transform 0.15s; }
 .lesson-chip span { font: 700 12.5px/1.25 var(--display); color: var(--ink); }
 .lesson-chip:hover, .lesson-chip.on { border-color: var(--team); transform: translateY(-2px); }
-.tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
-.tile { position: relative; min-height: 96px; border-radius: 12px; perspective: 600px; }
-.tile-front, .tile-back { position: absolute; inset: 0; display: grid; align-content: center; gap: 4px; padding: 10px; border-radius: 12px; border: 1px solid var(--line); backface-visibility: hidden; transition: transform 0.5s cubic-bezier(0.2, 0.8, 0.2, 1); }
-.tile-front { background: var(--raised); text-align: center; }
-.tile-front b { font: 900 24px/1 var(--display); color: var(--team); }
-.tile-front small { font-size: 11.5px; color: var(--muted); }
-.tile-back { background: color-mix(in srgb, var(--team) 16%, #121418); transform: rotateY(180deg); font-size: 12px; line-height: 1.35; text-align: left; color: #e7eaf0; }
-.tile.flipped .tile-front { transform: rotateY(180deg); }
-.tile.flipped .tile-back { transform: rotateY(360deg); }
 .fact { padding: 14px 16px; border-radius: 14px; background: var(--raised); border: 1px solid var(--line); }
 .fact-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
 .fact-nav { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: 12px; }
@@ -698,61 +689,29 @@ p { margin: 0; }
 .part-cta { display: flex; gap: 8px; margin-top: 16px; }
 .part-cta .primary { margin-top: 0; flex: 1; }
 
-.team-brief {
-  margin-top: 18px;
-  padding: 14px 16px;
-  border-radius: 14px;
-  background: linear-gradient(160deg, color-mix(in srgb, var(--team) 12%, #121418) 0%, var(--raised) 55%);
-  border: 1px solid color-mix(in srgb, var(--team) 28%, var(--line));
+/* Upgrades timeline (Explore) */
+.upgrades {
+  padding: 16px; border-radius: 16px;
+  background: radial-gradient(140% 120% at 100% 0%, color-mix(in srgb, var(--team) 20%, transparent), transparent 55%), var(--raised);
+  border: 1px solid color-mix(in srgb, var(--team) 35%, var(--line));
 }
-.team-brief-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; margin-bottom: 10px; }
-.team-brief-head h5 { margin: 4px 0 0; font: 700 15px/1.2 var(--display); }
-.team-brief-head h5 small { font-weight: 500; color: var(--muted); letter-spacing: 0.04em; text-transform: uppercase; font-size: 10px; margin-left: 6px; }
-.pill {
-  flex-shrink: 0;
-  padding: 3px 8px;
-  border-radius: 999px;
-  border: 1px solid var(--line);
-  font: 600 10px/1.2 var(--display);
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-}
-.team-brief-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
-.team-brief-list li {
-  display: grid;
-  gap: 4px;
-  padding: 10px 12px;
-  border-radius: 12px;
-  background: color-mix(in srgb, #0c0e12 70%, transparent);
-  border: 1px solid var(--line);
-}
-.team-brief-list .kind {
-  font: 700 10px/1 var(--display);
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--team);
-}
-.team-brief-list p { margin: 0; font-size: 13.5px; line-height: 1.45; color: #e4e7ee; }
-.team-brief-list .src-line {
-  font: 600 11px/1.2 var(--display);
-  color: var(--muted);
-  text-decoration: none;
-  width: fit-content;
-}
-.team-brief-list .src-line:hover { color: var(--ink); }
-.team-brief-actions { display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: center; margin-top: 12px; }
-.team-brief-actions .link { margin-top: 0; }
-.team-brief-actions .link.muted { color: var(--muted); font-weight: 600; }
-.team-brief-actions .link.muted:hover { color: var(--ink); }
-.team-brief-sources { margin-top: 10px; }
-.source-dot {
-  width: 6px; height: 6px; border-radius: 50%;
-  background: var(--team); flex-shrink: 0;
-}
-
-.upgrade-diary { margin-top: 18px; }
-.upgrade-list { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 8px; }
-.upgrade-list li { display: grid; gap: 4px; }
+.upgrades-head { display: grid; gap: 4px; margin-bottom: 14px; }
+.upgrades-head h4 { margin: 2px 0 0; font: 800 19px/1.15 var(--display); }
+.upgrades-head small { color: var(--muted); font-size: 12.5px; }
+.upgrade-timeline { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; position: relative; }
+.upgrade-timeline::before { content: ""; position: absolute; left: 6px; top: 8px; bottom: 8px; width: 2px; background: color-mix(in srgb, var(--team) 40%, var(--line)); border-radius: 2px; }
+.upgrade-timeline li { position: relative; padding-left: 24px; }
+.upgrade-timeline li::before { content: ""; position: absolute; left: 0; top: 14px; width: 14px; height: 14px; border-radius: 50%; background: var(--bg, #0d0f13); border: 2px solid var(--team); box-sizing: border-box; transition: background 0.2s; }
+.upgrade-timeline li:last-child::before, .upgrade-timeline li.on::before { background: var(--team); box-shadow: 0 0 0 4px color-mix(in srgb, var(--team) 25%, transparent); }
+.upgrade-item { display: grid; gap: 6px; width: 100%; text-align: left; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--line); background: #121418; color: inherit; cursor: pointer; transition: border-color 0.2s, transform 0.15s; }
+.upgrade-item:hover { border-color: var(--team); transform: translateX(2px); }
+.upgrade-timeline li.on .upgrade-item { border-color: var(--team); background: color-mix(in srgb, var(--team) 12%, #121418); }
+.upgrade-event { display: flex; align-items: center; gap: 8px; font: 700 11px/1 var(--display); letter-spacing: 0.14em; text-transform: uppercase; color: var(--team); }
+.upgrade-event em { font-style: normal; padding: 3px 7px; border-radius: 999px; background: var(--team); color: var(--team-ink); letter-spacing: 0.08em; font-size: 9.5px; }
+.upgrade-item b { font: 700 15px/1.25 var(--display); }
+.upgrade-item small { color: var(--muted); font-size: 12.5px; line-height: 1.4; }
+.upgrade-parts { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 2px; }
+.upgrade-parts span { padding: 3px 8px; border-radius: 999px; border: 1px solid var(--line-strong); font-size: 11px; color: #d6dae3; }
 .upgrade-row {
   display: grid; gap: 4px; width: 100%; text-align: left; padding: 10px 12px;
   border-radius: 12px; border: 1px solid var(--line); background: var(--raised); color: inherit; cursor: pointer;

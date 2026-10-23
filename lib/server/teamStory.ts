@@ -7,7 +7,7 @@ import { storyAllowDomains, STORY_MEDIA_DOMAINS, teamSite } from "./teamSites"
 import { teamById } from "../teams"
 
 /**
- * Live, sourced team briefing for Explore and Lena: FIA, trusted media and
+ * Live, sourced team briefing for Lena: FIA, trusted media and
  * the team's own site via Tavily search. It's assembled from article
  * snippets, not written by an AI model. Cached for 45 minutes.
  */

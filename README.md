@@ -13,8 +13,9 @@ npm run dev                  # http://localhost:3002
 
 - **3D car in every team's colours.** Studio turntable with reflections, or **Drive** mode: the car runs on a track with spinning wheels, suspension movement, glowing brakes, and the 2026 active aero switching between X-mode (straight, wings open) and Z-mode (corner, wings closed). A HUD shows speed, aero mode, ERS deployment and braking.
 - **Take it apart.** Click any of the 14 parts and it slides off the car while the rest turns see-through and the camera flies to it. **Exploded view** separates everything; **Reassemble** or Esc puts it back.
-- **Bite-sized learning.** Nothing is shown all at once: the Explore tab offers a hint, a showcase button, lesson chips, three flip-cards with headline numbers and one "did you know" fact at a time. A selected part shows a one-line summary, three key specs and a three-step card (how it works, 2026 rules, upgrades), with full specs tucked away. Controls live in an icon rail with tooltips, part names appear on hover, and the side panel can be hidden.
-- **Live team briefing.** Explore shows a paddock card for your team from FIA docs, Formula1.com, The Race, Autosport, Motorsport and the team's official site (Tavily, ~45 min cache). Each note links to its outlet; Lena’s `get_team_story` tool uses the same feed. The development diary below stays a labelled teaching log.
+- **Bite-sized learning.** Nothing is shown all at once: the Explore tab offers a hint, a showcase button, your team's upgrades, lesson chips and one "did you know" fact at a time. A selected part shows a one-line summary, three key specs and a three-step card (how it works, 2026 rules, upgrades), with full specs tucked away. Controls live in an icon rail with tooltips, part names appear on hover, and the side panel can be hidden.
+- **Team upgrades.** Explore shows your team's upgrade packages as a timeline; tap one to light up the parts it changed on the car.
+- **Live team briefing.** Lena's `get_team_story` tool builds a team briefing from FIA docs, Formula1.com, The Race, Autosport, Motorsport and the team's official site (Tavily, ~45 min cache).
 - **Race engineer.** The engineer can search fia.com, recent news, live timing and the standings, and it controls the 3D car while it explains: it takes parts off, highlights several with numbered labels, explodes the car or switches to drive mode. Fan/Engineer depth toggle, an optional Deep analysis mode, a collapsible view of the model's reasoning, and source chips on every answer.
 - **Lena, your race engineer.** An illustrated character who wears the selected team's kit (shirt in the team's livery colours with its name on the chest) and a pit-wall headset in team colours. She changes kit and says hello when you switch team, appears on screen when she talks, speaks with a natural British voice (see below; can be switched off), and shows live captions. She runs **six guided lessons** (downforce, ground effect, active aero, the power unit, tyres and brakes, suspension) that drive the 3D car step by step: taking parts off, highlighting, switching to drive mode, turning on the airflow.
 - **Showcase.** One click plays a narrated reveal: the car comes apart piece by piece, shows its blueprint, reassembles with each part clunking into place, fires up (starter, catch, throttle blips), then launches from a standing start with camera cuts. The engine note is synthesized: V6 firing pulses, exhaust roar, turbo whistle, the hybrid's electric whine, 8-speed upshifts with ignition cuts, and overrun crackle under braking.
@@ -32,7 +33,7 @@ npm run dev                  # http://localhost:3002
 | Lena's chat answers | NVIDIA Nemotron (open model) on Nebius Token Factory, as a tool-using agent (`lib/server/agent/`) |
 | Lena controlling the 3D car | The same agent, through tools (`focus_part`, `highlight_parts`, `set_view`, `start_lesson`, …) |
 | Lena's voice | Microsoft neural text-to-speech, `en-GB-LibbyNeural` (`lib/server/tts.ts`) |
-| Team briefing (Explore) and Paddock news | Not AI: Tavily web search, quoted from FIA, F1 media and team sites |
+| Team briefing and Paddock news | Not AI: Tavily web search, quoted from FIA, F1 media and team sites |
 | Lessons, showcase and race radio calls | Not AI: written lines, spoken in Lena's voice |
 
 ## The agent
@@ -48,7 +49,7 @@ Tool results are data. All behaviour rules (when to use which tool, how to answe
 
 | Tool | Kind | Does |
 |------|------|------|
-| `get_team_story` | live | Team briefing from the FIA, trusted media and the team's site (same feed as the Explore card). Needs `TAVILY_API_KEY`. |
+| `get_team_story` | live | Team briefing from the FIA, trusted media and the team's site (Tavily). Needs `TAVILY_API_KEY`. |
 | `web_search` | live | Tavily. Scope `fia` = fia.com only, `news` = last month, `any` = general. Needs `TAVILY_API_KEY`. |
 | `get_live_timing` | live | OpenF1: latest session and race control messages. |
 | `get_standings`, `get_calendar` | live | Jolpica-F1: championships (any season), next races, last podium. |
@@ -63,7 +64,7 @@ Nemotron reasoning models return their reasoning separately (`reasoning_content`
 | Path | What |
 |------|------|
 | `app/api/agent/route.ts` | `POST`: validates the request and streams the agent's events. |
-| `app/api/paddock/route.ts`, `app/api/team-story/route.ts` | `GET ?team=<id>`: Paddock data and the live team briefing (400 for unknown teams). |
+| `app/api/paddock/route.ts` | `GET ?team=<id>`: Paddock data (400 for unknown teams). |
 | `app/api/voice/route.ts` | `GET ?text=…&tone=calm\|race`: Lena's voice as MP3, cacheable forever. |
 | `lib/server/` | **Server only** (every module starts with `import "server-only"`). |
 | `lib/server/env.ts` | The only place that reads `process.env`. |
@@ -84,7 +85,7 @@ Nemotron reasoning models return their reasoning separately (`reasoning_content`
 | Tavily searches and Paddock news | Next's Data Cache (`unstable_cache` in `lib/server/cache.ts`) | news 15 min, FIA 2 h, general 1 h |
 | Team briefings | Next's Data Cache | 45 min |
 | Lena's voice audio | Browser HTTP cache (immutable GET URLs) and a 32 MB per-server LRU | indefinitely / until evicted |
-| `/api/paddock`, `/api/team-story` responses | CDN (`Cache-Control: s-maxage`) | 1 min / 15 min |
+| `/api/paddock` responses | CDN (`Cache-Control: s-maxage`) | 1 min |
 | Agent responses | Never cached (`no-store`) | |
 | Team, mute setting, chat history, learning progress | The user's browser (localStorage, `lib/storage.ts`) | until cleared |
 

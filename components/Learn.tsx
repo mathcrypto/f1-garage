@@ -9,16 +9,9 @@ import { REGULATIONS_2026 } from "@/lib/regulations"
 import { startShowcase } from "@/lib/showcase"
 import { useEngineerState, useGarage } from "@/lib/store"
 import { teamById } from "@/lib/teams"
-import type { TeamStory } from "@/lib/server/teamStory"
 import { upgradesForPart, upgradesForTeam, type UpgradePackage } from "@/lib/upgrades"
 
 // Bite-sized learning: one idea on screen at a time, more on demand.
-
-const STATS = [
-  { value: "768 kg", label: "minimum mass", back: "722 kg for car and driver, plus 46 kg of tyres." },
-  { value: "−30%", label: "downforce", back: "Less ground effect and smaller wings, with about 55% less drag too." },
-  { value: "350 kW", label: "electric power", back: "The MGU-K is almost three times stronger: roughly a 50/50 split with the engine." },
-]
 
 const LESSON_ICONS: Record<string, string> = {
   "aero-basics": "M3 14c4-6 14-6 18 0M5 18c3-3 11-3 14 0",
@@ -27,19 +20,6 @@ const LESSON_ICONS: Record<string, string> = {
   "power-unit": "M7 4h10v6l-5 10-5-10z",
   "tyres-brakes": "M12 3a9 9 0 1 0 .01 0M12 8a4 4 0 1 0 .01 0",
   suspension: "M5 18l7-12 7 12M8 13h8",
-}
-
-function FlipTile({ value, label, back }: (typeof STATS)[number]) {
-  const [flipped, setFlipped] = useState(false)
-  return (
-    <button className={flipped ? "tile flipped" : "tile"} onClick={() => setFlipped(!flipped)} aria-pressed={flipped}>
-      <span className="tile-front">
-        <b>{value}</b>
-        <small>{label}</small>
-      </span>
-      <span className="tile-back">{back}</span>
-    </button>
-  )
 }
 
 function FactCard() {
@@ -82,145 +62,60 @@ function FactCard() {
   )
 }
 
-const KIND_LABEL: Record<string, string> = {
-  weekend: "Weekend",
-  upgrade: "Upgrade",
-  aero: "Aero",
-  power: "Power unit",
-  general: "Note",
-}
-
-function TeamBriefing({ onAsk }: { onAsk?: (q: string) => void }) {
+/** The team's curated upgrade packages as a timeline; tapping one lights it up on the car. */
+function Upgrades() {
   const teamId = useGarage((s) => s.teamId)
+  const highlights = useGarage((s) => s.highlights)
   const team = teamById(teamId)
-  const [story, setStory] = useState<TeamStory | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [openSrc, setOpenSrc] = useState(false)
-
+  const list = upgradesForTeam(teamId)
+  const [active, setActive] = useState<string | null>(null)
+  useEffect(() => setActive(null), [teamId])
+  // Something else (Lena, a lesson) replaced the highlights: drop the active state.
   useEffect(() => {
-    // Switching team cancels the previous request.
-    const controller = new AbortController()
-    setLoading(true)
-    setOpenSrc(false)
-    setStory(null)
-    fetch(`/api/team-story?team=${encodeURIComponent(teamId)}`, { signal: controller.signal })
-      .then((r) => (r.ok ? (r.json() as Promise<TeamStory>) : null))
-      .then((data) => setStory(data))
-      .catch(() => { if (!controller.signal.aborted) setStory(null) })
-      .finally(() => { if (!controller.signal.aborted) setLoading(false) })
-    return () => controller.abort()
-  }, [teamId])
+    if (!highlights.length) setActive(null)
+  }, [highlights])
+  if (!list.length) return null
+  const latestId = list.at(-1)?.id
+
+  const toggle = (u: UpgradePackage) => {
+    const on = active !== u.id
+    setActive(on ? u.id : null)
+    useGarage.getState().setHighlights(on ? u.parts : [])
+  }
 
   return (
-    <section className="team-brief">
-      <div className="team-brief-head">
-        <div>
-          <span className="eyebrow">From the paddock</span>
-          <h5>
-            {team.name} <small>live briefing</small>
-          </h5>
-        </div>
-      </div>
-
-      {loading && <p className="muted small">Gathering FIA, media and team notes…</p>}
-
-      {!loading && story && !story.available && (
-        <p className="muted small">Live team news isn’t available right now. The upgrades below still show what changed on the car.</p>
-      )}
-
-      {!loading && story?.available && !story.bullets.length && (
-        <p className="muted small">
-          Nothing new on {team.name} in the trusted F1 sources right now — we won’t fill this with other teams or sponsor noise.
-          The upgrades below still show what changed on the car.
-        </p>
-      )}
-
-      {!loading && story && story.bullets.length > 0 && (
-        <>
-          <ul className="team-brief-list">
-            {story.bullets.map((b, i) => {
-              const src = story.sources[b.sourceIndex]
-              return (
-                <li key={`${b.sourceIndex}-${i}`}>
-                  <span className="kind">{KIND_LABEL[b.kind] ?? "Note"}</span>
-                  <p>{b.text}</p>
-                  {src && (
-                    <a className="src-line" href={src.url} target="_blank" rel="noreferrer">
-                      {src.outlet}
-                    </a>
-                  )}
-                </li>
-              )
-            })}
-          </ul>
-
-          <div className="team-brief-actions">
-            {onAsk && (
-              <button
-                type="button"
-                className="link"
-                onClick={() => onAsk(`What is ${team.name} fighting this weekend, and what upgrades are they talking about? Use live sources.`)}
-              >
-                Ask Lena about this →
-              </button>
-            )}
-            {story.sources.length > 0 && (
-              <button type="button" className="link muted" onClick={() => setOpenSrc((v) => !v)}>
-                {openSrc ? "Hide sources" : `Sources (${story.sources.length})`}
-              </button>
-            )}
-            {story.officialSite && (
-              <a className="link muted" href={story.officialSite} target="_blank" rel="noreferrer">
-                Official site
-              </a>
-            )}
-          </div>
-
-          {openSrc && (
-            <div className="sources team-brief-sources">
-              {story.sources.map((s) => (
-                <a key={s.url} className="source" href={s.url} target="_blank" rel="noreferrer" title={s.title}>
-                  <span className="source-dot" aria-hidden />
-                  {s.outlet}
-                </a>
-              ))}
-            </div>
-          )}
-        </>
-      )}
+    <section className="upgrades" aria-label={`${team.name} upgrades`}>
+      <header className="upgrades-head">
+        <span className="eyebrow">Development</span>
+        <h4>{team.name} upgrades</h4>
+        <small>Tap a package to see it on the {team.car}.</small>
+      </header>
+      <ol className="upgrade-timeline">
+        {list.map((u) => (
+          <li key={u.id} className={active === u.id ? "on" : undefined}>
+            <button type="button" className="upgrade-item" onClick={() => toggle(u)} aria-pressed={active === u.id}>
+              <span className="upgrade-event">
+                {u.event}
+                {u.id === latestId && <em>Latest</em>}
+              </span>
+              <b>{u.title}</b>
+              <small>{u.summary}</small>
+              <span className="upgrade-parts">
+                {u.parts.map((p) => (
+                  <span key={p.id} title={p.note}>
+                    {partById(p.id)?.name ?? p.id}
+                  </span>
+                ))}
+              </span>
+            </button>
+          </li>
+        ))}
+      </ol>
     </section>
   )
 }
 
-function Upgrades() {
-  const teamId = useGarage((s) => s.teamId)
-  const team = teamById(teamId)
-  const list = upgradesForTeam(teamId)
-  const show = (u: UpgradePackage) => {
-    useGarage.getState().setHighlights(u.parts)
-  }
-  return (
-    <div className="upgrade-diary">
-      <h5>
-        {team.name} upgrades
-      </h5>
-      <ul className="upgrade-list">
-        {list.map((u) => (
-          <li key={u.id}>
-            <button type="button" className="upgrade-row" onClick={() => show(u)}>
-              <b>
-                {u.event} · {u.title}
-              </b>
-              <small>{u.summary}</small>
-            </button>
-          </li>
-        ))}
-      </ul>
-    </div>
-  )
-}
-
-export function Explore({ onAsk }: { onAsk?: (q: string) => void }) {
+export function Explore() {
   const teamId = useGarage((s) => s.teamId)
   const lesson = useEngineerState((s) => s.lesson)
   const team = teamById(teamId)
@@ -250,6 +145,8 @@ export function Explore({ onAsk }: { onAsk?: (q: string) => void }) {
         </span>
       </button>
 
+      <Upgrades />
+
       <h5>Learn with Lena</h5>
       <div className="lesson-rail">
         {LESSONS.map((l) => (
@@ -270,14 +167,8 @@ export function Explore({ onAsk }: { onAsk?: (q: string) => void }) {
         ))}
       </div>
 
-      <h5>
-        2026 in three numbers <small>tap to flip</small>
-      </h5>
-      <div className="tiles">{STATS.map((s) => <FlipTile key={s.label} {...s} />)}</div>
 
       <FactCard />
-      <TeamBriefing onAsk={onAsk} />
-      <Upgrades />
     </div>
   )
 }
@@ -298,7 +189,7 @@ export function PartCard({ onAsk }: { onAsk: (q: string) => void }) {
     if (selected) useProgress.getState().markPart(selected)
   }, [selected])
   const part = selected ? partById(selected) : undefined
-  if (!part) return <Explore onAsk={onAsk} />
+  if (!part) return <Explore />
   const team = teamById(teamId)
   const note = highlights.find((h) => h.id === part.id)?.note
   const current = STEPS[step]
