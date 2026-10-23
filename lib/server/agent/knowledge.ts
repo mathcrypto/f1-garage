@@ -1,7 +1,7 @@
 import "server-only"
 import { CAR_SPECS, PARTS } from "../../parts"
 import { REGULATIONS_2026 } from "../../regulations"
-import { upgradeDiaryIndex } from "../../upgrades"
+import { upgradesIndex } from "../../upgrades"
 
 // Static garage handbook — shipped with the app. Only pre-written car-tech
 // topics are "stale". Everything else gets live data tools by default.
@@ -30,9 +30,9 @@ ${car}
 ### 2026 regulations (headlines + short chapters)
 ${regs}
 
-### Team upgrades (curated packages, not a live feed)
-Index of packages (call get_team_upgrades for full text; show_upgrade to highlight on the car):
-${upgradeDiaryIndex()}
+### Team upgrades (declared to the FIA in 2026, each with a source)
+Index of packages (call get_team_upgrades for details and sources; show_upgrade to highlight on the car):
+${upgradesIndex()}
 For confirmed race-weekend / team news, call get_team_story (FIA + trusted media + official team site). Use web_search only for narrower follow-ups.
 
 ### Parts
@@ -102,7 +102,7 @@ export function needsFreshData(question: string, priorUserText = ""): boolean {
   // Live team briefing whenever they ask what the team is doing / fighting / bringing.
   if (/\b(this weekend|fighting|team (story|briefing|news)|what .+ (bringing|fighting)|document.?38)\b/i.test(q)) return true
 
-  // Diary upgrades without "latest/news" → get_team_upgrades only (no web/standings).
+  // Upgrade questions without "latest/news" → get_team_upgrades only (no web/standings).
   if (/\bupgrades?\b/i.test(q) && !/\b(latest|recent|news|this weekend|this race|brought)\b/i.test(q)) return false
 
   // Only car-tech handbook subjects are stale.

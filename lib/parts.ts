@@ -21,7 +21,7 @@ export const PARTS: Part[] = [
     howItWorks:
       "Stacked elements turn air upward so the wing is pushed down. Just as important is the wake: the endplates and flap tips steer air around the front tyres, whose turbulent wake would otherwise pollute the floor.",
     regulation2026:
-      "2026 wings are narrower and use active aerodynamics: the flaps open on straights (low-drag mode) and close for corners (high-downforce mode), replacing DRS as the drag-reduction tool.",
+      "2026 front wings are 100 mm narrower and use active aerodynamics: the flaps open on straights (low-drag mode) and close for corners (high-downforce mode), replacing DRS as the drag-reduction tool.",
     watchFor: "New endplate shapes and flap profiles are the most common upgrade. Teams tune them to change balance between front and rear.",
     specs: [["Elements", "Multi-element, with active flaps"], ["Modes", "Corner Mode / Straight Mode"], ["Replaces", "DRS as the drag-reduction tool"]],
   },
@@ -43,7 +43,7 @@ export const PARTS: Part[] = [
     summary: "Links the wheels to the chassis and controls ride height, which the floor is very sensitive to.",
     howItWorks:
       "Wishbones locate the wheel; push-rod or pull-rod layouts send loads to springs and dampers inside the chassis. The arms are shaped like small wings, so they also guide air.",
-    regulation2026: "Wishbone fairings and suspension geometry rules were reworked alongside the smaller 2026 car.",
+    regulation2026: "The car around it is smaller: the wheelbase is limited to 3400 mm (was 3600) and the width to 1900 mm (was 2000).",
     watchFor: "Changes to anti-dive geometry or arm fairings: they affect both handling under braking and aero stability.",
     specs: [["Layout", "Double wishbone, push or pull rod"], ["Arms", "Aerofoil-section carbon wishbones"], ["Job", "Holds the aero platform steady"]],
   },
@@ -54,7 +54,7 @@ export const PARTS: Part[] = [
     summary: "The survival cell around the driver, topped by the titanium halo.",
     howItWorks:
       "The monocoque is a carbon-fibre tub that every other part bolts to. The halo protects the driver's head from debris and impacts and can carry the weight of a double-decker bus.",
-    regulation2026: "The halo and roll hoop load tests were strengthened for 2026.",
+    regulation2026: "Roll hoop loads rise from 16g to 20g, and side intrusion protection around the cockpit and fuel cell is increased.",
     watchFor: "Small aero fairings on the halo and mirror stays are frequent, cheap upgrades.",
     specs: [["Survival cell", "Carbon-fibre monocoque"], ["Halo", "Titanium, strengthened for 2026"], ["Minimum mass", "724 kg + tyres"]],
   },
@@ -64,8 +64,8 @@ export const PARTS: Part[] = [
     system: "Aerodynamics",
     summary: "House the radiators and shape the airflow along the side of the car toward the rear.",
     howItWorks:
-      "The inlet feeds the cooling system; the external shape (downwash, undercut) guides air to the back of the floor and the beam wing. Cooling and aero always trade off.",
-    regulation2026: "The 2026 power unit rejects more heat into the electrical system, so cooling layouts were reshuffled across the grid.",
+      "The inlet feeds the cooling system; the external shape (downwash, undercut) guides air to the back of the floor and the rear of the car. Cooling and aero always trade off.",
+    regulation2026: "Sidepods are among the most often upgraded parts in 2026: Haas, Red Bull, Alpine and McLaren all declared sidepod changes this season.",
     watchFor: "Sidepod reshapes are among the biggest visible upgrades, often paired with a new floor.",
     specs: [["Contents", "Radiators and coolers"], ["Shaping", "Downwash and undercut to the floor"], ["Trade-off", "Cooling versus drag"]],
   },
@@ -88,7 +88,7 @@ export const PARTS: Part[] = [
     summary: "Covers the power unit and feeds air to the engine through the inlet above the driver's head.",
     howItWorks:
       "The airbox delivers air to the combustion engine. The cover's shape and cooling exits change how much drag the car makes and how clean the air is that reaches the rear wing.",
-    regulation2026: "Packaging changed with the new power unit and its bigger battery.",
+    regulation2026: "It covers the new power unit: no MGU-H, and an MGU-K of up to 350 kW.",
     watchFor: "Tighter 'coke-bottle' tapering at the rear and new cooling gills or louvres.",
     specs: [["Covers", "Power unit and energy store"], ["Airbox", "Feeds the combustion engine"], ["Exits", "Cooling louvres and tail outlet"]],
   },
@@ -111,7 +111,7 @@ export const PARTS: Part[] = [
     summary: "Carries the rear wheels and transmits power through the 8-speed gearbox.",
     howItWorks:
       "The gearbox casing doubles as the mounting point for the rear suspension. Its geometry controls how the car squats under acceleration, which matters for the floor and diffuser.",
-    regulation2026: "Gearboxes remain 8-speed, with a constrained design cycle to limit costs.",
+    regulation2026: "Gearboxes remain 8-speed.",
     watchFor: "Suspension fairings that help guide air to the diffuser.",
     specs: [["Mounting", "On the gearbox casing"], ["Gearbox", "8 forward gears"], ["Tuning", "Anti-squat geometry"]],
   },
@@ -121,19 +121,9 @@ export const PARTS: Part[] = [
     system: "Aerodynamics",
     summary: "The upswept exit at the back of the floor that expands the airflow and helps extract downforce.",
     howItWorks: "By slowing and expanding the air leaving the floor, the diffuser keeps underfloor pressure low.",
-    regulation2026: "Smaller and simpler for 2026, part of the overall downforce reduction.",
+    regulation2026: "The 2026 rules reduce ground effect, and the beam wing that used to sit above the diffuser is no longer allowed.",
     watchFor: "Usually updated together with the floor.",
-    specs: [["Job", "Expands the underfloor flow"], ["2026 change", "Smaller than 2022–2025"], ["Works with", "Floor and beam wing"]],
-  },
-  {
-    id: "beam-wing",
-    name: "Beam wing",
-    system: "Aerodynamics",
-    summary: "The small wing between the diffuser and rear wing.",
-    howItWorks: "It links the diffuser and rear wing flows, helping both work harder. Teams swap it for low or high downforce tracks.",
-    regulation2026: "The 2026 rear-end rules change the beam wing's role in the overall package.",
-    watchFor: "Track-specific beam wing choices, especially for high-speed circuits like Monza or Las Vegas.",
-    specs: [["Position", "Between diffuser and rear wing"], ["Job", "Links diffuser and rear wing flow"], ["Swapped for", "Low- or high-downforce tracks"]],
+    specs: [["Job", "Expands the underfloor flow"], ["2026 change", "Smaller than 2022–2025"], ["Works with", "Floor and rear wing"]],
   },
   {
     id: "rear-wing",
@@ -163,7 +153,7 @@ export const PARTS: Part[] = [
     system: "Tyres & brakes",
     summary: "The driven wheels. Rear brakes are shared with the MGU-K, which recovers energy while slowing the car.",
     howItWorks: "A brake-by-wire system balances friction braking and energy recovery so the driver feels a consistent pedal.",
-    regulation2026: "With much stronger energy recovery, brake-by-wire calibration is a bigger engineering focus.",
+    regulation2026: "The MGU-K now recovers up to 350 kW under braking (was 120 kW), so far more of the rear braking is energy recovery.",
     watchFor: "Rear brake duct and rim upgrades aimed at tyre temperature control.",
     specs: [["Rim", "18-inch"], ["Width", "30 mm narrower than 2025"], ["Diameter", "≈10–15 mm smaller"], ["Braking", "Shared with MGU-K recovery"]],
   },

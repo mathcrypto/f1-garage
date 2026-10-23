@@ -44,7 +44,6 @@ export function GltfCar({ url, team }: { url: string; team: Team }) {
         partId === "diffuser" ||
         partId === "front-wing" ||
         partId === "rear-wing" ||
-        partId === "beam-wing" ||
         partId === "front-suspension" ||
         partId === "rear-suspension" ||
         /floor|diffuser|plank|carbon|wing|wishbone/.test(n)
@@ -230,7 +229,6 @@ function explodeFor(id: string): [number, number, number] {
     "power-unit": [0, 0.51, 0],
     "rear-suspension": [0, 0.43, -0.8],
     diffuser: [0, 0.05, -1.25],
-    "beam-wing": [0, 0.36, -1.23],
     "rear-wing": [0, 0.87, -1.45],
     "front-tyres": [0.87, 0, 0.22],
     "rear-tyres": [0.87, 0, -0.22],

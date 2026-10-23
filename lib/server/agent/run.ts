@@ -1,7 +1,7 @@
 import "server-only"
 import OpenAI from "openai"
 import { LIMITS, type AgentEvent, type ChatTurn } from "../../agent/types"
-import { findUpgrade, latestUpgrade, narrateUpgrade, upgradeById } from "../../upgrades"
+import { findUpgrade, latestUpgrade, narrateUpgrade } from "../../upgrades"
 import { env } from "../env"
 import { getStandings } from "../f1data"
 import { isChampionshipQuestion, isConversationalShare, needsFreshData, requestedSeason } from "./knowledge"
@@ -62,8 +62,7 @@ function fallbackAnswer(teamId: string, question: string, toolResults: string[])
   const shown = toolResults.find((t) => t.startsWith("Shown on the car:"))
   const match = shown && /\[([^\]]+)\]\s+([^\n(]+)/.exec(shown)
   const pack =
-    (match && findUpgrade(teamId, match[2])) ||
-    (shown && upgradeById(`${teamId}-launch`)) ||
+    (match && findUpgrade(teamId, match[1])) ||
     findUpgrade(teamId, question) ||
     (/\bupgrade|package|diary\b/i.test(question) ? latestUpgrade(teamId) : undefined)
   if (pack) return narrateUpgrade(pack)

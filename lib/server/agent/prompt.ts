@@ -4,7 +4,7 @@ import { LESSONS } from "../../lessons"
 import { partById, PARTS } from "../../parts"
 import { REGULATIONS_2026 } from "../../regulations"
 import { TEAMS, teamById } from "../../teams"
-import { formatTeamUpgradeDiary } from "../../upgrades"
+import { upgradesForTeam } from "../../upgrades"
 import { garageHandbook } from "./knowledge"
 
 // Lena's instructions. Behaviour rules live here, not inside tool results:
@@ -26,12 +26,13 @@ Garage briefing style:
 If the garage context says mode is drive or race, switch to pit-wall radio: only what the driver needs right now, radio words ("box box", "push", "lift and coast"), no essays.
 
 Getting facts:
-- Never invent driver names, positions, points, race results or upgrades. Your training data is often out of date.
+- Never make anything up. Every number, date, spec, upgrade, result, name or quote must come from the handbook below, a tool result or a search result this turn. If you don't have a sourced answer, say you don't know and offer to check; don't estimate, round up a guess or fill gaps from memory. Your training data is often out of date.
+- Keep figures exactly as the source gives them, with their qualifier ("up to", "about", "minimum").
 - Anything that changes (standings, calendar, results, live timing, news, "who's leading"): use the live tools when they're offered this turn. A live snapshot pasted into this turn is authoritative for the season it states.
 - Respect the season the user names: a "2025 championship" question needs get_standings with season 2025, never the current table.
-- How the car works, 2026 headline regulations, specs, lessons and each team's curated upgrades are in the handbook below: answer from it, get_team_upgrades or explain_regulation; don't search the web for them.
+- How the car works, 2026 headline regulations, specs, lessons and each team's FIA-declared upgrades are in the handbook below: answer from it, get_team_upgrades or explain_regulation; don't search the web for them.
 - Team news, what a team is fighting this weekend, confirmed recent upgrades: call get_team_story first. Use only its notes and stay on that team; if it has no notes, say the paddock is quiet on them and offer their upgrades or a part explanation.
-- Call the curated packages "upgrades" when you talk to the user, never a "diary" or "teaching log".
+- Team upgrades come from the FIA's declared-upgrade documents: get_team_upgrades lists them with their source. Say which race each one came from. Only describe what the entry says changed; don't add reasons or effects it doesn't state.
 - web_search is for narrower follow-ups: scope "fia" = fia.com, "news" = last month, "any" = general.
 - Source chips appear under your answer automatically. Never read sources, URLs or outlet names aloud.
 
@@ -55,7 +56,7 @@ ${garageHandbook()}`
 export function contextLine(c: GarageContext, today = new Date()): string {
   const team = teamById(c.teamId)
   const part = c.selectedPartId ? partById(c.selectedPartId) : undefined
-  const diary = formatTeamUpgradeDiary(team.id).split("\n").slice(0, 6).join(" ").slice(0, 280)
+  const upgrades = upgradesForTeam(team.id).map((u) => `${u.event}: ${u.title}`).join("; ") || "none listed"
   const race = c.race
     ? [
         `race phase: ${c.race.phase}`,
@@ -73,7 +74,7 @@ export function contextLine(c: GarageContext, today = new Date()): string {
     `today: ${today.toISOString().slice(0, 10)}`,
     `learning progress: parts seen ${c.progress.parts}, lessons ${c.progress.lessons}/${LESSONS.length}, regulations ${c.progress.regs}`,
     c.suggestedNext ? `suggested next: ${c.suggestedNext.kind} "${c.suggestedNext.label}"` : "suggested next: none, garage tour complete",
-    `upgrades snapshot: ${diary}`,
+    `declared upgrades: ${upgrades}`,
     race,
     c.mode === "studio" ? "style: garage briefing, connected paragraphs" : "style: pit-wall radio, terse calls only",
   ].filter(Boolean).join("; ")

@@ -12,9 +12,9 @@ npm run dev                  # http://localhost:3002
 ## What you can do
 
 - **3D car in every team's colours.** Studio turntable with reflections, or **Drive** mode: the car runs on a track with spinning wheels, suspension movement, glowing brakes, and the 2026 active aero switching between Straight Mode (straight, wings open) and Corner Mode (corner, wings closed). A HUD shows speed, aero mode, ERS deployment and braking.
-- **Take it apart.** Click any of the 14 parts and it slides off the car while the rest turns see-through and the camera flies to it. **Exploded view** separates everything; **Reassemble** or Esc puts it back.
+- **Take it apart.** Click any of the 13 parts and it slides off the car while the rest turns see-through and the camera flies to it. **Exploded view** separates everything; **Reassemble** or Esc puts it back.
 - **Bite-sized learning.** Nothing is shown all at once: the Explore tab offers a hint, a showcase button, your team's upgrades, lesson chips and one "did you know" fact at a time. A selected part shows a one-line summary, three key specs and a three-step card (how it works, 2026 rules, upgrades), with full specs tucked away. Controls live in an icon rail with tooltips, part names appear on hover, and the side panel can be hidden.
-- **Team upgrades.** Explore shows your team's upgrade packages as a timeline; tap one to light up the parts it changed on the car.
+- **Team upgrades.** Explore shows your team's real 2026 upgrades as declared to the FIA, each with its source; tap one to light up the parts it changed on the car.
 - **Live team briefing.** Lena's `get_team_story` tool builds a team briefing from FIA docs, Formula1.com, The Race, Autosport, Motorsport and the team's official site (Tavily, ~45 min cache).
 - **Race engineer.** The engineer can search fia.com, recent news, live timing and the standings, and it controls the 3D car while it explains: it takes parts off, highlights several with numbered labels, explodes the car or switches to blueprint and airflow views. The car only goes on track when you press Showcase, Drive or Race. Fan/Engineer depth toggle, an optional Deep analysis mode, a collapsible view of the model's reasoning, and source chips on every answer.
 - **Lena, your race engineer.** An illustrated character who wears the selected team's kit (shirt in the team's livery colours with its name on the chest) and a pit-wall headset in team colours. She changes kit and says hello when you switch team, appears on screen when she talks, speaks with a natural British voice (see below; can be switched off), and shows live captions. She runs **six guided lessons** (downforce, ground effect, active aero, the power unit, tyres and brakes, suspension) that drive the 3D car step by step: taking parts off, highlighting, moving the camera, turning on the airflow.
@@ -53,7 +53,7 @@ Tool results are data. All behaviour rules (when to use which tool, how to answe
 | `web_search` | live | Tavily. Scope `fia` = fia.com only, `news` = last month, `any` = general. Needs `TAVILY_API_KEY`. |
 | `get_live_timing` | live | OpenF1: latest session and race control messages. |
 | `get_standings`, `get_calendar` | live | Jolpica-F1: championships (any season), next races, last podium. |
-| `get_team_upgrades`, `show_upgrade` | garage | The curated development diary; highlights a package on the car. |
+| `get_team_upgrades`, `show_upgrade` | garage | A team's FIA-declared 2026 upgrades with sources; highlights one on the car. |
 | `explain_regulation` | garage | A 2026 regulation chapter, highlighted on the car. |
 | `focus_part`, `highlight_parts`, `set_view`, `start_lesson`, `open_race_setup` | garage | Control the 3D car, lessons and the race lobby. |
 
@@ -73,7 +73,7 @@ Nemotron reasoning models return their reasoning separately (`reasoning_content`
 | `lib/server/cache.ts` | Caching helpers (below). |
 | `lib/agent/types.ts` | Types shared by browser and server: garage context, chat turns, agent events. |
 | `lib/storage.ts` | Every localStorage key, with guarded access. |
-| `lib/parts.ts`, `teams.ts`, `regulations.ts`, `upgrades.ts`, `lessons.ts` | Shared content: parts, the 2026 grid, rules, the diary, lessons. |
+| `lib/parts.ts`, `teams.ts`, `regulations.ts`, `upgrades.ts`, `lessons.ts` | Shared content: parts, the 2026 grid, rules, sourced team upgrades, lessons. |
 | `components/Engineer.tsx` | The chat: sends questions, renders steps, AI attribution, sources. |
 | `components/three/` | The 3D scene: car, track, effects. |
 

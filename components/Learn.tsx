@@ -9,7 +9,7 @@ import { REGULATIONS_2026 } from "@/lib/regulations"
 import { startShowcase } from "@/lib/showcase"
 import { useEngineerState, useGarage } from "@/lib/store"
 import { teamById } from "@/lib/teams"
-import { upgradesForPart, upgradesForTeam, type UpgradePackage } from "@/lib/upgrades"
+import { upgradeMonth, upgradesForPart, upgradesForTeam, type UpgradePackage } from "@/lib/upgrades"
 
 // Bite-sized learning: one idea on screen at a time, more on demand.
 
@@ -75,7 +75,6 @@ function Upgrades() {
     if (!highlights.length) setActive(null)
   }, [highlights])
   if (!list.length) return null
-  const latestId = list.at(-1)?.id
 
   const toggle = (u: UpgradePackage) => {
     const on = active !== u.id
@@ -88,15 +87,15 @@ function Upgrades() {
       <header className="upgrades-head">
         <span className="eyebrow">Development</span>
         <h4>{team.name} upgrades</h4>
-        <small>Tap a package to see it on the {team.car}.</small>
+        <small>Declared to the FIA this season. Tap one to see it on the {team.car}.</small>
       </header>
       <ol className="upgrade-timeline">
         {list.map((u) => (
           <li key={u.id} className={active === u.id ? "on" : undefined}>
             <button type="button" className="upgrade-item" onClick={() => toggle(u)} aria-pressed={active === u.id}>
               <span className="upgrade-event">
-                {u.event}
-                {u.id === latestId && <em>Latest</em>}
+                {u.event} GP
+                <em>{upgradeMonth(u)}</em>
               </span>
               <b>{u.title}</b>
               <small>{u.summary}</small>
@@ -108,6 +107,9 @@ function Upgrades() {
                 ))}
               </span>
             </button>
+            <a className="upgrade-source" href={u.source.url} target="_blank" rel="noreferrer">
+              Source: {u.source.title}
+            </a>
           </li>
         ))}
       </ol>
@@ -243,7 +245,7 @@ export function PartCard({ onAsk }: { onAsk: (q: string) => void }) {
                 onClick={() => useGarage.getState().setHighlights(u.parts)}
               >
                 <b>
-                  {u.event}: {u.title}
+                  {u.event} GP: {u.title}
                 </b>
                 <small>{u.parts.find((p) => p.id === part.id)?.note ?? u.summary}</small>
               </button>

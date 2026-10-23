@@ -332,8 +332,6 @@ function useGeometry() {
       rwFlap: airfoil(1.0, 0.24, 0.1),
       rwEndplate: sideUV(profile([[-2.36, 0.74], [-2.4, 1.1], [-2.94, 1.12], [-2.9, 0.82]], 0.016)),
       swanNeck: profile([[-2.28, 0.42], [-2.36, 0.9], [-2.5, 0.9], [-2.44, 0.42]], 0.022),
-      beam1: airfoil(0.8, 0.16, 0.12),
-      beam2: airfoil(0.8, 0.15, 0.12),
       gearbox: loft([{ z: -1.55, w: 0.27, h: 0.26, y: 0.36 }, { z: -2.32, w: 0.15, h: 0.17, y: 0.37 }]),
       frontRodsL: frontRods(1), frontRodsR: frontRods(-1),
       rearRodsL: rearRods(1), rearRodsR: rearRods(-1),
@@ -617,10 +615,6 @@ export function Car({ team }: { team: Team }) {
         <mesh material={m.rain} position={[0, 0.36, -2.42]} userData={{ keepEmissive: true }}><boxGeometry args={[0.12, 0.05, 0.02]} /></mesh>
       </Part>
 
-      <Part id="beam-wing" explode={[0, 0.36, -1.23]}>
-        <mesh geometry={geo.beam1} material={m.aeroCarbon} position={[0, 0.4, -2.28]} rotation={[0.3, 0, 0]} />
-        <mesh geometry={geo.beam2} material={m.aeroCarbon} position={[0, 0.48, -2.42]} rotation={[0.45, 0, 0]} />
-      </Part>
 
       <Part id="rear-wing" explode={[0, 0.87, -1.45]}>
         <mesh geometry={geo.rwMain} material={m.aeroCarbon} position={[0, 0.88, -2.42]} rotation={[0.18, 0, 0]} />

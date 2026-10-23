@@ -705,9 +705,11 @@ p { margin: 0; }
 .upgrade-item:hover { border-color: var(--team); transform: translateX(2px); }
 .upgrade-timeline li.on .upgrade-item { border-color: var(--team); background: color-mix(in srgb, var(--team) 12%, #121418); }
 .upgrade-event { display: flex; align-items: center; gap: 8px; font: 700 11px/1 var(--display); letter-spacing: 0.14em; text-transform: uppercase; color: var(--team); }
-.upgrade-event em { font-style: normal; padding: 3px 7px; border-radius: 999px; background: var(--team); color: var(--team-ink); letter-spacing: 0.08em; font-size: 9.5px; }
+.upgrade-event em { font-style: normal; color: var(--muted); letter-spacing: 0.08em; }
 .upgrade-item b { font: 700 15px/1.25 var(--display); }
 .upgrade-item small { color: var(--muted); font-size: 12.5px; line-height: 1.4; }
+.upgrade-source { display: inline-block; margin: 6px 0 0 4px; font-size: 11px; color: var(--muted); text-decoration: underline; text-underline-offset: 2px; }
+.upgrade-source:hover { color: var(--ink); }
 .upgrade-parts { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 2px; }
 .upgrade-parts span { padding: 3px 8px; border-radius: 999px; border: 1px solid var(--line-strong); font-size: 11px; color: #d6dae3; }
 .upgrade-row {

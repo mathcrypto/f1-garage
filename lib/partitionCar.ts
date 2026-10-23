@@ -12,7 +12,7 @@ export function classifyPoint(x: number, y: number, z: number): string {
   if (z > 2.05 && y < 0.5) return "front-wing"
   if (z < -2.05 && y > 0.55) return "rear-wing"
   if (z < -1.85 && y < 0.45) return "diffuser"
-  if (z < -2.15 && y > 0.25 && y < 0.55) return "beam-wing"
+  if (z < -2.15 && y > 0.25 && y < 0.55) return "rear-wing" // no beam wing in 2026: rear wing supports
 
   if (ax > 0.55 && z > 1.15 && z < 2.15) return "front-tyres"
   if (ax > 0.55 && z < -1.15 && z > -2.15) return "rear-tyres"

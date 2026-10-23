@@ -15,7 +15,7 @@ export const REGULATIONS_2026: Regulation[] = [
     title: "Active aerodynamics replace DRS",
     body: "Front and rear wing flaps switch between a high-downforce cornering mode and a low-drag straight-line mode.",
     detail:
-      "In Corner Mode the flaps stay closed for grip. In Straight Mode, on the straights, they open to cut drag. Unlike old DRS, both cars can use the system when the rules allow — overtaking help now comes more from energy (overtake mode) than from a one-car rear-wing slot. Teams spend a lot of development time on how fast the flaps move and how the car feels at the switch.",
+      "In Corner Mode the flaps stay closed for grip. In Straight Mode, on the straights, they open to cut drag. Unlike old DRS, both cars can use the system when the rules allow — overtaking help now comes more from energy (overtake mode) than from a one-car rear-wing slot.",
     parts: ["front-wing", "rear-wing"],
   },
   {
@@ -31,7 +31,7 @@ export const REGULATIONS_2026: Regulation[] = [
     title: "Overtake mode",
     body: "A car close behind gets extra electrical energy to deploy, the new overtaking aid.",
     detail:
-      "When you are within the activation window of the car ahead, the rules give you extra deployable energy for a push. It replaces the old DRS 'free pass' idea with a hybrid boost. From the pit wall you hear 'overtake mode available' — then it is down to battery state, slipstream and bravery into the braking zone.",
+      "A driver can use Overtake Mode when they are within one second of the car ahead at the detection point. It gives extra electrical deployment instead of the old DRS rear-wing slot. Whether the pass sticks then comes down to battery charge, slipstream and braking.",
     parts: ["power-unit", "rear-wing"],
   },
   {
@@ -39,7 +39,7 @@ export const REGULATIONS_2026: Regulation[] = [
     title: "Smaller, lighter cars",
     body: "Shorter wheelbase, narrower body and narrower tyres, with a lower minimum weight than 2025.",
     detail:
-      "Maximum wheelbase drops to about 3400 mm and overall width to 1900 mm. Narrower 18-inch tyres cut grip and visual bulk. The aim is cars that are easier to follow and more agile in traffic, at the cost of some absolute corner speed versus the 2022–2025 ground-effect generation.",
+      "Maximum wheelbase drops from 3600 mm to 3400 mm and overall width from 2000 mm to 1900 mm. The floor is 150 mm narrower and the front wing 100 mm narrower. The tyres stay on 18-inch rims but are 25 mm narrower at the front and 30 mm at the rear. The minimum mass is 724 kg plus the tyres, about 770 kg, down from 800 kg.",
     parts: ["cockpit", "front-tyres", "rear-tyres"],
   },
   {
@@ -47,7 +47,7 @@ export const REGULATIONS_2026: Regulation[] = [
     title: "Less ground effect",
     body: "Flatter floor and smaller diffuser cut downforce and reduce the 'porpoising' sensitivity of 2022–2025 cars.",
     detail:
-      "The deep tunnels of the previous era are dialled back. Floors still matter hugely, but ride-height sensitivity falls, so cars should bounce less and follow more closely. Teams still fight over millimetres of edge fence and seal — just with a different starting point.",
+      "The 2026 rules reduce ground effect with a flatter floor than the 2022–2025 cars. The floor is still the most upgraded part on the grid this season: almost every team has declared floor changes to the FIA.",
     parts: ["floor", "diffuser"],
   },
   {
@@ -55,15 +55,15 @@ export const REGULATIONS_2026: Regulation[] = [
     title: "100% sustainable fuel",
     body: "Power units run on fully sustainable fuel.",
     detail:
-      "The fuel must meet FIA sustainability criteria while still delivering the energy density a V6 turbo needs. Combustion maps, knock limits and reliability all shift slightly versus fossil fuels — another reason early-season PU software updates matter.",
+      "From 2026 the power units run on 100% sustainable fuel that must meet the FIA's sustainability criteria.",
     parts: ["power-unit"],
   },
   {
     id: "safety",
     title: "Stronger safety structures",
-    body: "Tougher front impact, side intrusion and roll hoop tests.",
+    body: "Two-stage front impact structure, stronger roll hoop and side intrusion protection.",
     detail:
-      "The nose uses a two-stage front impact structure so it is less likely to detach in a heavy shunt. Halo and roll-hoop load tests are tougher. Safety upgrades rarely look dramatic on camera, but they constrain how nose and cockpit aero can be shaped.",
+      "The nose uses a two-stage front impact structure so it is less likely to detach in a heavy crash. Roll hoop loads rise from 16g to 20g, side intrusion protection around the cockpit increases, and the protection beside the fuel cell more than doubles.",
     parts: ["nose", "cockpit"],
   },
   {
@@ -79,15 +79,15 @@ export const REGULATIONS_2026: Regulation[] = [
     title: "Energy budget per lap",
     body: "How much electrical energy you can harvest and deploy each lap is capped — managing it is a core race skill.",
     detail:
-      "With a much stronger MGU-K, the limit is less 'can we make power?' and more 'when do we spend it?'. Lift-and-coast, overtake mode, and defending all burn the same budget. Lena’s race radio often comes down to battery percent and mode calls.",
+      "The battery can recover up to 8.5 MJ per lap, and the MGU-K deploys up to 350 kW. Attacking with Overtake Mode and defending use the same energy, so when to spend it matters as much as how much there is.",
     parts: ["power-unit", "rear-tyres"],
   },
   {
     id: "following",
     title: "Easier following, still hard racing",
-    body: "Less dirty air from reduced downforce and active aero should help cars stay closer — strategy and battery still decide the pass.",
+    body: "The FIA designed the rules for closer racing: less downforce, active aero and Overtake Mode.",
     detail:
-      "The regulation package aims at closer racing: smaller wakes, overtake mode, and cars that lose less load in dirty air. It does not remove skill — tyre prep, traffic, and hybrid discipline still separate a good lap from a great one.",
+      "The FIA's aim is cars that lose less performance when following another car, combining reduced downforce, active aero and Overtake Mode's extra energy within one second of the car ahead.",
     parts: ["floor", "rear-wing", "power-unit"],
   },
 ]

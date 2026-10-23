@@ -11,7 +11,7 @@ export const lines = {
   showcase: (car: string) => [
     `Radio check. This is the ${car}. Let's take her apart.`,
     "Front wing, nose, suspension. Bodywork, floor, power unit. All off, all accounted for.",
-    "X-ray. Wheelbase thirty-four hundred, width nineteen hundred. Bang on the limits.",
+    "X-ray. Wheelbase up to thirty-four hundred millimetres, width up to nineteen hundred. Those are the 2026 limits.",
     "Putting her back together.",
     "Car's ready. Out on track.",
     "Burnout. Heat in the rears.",
