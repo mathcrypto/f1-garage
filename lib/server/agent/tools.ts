@@ -54,7 +54,7 @@ const sources = (ctx: ToolContext, list: Source[]) => { if (list.length) ctx.emi
 const TOOLS = {
   web_search: {
     kind: "live",
-    description: "Fresh information not in the handbook or diary: confirmed latest news and brand-new FIA documents. Not for explaining parts, 2026 headline rules or diary packages. scope 'fia' = fia.com, 'news' = last month, 'any' = general.",
+    description: "Fresh information not in the handbook or the curated upgrades: confirmed latest news and brand-new FIA documents. Not for explaining parts, 2026 headline rules or the curated upgrades. scope 'fia' = fia.com, 'news' = last month, 'any' = general.",
     parameters: {
       query: { type: "string", description: "e.g. 'Ferrari floor upgrade Singapore 2026'" },
       scope: { type: "string", enum: ["fia", "news", "any"] },
@@ -109,23 +109,23 @@ const TOOLS = {
   },
   get_team_upgrades: {
     kind: "garage",
-    description: "The curated development diary for a team (illustrative launch and early-season packages, for teaching). Defaults to the user's team. For confirmed latest news use get_team_story.",
+    description: "A team's curated upgrade packages (launch and early-season). Defaults to the user's team. For confirmed latest news use get_team_story.",
     parameters: {
       teamId: { type: "string", enum: TEAM_IDS, description: "Defaults to the team in the garage context" },
       partId: { type: "string", enum: PART_IDS, description: "Only packages that touch this part" },
     },
-    label: () => "Opening the development diary",
+    label: () => "Looking up the upgrades",
     async run(a, ctx) {
       const team = teamOf(a, ctx)
       const part = oneOf(a.partId, PART_IDS)
       if (!part) return formatTeamUpgradeDiary(team)
       const list = upgradesForPart(team, part)
-      return list.length ? list.map(formatUpgrade).join("\n\n") : json({ result: `No diary packages touch ${part} for this team.` })
+      return list.length ? list.map(formatUpgrade).join("\n\n") : json({ result: `No upgrades touch ${part} for this team.` })
     },
   },
   show_upgrade: {
     kind: "garage",
-    description: "Highlight a development-diary package on the user's 3D car, with a numbered note on each part.",
+    description: "Highlight an upgrade package on the user's 3D car, with a numbered note on each part.",
     parameters: {
       packageId: { type: "string", description: "Package id, e.g. ferrari-bahrain" },
       teamId: { type: "string", enum: TEAM_IDS, description: "Without packageId, shows this team's latest package" },

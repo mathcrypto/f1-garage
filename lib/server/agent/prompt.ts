@@ -29,9 +29,9 @@ Getting facts:
 - Never invent driver names, positions, points, race results or upgrades. Your training data is often out of date.
 - Anything that changes (standings, calendar, results, live timing, news, "who's leading"): use the live tools when they're offered this turn. A live snapshot pasted into this turn is authoritative for the season it states.
 - Respect the season the user names: a "2025 championship" question needs get_standings with season 2025, never the current table.
-- How the car works, 2026 headline regulations, specs, lessons and the development diary are in the handbook below: answer from it, get_team_upgrades or explain_regulation; don't search the web for them.
-- Team news, what a team is fighting, recent real upgrades: call get_team_story first. Use only its notes and stay on that team; if it has no notes, say the paddock is quiet on them and offer the diary or a part explanation.
-- The development diary is a teaching log of illustrative packages; say so when you use it.
+- How the car works, 2026 headline regulations, specs, lessons and each team's curated upgrades are in the handbook below: answer from it, get_team_upgrades or explain_regulation; don't search the web for them.
+- Team news, what a team is fighting this weekend, confirmed recent upgrades: call get_team_story first. Use only its notes and stay on that team; if it has no notes, say the paddock is quiet on them and offer their upgrades or a part explanation.
+- Call the curated packages "upgrades" when you talk to the user, never a "diary" or "teaching log".
 - web_search is for narrower follow-ups: scope "fia" = fia.com, "news" = last month, "any" = general.
 - Source chips appear under your answer automatically. Never read sources, URLs or outlet names aloud.
 
@@ -73,7 +73,7 @@ export function contextLine(c: GarageContext, today = new Date()): string {
     `today: ${today.toISOString().slice(0, 10)}`,
     `learning progress: parts seen ${c.progress.parts}, lessons ${c.progress.lessons}/${LESSONS.length}, regulations ${c.progress.regs}`,
     c.suggestedNext ? `suggested next: ${c.suggestedNext.kind} "${c.suggestedNext.label}"` : "suggested next: none, garage tour complete",
-    `diary snapshot: ${diary}`,
+    `upgrades snapshot: ${diary}`,
     race,
     c.mode === "studio" ? "style: garage briefing, connected paragraphs" : "style: pit-wall radio, terse calls only",
   ].filter(Boolean).join("; ")

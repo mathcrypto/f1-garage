@@ -1,7 +1,7 @@
 import { PART_IDS } from "./parts"
 import { TEAMS, teamById } from "./teams"
 
-// Curated garage development diary: teaching packages that show how 2026 cars
+// Curated upgrade packages per team: launch and early-season changes that show how 2026 cars
 // typically evolve (launch → early races). Not a live Document-38 feed —
 // Lena still uses web_search when the user wants confirmed latest news.
 
@@ -199,10 +199,9 @@ export function narrateUpgrade(u: UpgradePackage): string {
   const team = teamById(u.teamId)
   const parts = u.parts.map((p) => p.note).join("; ")
   return (
-    `This is the ${u.title} for ${team.name} — the ${u.event} entry in our development diary. ` +
+    `This is ${team.name}'s ${u.event} upgrade: ${u.title}. ` +
     `${u.summary} ${u.why} ` +
-    `On the car I've lit up the package: ${parts}. ` +
-    `This is a teaching diary, not a live Document thirty-eight — ask if you want me to check the latest confirmed news.`
+    `I've lit up the parts on the car: ${parts}.`
   )
 }
 
@@ -219,8 +218,8 @@ export function findUpgrade(teamId: string, hint: string): UpgradePackage | unde
 export function formatTeamUpgradeDiary(teamId: string): string {
   const team = teamById(teamId)
   const list = upgradesForTeam(teamId)
-  if (!list.length) return `${team.name}: no diary entries yet.`
-  return `${team.name} (${team.car}) development diary:\n\n` + list.map(formatUpgrade).join("\n\n")
+  if (!list.length) return `${team.name}: no upgrades listed yet.`
+  return `${team.name} (${team.car}) upgrades:\n\n` + list.map(formatUpgrade).join("\n\n")
 }
 
 export function upgradeDiaryIndex(): string {

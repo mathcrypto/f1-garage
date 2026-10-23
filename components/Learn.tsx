@@ -126,13 +126,13 @@ function TeamBriefing({ onAsk }: { onAsk?: (q: string) => void }) {
       {loading && <p className="muted small">Gathering FIA, media and team notes…</p>}
 
       {!loading && story && !story.available && (
-        <p className="muted small">Live team stories aren’t available right now. Diary packages below still teach the car.</p>
+        <p className="muted small">Live team news isn’t available right now. The upgrades below still show what changed on the car.</p>
       )}
 
       {!loading && story?.available && !story.bullets.length && (
         <p className="muted small">
           Nothing new on {team.name} in the trusted F1 sources right now — we won’t fill this with other teams or sponsor noise.
-          The teaching diary below still covers the car.
+          The upgrades below still show what changed on the car.
         </p>
       )}
 
@@ -193,7 +193,7 @@ function TeamBriefing({ onAsk }: { onAsk?: (q: string) => void }) {
   )
 }
 
-function UpgradeDiary({ onAsk }: { onAsk?: (q: string) => void }) {
+function Upgrades() {
   const teamId = useGarage((s) => s.teamId)
   const team = teamById(teamId)
   const list = upgradesForTeam(teamId)
@@ -203,7 +203,7 @@ function UpgradeDiary({ onAsk }: { onAsk?: (q: string) => void }) {
   return (
     <div className="upgrade-diary">
       <h5>
-        {team.name} development diary <small>teaching packages</small>
+        {team.name} upgrades
       </h5>
       <ul className="upgrade-list">
         {list.map((u) => (
@@ -214,21 +214,9 @@ function UpgradeDiary({ onAsk }: { onAsk?: (q: string) => void }) {
               </b>
               <small>{u.summary}</small>
             </button>
-            {onAsk && (
-              <button
-                type="button"
-                className="link"
-                onClick={() => onAsk(`Walk me through the ${u.title} package for ${team.name} and show it on the car.`)}
-              >
-                Ask Lena →
-              </button>
-            )}
           </li>
         ))}
       </ul>
-      <p className="muted small" style={{ marginTop: 8 }}>
-        Diary is a garage teaching log. Ask Lena for the latest confirmed news when you need race-weekend updates.
-      </p>
     </div>
   )
 }
@@ -277,7 +265,7 @@ export function Explore({ onAsk }: { onAsk?: (q: string) => void }) {
             ◆
           </span>
           <span>
-            <b>Latest diary: {latest.event}</b>
+            <b>Latest upgrade: {latest.event}</b>
             <small>{latest.title}</small>
           </span>
         </button>
@@ -329,7 +317,7 @@ export function Explore({ onAsk }: { onAsk?: (q: string) => void }) {
 
       <FactCard />
       <TeamBriefing onAsk={onAsk} />
-      <UpgradeDiary onAsk={onAsk} />
+      <Upgrades />
     </div>
   )
 }
@@ -395,7 +383,7 @@ export function PartCard({ onAsk }: { onAsk: (q: string) => void }) {
         </p>
         {current.key === "watchFor" && teamPacks.length > 0 && (
           <div className="part-upgrades">
-            <p className="eyebrow">{team.name} diary touching this part</p>
+            <p className="eyebrow">{team.name} upgrades to this part</p>
             {teamPacks.map((u) => (
               <button
                 key={u.id}
@@ -436,7 +424,7 @@ export function PartCard({ onAsk }: { onAsk: (q: string) => void }) {
           className="primary"
           onClick={() =>
             onAsk(
-              `What does the development diary say ${team.name} changed on the ${part.name.toLowerCase()}? Show the package on the car. If I need confirmed latest news beyond the diary, say so.`,
+              `What has ${team.name} changed on the ${part.name.toLowerCase()}? Show the upgrade on the car.`,
             )
           }
         >

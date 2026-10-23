@@ -30,7 +30,7 @@ ${car}
 ### 2026 regulations (headlines + short chapters)
 ${regs}
 
-### Team development diary (curated teaching packages — not a live Document-38 feed)
+### Team upgrades (curated packages, not a live feed)
 Index of packages (call get_team_upgrades for full text; show_upgrade to highlight on the car):
 ${upgradeDiaryIndex()}
 For confirmed race-weekend / team news, call get_team_story (FIA + trusted media + official team site). Use web_search only for narrower follow-ups.

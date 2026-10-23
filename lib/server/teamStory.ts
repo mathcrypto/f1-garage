@@ -216,7 +216,7 @@ export async function fetchTeamStory(teamId: string): Promise<TeamStory> {
 
 /** The briefing as data for the agent (behaviour rules are in its prompt). */
 export function formatTeamStory(story: TeamStory): string {
-  if (!story.available) return `Live team briefing unavailable (web search isn't configured). Use the development diary instead and say so briefly.`
+  if (!story.available) return `Live team briefing unavailable (web search isn't configured). Use the curated upgrades instead and say so briefly.`
   if (!story.bullets.length) return `No fresh race or technical notes about ${story.teamName} right now.`
   const tags: Record<StoryBullet["kind"], string> = { weekend: "Weekend", upgrade: "Upgrade", aero: "Aero", power: "Power unit", general: "Note" }
   const lines = story.bullets.map((b, i) => {

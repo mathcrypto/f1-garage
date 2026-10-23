@@ -310,10 +310,11 @@ export function EngineerPanel({ engineer }: { engineer: ReturnType<typeof useEng
             <div className="empty-hero">
               <Lena size={96} teamId={teamId} />
               <div>
-                <p className="empty-title">Hi, I&apos;m Lena.</p>
+                <p className="empty-title">Hi, I&apos;m Lena, your race engineer at {team.name}.</p>
                 <p>
-                  Ask about parts, {team.name}&apos;s development diary, or 2026 rules — I&apos;ll show it on the car. Turn on Deep analysis for the full
-                  technical brief, or ask me to open a race when you&apos;re ready to play.
+                  Ask me how any part of the {team.car} works, what {team.name}&apos;s latest upgrades changed, or what the 2026 rules mean for the car.
+                  I&apos;ll show you on the car as I explain. Switch on Deep analysis for the full technical briefing, or ask me to open the race lobby
+                  when you want to drive.
                 </p>
                 {suggest && (
                   <button
