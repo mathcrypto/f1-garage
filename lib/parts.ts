@@ -23,7 +23,7 @@ export const PARTS: Part[] = [
     regulation2026:
       "2026 wings are narrower and use active aerodynamics: the flaps open on straights (low-drag mode) and close for corners (high-downforce mode), replacing DRS as the drag-reduction tool.",
     watchFor: "New endplate shapes and flap profiles are the most common upgrade. Teams tune them to change balance between front and rear.",
-    specs: [["Elements", "Multi-element, with active flaps"], ["Modes", "Z-mode (corner) / X-mode (straight)"], ["Replaces", "DRS as the drag-reduction tool"]],
+    specs: [["Elements", "Multi-element, with active flaps"], ["Modes", "Corner Mode / Straight Mode"], ["Replaces", "DRS as the drag-reduction tool"]],
   },
   {
     id: "nose",
@@ -56,7 +56,7 @@ export const PARTS: Part[] = [
       "The monocoque is a carbon-fibre tub that every other part bolts to. The halo protects the driver's head from debris and impacts and can carry the weight of a double-decker bus.",
     regulation2026: "The halo and roll hoop load tests were strengthened for 2026.",
     watchFor: "Small aero fairings on the halo and mirror stays are frequent, cheap upgrades.",
-    specs: [["Survival cell", "Carbon-fibre monocoque"], ["Halo", "Titanium, strengthened for 2026"], ["Car + driver mass", "722 kg minimum"]],
+    specs: [["Survival cell", "Carbon-fibre monocoque"], ["Halo", "Titanium, strengthened for 2026"], ["Minimum mass", "724 kg + tyres"]],
   },
   {
     id: "sidepods",
@@ -79,7 +79,7 @@ export const PARTS: Part[] = [
     regulation2026:
       "2026 moves away from the full ground-effect tunnels of 2022–2025 toward a flatter floor with a smaller diffuser, cutting downforce and making the cars less ride-height sensitive.",
     watchFor: "Floor edges change almost every few races: they are the most powerful and most frequently updated aero part.",
-    specs: [["Concept", "Flatter floor, less ground effect"], ["Downforce (whole car)", "≈30% less than 2025"], ["Ride height", "Less sensitive than 2022–2025"]],
+    specs: [["Concept", "Flatter floor, less ground effect"], ["Downforce (whole car)", "Lower than 2025"], ["Ride height", "Less sensitive than 2022–2025"]],
   },
   {
     id: "engine-cover",
@@ -144,7 +144,7 @@ export const PARTS: Part[] = [
     regulation2026:
       "DRS is replaced by active aero: front and rear wing flaps move between a cornering mode and a low-drag straight-line mode. A separate 'overtake mode' gives the following car extra electrical energy.",
     watchFor: "Low-drag 'skinny' rear wings for fast tracks and the mechanisms that actuate the flaps.",
-    specs: [["Modes", "Z-mode (corner) / X-mode (straight)"], ["Drag (whole car)", "≈55% less than 2025"], ["Overtaking", "Overtake mode gives extra energy"]],
+    specs: [["Modes", "Corner Mode / Straight Mode"], ["Drag (whole car)", "Much lower than 2025"], ["Overtaking", "Overtake mode gives extra energy"]],
   },
   {
     id: "front-tyres",
@@ -155,7 +155,7 @@ export const PARTS: Part[] = [
       "Carbon discs work at over 1000 °C. Brake ducts cool them and blow heat into the wheel rim to keep the tyres in their working window.",
     regulation2026: "Tyres stay 18-inch but are narrower in 2026 to match the lighter, smaller car.",
     watchFor: "New brake duct and drum designs: small, but they change tyre warm-up and degradation.",
-    specs: [["Rim", "18-inch"], ["Width", "25 mm narrower than 2025"], ["Diameter", "≈15 mm smaller"], ["Brakes", "Carbon-carbon, over 1000 °C"]],
+    specs: [["Rim", "18-inch"], ["Width", "25 mm narrower than 2025"], ["Diameter", "≈10–15 mm smaller"], ["Brakes", "Carbon-carbon, over 1000 °C"]],
   },
   {
     id: "rear-tyres",
@@ -165,7 +165,7 @@ export const PARTS: Part[] = [
     howItWorks: "A brake-by-wire system balances friction braking and energy recovery so the driver feels a consistent pedal.",
     regulation2026: "With much stronger energy recovery, brake-by-wire calibration is a bigger engineering focus.",
     watchFor: "Rear brake duct and rim upgrades aimed at tyre temperature control.",
-    specs: [["Rim", "18-inch"], ["Width", "30 mm narrower than 2025"], ["Diameter", "≈10 mm smaller"], ["Braking", "Shared with MGU-K recovery"]],
+    specs: [["Rim", "18-inch"], ["Width", "30 mm narrower than 2025"], ["Diameter", "≈10–15 mm smaller"], ["Braking", "Shared with MGU-K recovery"]],
   },
 ]
 
@@ -176,9 +176,12 @@ export const PART_IDS = PARTS.map((p) => p.id)
 export const CAR_SPECS: [string, string][] = [
   ["Wheelbase", "3400 mm max (was 3600)"],
   ["Width", "1900 mm max (was 2000)"],
-  ["Minimum mass", "768 kg (722 kg car + driver, 46 kg tyres)"],
-  ["Downforce", "≈30% less than 2025"],
-  ["Drag", "≈55% less than 2025"],
+  ["Minimum mass", "724 kg + tyres, ≈770 kg (was 800)"],
+  ["Downforce", "Lower than 2025 (FIA aimed for −30%)"],
+  ["Drag", "Much lower than 2025 (FIA aimed for −55%)"],
   ["Wheels", "18-inch, narrower tyres"],
 ]
-export const SPEC_SOURCE = { label: "FIA: 2026 Formula 1 regulations", url: "https://fia.com/node/51855" }
+export const SPEC_SOURCE = {
+  label: "FIA: 2026 Formula 1 Technical Regulations",
+  url: "https://www.fia.com/sites/default/files/fia_2026_formula_1_technical_regulations_issue_8_-_2024-06-24.pdf",
+}

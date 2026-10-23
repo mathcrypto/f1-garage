@@ -181,7 +181,7 @@ export function Blueprint() {
       <Dimension from={[1.25, 0.02, 1.75]} to={[1.25, 0.02, -1.65]} label="Wheelbase 3400 mm (max)" />
       <Dimension from={[-0.95, 0.02, 3.05]} to={[0.95, 0.02, 3.05]} label="Width 1900 mm (max)" />
       <Dimension from={[-1.25, 0, 1.75]} to={[-1.25, 0.72, 1.75]} label="18-inch rim" tick={0.06} />
-      <Html position={[0, 1.5, 0.2]} center className="dim-wrap"><div className="dim strong">Min. mass 768 kg · −30% downforce · −55% drag</div></Html>
+      <Html position={[0, 1.5, 0.2]} center className="dim-wrap"><div className="dim strong">Min. mass 724 kg + tyres (≈770 kg) · less downforce and drag<small>Source: FIA 2026 Technical Regulations</small></div></Html>
     </group>
   )
 }

@@ -412,7 +412,7 @@ function Flap({ geometry, material, position, corner, straight }: { geometry: TH
   const ref = useRef<THREE.Mesh>(null!)
   const motion = useMotion()
   useFrame((_, dt) => {
-    // X-mode (straight) = flaps open/flat; Z-mode (corner) = flaps up for downforce.
+    // Straight Mode (straight) = flaps open/flat; Corner Mode (corner) = flaps up for downforce.
     const open = motion !== null && motion.aero === "straight"
     ref.current.rotation.x = THREE.MathUtils.damp(ref.current.rotation.x, open ? straight : corner, 14, dt)
   })

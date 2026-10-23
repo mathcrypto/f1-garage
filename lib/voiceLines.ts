@@ -35,7 +35,7 @@ export const lines = {
     "Early on the throttle out of the last corner. Long straight.",
     "Use all the exit kerb. Free lap time.",
     "Save the battery for the fight. Don't dump it lap one.",
-    "X-mode on the straight, Z before turn-in.",
+    "Straight Mode on the straight, Corner Mode before turn-in.",
   ],
   cornerSlow: "Hairpin. Big stop. Brake on the marker.",
   cornerMedium: "Medium coming. Brake early, prioritise exit.",

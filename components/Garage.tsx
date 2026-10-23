@@ -77,7 +77,7 @@ function DriveHud() {
           </div>
         )}
         <div className={`hud-aero ${t.aero}${t.boosting ? " boost" : ""}${t.focus === "aero" ? " focus" : ""}`}>
-          <b>{t.boosting ? "OVERTAKE" : t.aero === "straight" ? "X-MODE" : "Z-MODE"}</b>
+          <b>{t.boosting ? "OVERTAKE" : t.aero === "straight" ? "STRAIGHT MODE" : "CORNER MODE"}</b>
           <small>
             {t.boosting
               ? "Spending battery for speed"

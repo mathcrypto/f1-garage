@@ -11,7 +11,7 @@ export type TourPhase = {
   ers?: number
   batteryRate?: number
   boosting?: boolean
-  /** Big on-screen lesson title (e.g. "1 · X-mode"). */
+  /** Big on-screen lesson title (e.g. "1 · Straight Mode"). */
   title?: string
   /** Plain hint under the title. */
   hint?: string
@@ -49,29 +49,29 @@ export const TOUR_PHASES: TourPhase[] = [
     cam: "chase",
   },
 
-  // ── 1. X-mode — wings OPEN ───────────────────────────────────────────────
+  // ── 1. Straight Mode — wings OPEN ───────────────────────────────────────────────
   {
     until: L + 11,
     aero: "straight",
     ers: 0.4,
     batteryRate: -0.015,
-    title: "1 · X-mode",
+    title: "1 · Straight Mode",
     hint: "Wings opening on the car — less drag, more top speed",
     focus: "aero",
-    say: "X-mode. Watch the wings open. Less drag on the straight.",
+    say: "Straight Mode. Watch the wings open. Less drag on the straight.",
     cam: "tv",
   },
 
-  // ── 2. Z-mode — wings CLOSED ─────────────────────────────────────────────
+  // ── 2. Corner Mode — wings CLOSED ─────────────────────────────────────────────
   {
     until: L + 22,
     aero: "corner",
     ers: 0.08,
     batteryRate: 0.025,
-    title: "2 · Z-mode",
+    title: "2 · Corner Mode",
     hint: "Wings closing — more downforce, more grip",
     focus: "aero",
-    say: "Z-mode. Watch the wings close. More grip for the corner.",
+    say: "Corner Mode. Watch the wings close. More grip for the corner.",
     cam: "tv",
   },
 

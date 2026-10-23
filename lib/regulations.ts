@@ -15,7 +15,7 @@ export const REGULATIONS_2026: Regulation[] = [
     title: "Active aerodynamics replace DRS",
     body: "Front and rear wing flaps switch between a high-downforce cornering mode and a low-drag straight-line mode.",
     detail:
-      "In Z-mode (corners) the flaps stay closed for grip. In X-mode (straights) they open to cut drag. Unlike old DRS, both cars can use the system when the rules allow — overtaking help now comes more from energy (overtake mode) than from a one-car rear-wing slot. Teams spend a lot of development time on how fast the flaps move and how the car feels at the switch.",
+      "In Corner Mode the flaps stay closed for grip. In Straight Mode, on the straights, they open to cut drag. Unlike old DRS, both cars can use the system when the rules allow — overtaking help now comes more from energy (overtake mode) than from a one-car rear-wing slot. Teams spend a lot of development time on how fast the flaps move and how the car feels at the switch.",
     parts: ["front-wing", "rear-wing"],
   },
   {
@@ -71,7 +71,7 @@ export const REGULATIONS_2026: Regulation[] = [
     title: "When active aero may move",
     body: "Flap movement is controlled by the sporting and technical regulations — not free whenever the driver wants.",
     detail:
-      "X-mode and Z-mode switch under defined conditions (straight-line zones, speed, and safety overrides). Race control can force a mode for wet or incident cover. Engineers brief drivers on where the car will open and close so braking points stay consistent.",
+      "Straight Mode and Corner Mode switch under defined conditions (straight-line zones, speed, and safety overrides). Race control can force a mode for wet or incident cover. Engineers brief drivers on where the car will open and close so braking points stay consistent.",
     parts: ["front-wing", "rear-wing"],
   },
   {

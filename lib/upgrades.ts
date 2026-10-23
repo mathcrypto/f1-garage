@@ -91,9 +91,9 @@ const DIARY: UpgradePackage[] = [
     "Once the tunnel matches the track, they freeze a strong aero step and roll it out everywhere.",
     [["sidepods", "New undercut"], ["floor", "Baseline fence pack"], ["diffuser", "Matched exit"]]),
   pkg("mclaren", "silverstone", "Silverstone", "Low-drag active-aero map",
-    "Revised X-mode flap schedule and a thinner rear wing for the Hangar Straight.",
+    "Revised Straight Mode flap schedule and a thinner rear wing for the Hangar Straight.",
     "Home race: protect top speed while keeping Maggotts–Becketts confidence.",
-    [["rear-wing", "Thinner main plane"], ["front-wing", "X-mode schedule"], ["beam-wing", "Low-drag trim"]]),
+    [["rear-wing", "Thinner main plane"], ["front-wing", "Straight Mode schedule"], ["beam-wing", "Low-drag trim"]]),
 
   // Aston Martin
   pkg("astonmartin", "launch", "Launch", "AMR26 sidepod concept",
