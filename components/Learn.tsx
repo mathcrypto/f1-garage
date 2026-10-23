@@ -1,16 +1,16 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useState } from "react"
 import { startLesson } from "./EngineerCam"
 import { LESSONS } from "@/lib/lessons"
 import { SPEC_SOURCE, partById, type Part } from "@/lib/parts"
-import { nextLearningStep, useProgress } from "@/lib/progress"
+import { useProgress } from "@/lib/progress"
 import { REGULATIONS_2026 } from "@/lib/regulations"
 import { startShowcase } from "@/lib/showcase"
 import { useEngineerState, useGarage } from "@/lib/store"
 import { teamById } from "@/lib/teams"
 import type { TeamStory } from "@/lib/server/teamStory"
-import { latestUpgrade, upgradesForPart, upgradesForTeam, type UpgradePackage } from "@/lib/upgrades"
+import { upgradesForPart, upgradesForTeam, type UpgradePackage } from "@/lib/upgrades"
 
 // Bite-sized learning: one idea on screen at a time, more on demand.
 
@@ -120,7 +120,6 @@ function TeamBriefing({ onAsk }: { onAsk?: (q: string) => void }) {
             {team.name} <small>live briefing</small>
           </h5>
         </div>
-        {story?.cached && <span className="pill muted">Cached</span>}
       </div>
 
       {loading && <p className="muted small">Gathering FIA, media and team notes…</p>}
@@ -225,11 +224,6 @@ export function Explore({ onAsk }: { onAsk?: (q: string) => void }) {
   const teamId = useGarage((s) => s.teamId)
   const lesson = useEngineerState((s) => s.lesson)
   const team = teamById(teamId)
-  const partsSeen = useProgress((s) => s.parts)
-  const lessonsSeen = useProgress((s) => s.lessons)
-  const regsSeen = useProgress((s) => s.regs)
-  const suggest = useMemo(() => nextLearningStep(partsSeen, lessonsSeen, regsSeen), [partsSeen, lessonsSeen, regsSeen])
-  const latest = latestUpgrade(teamId)
 
   useEffect(() => {
     useProgress.getState().hydrate()
@@ -255,40 +249,6 @@ export function Explore({ onAsk }: { onAsk?: (q: string) => void }) {
           <small>Take-apart, X-ray, then out on track</small>
         </span>
       </button>
-
-      {latest && onAsk && (
-        <button
-          className="watch diary-cta"
-          onClick={() => onAsk(`Walk me through ${team.name}'s latest upgrade package on the car`)}
-        >
-          <span className="watch-play" aria-hidden>
-            ◆
-          </span>
-          <span>
-            <b>Latest upgrade: {latest.event}</b>
-            <small>{latest.title}</small>
-          </span>
-        </button>
-      )}
-
-      {suggest && onAsk && (
-        <p className="muted small">
-          Keep learning:{" "}
-          <button
-            className="link"
-            type="button"
-            onClick={() => {
-              if (suggest.kind === "lesson") startLesson(suggest.id)
-              else if (suggest.kind === "part") {
-                useGarage.getState().select(suggest.id)
-                onAsk(`Explain the ${suggest.label.toLowerCase()} simply`)
-              } else onAsk(`Explain the 2026 regulation: ${suggest.label}`)
-            }}
-          >
-            {suggest.label} →
-          </button>
-        </p>
-      )}
 
       <h5>Learn with Lena</h5>
       <div className="lesson-rail">

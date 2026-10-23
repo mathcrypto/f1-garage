@@ -274,7 +274,6 @@ export function EngineerPanel({ engineer }: { engineer: ReturnType<typeof useEng
     `Walk me through ${team.name}'s latest upgrade package on the car`,
     part ? `Take apart the ${part.name.toLowerCase()} and explain it` : "Show me how active aero works",
     "Explain the 2026 power split regulation and highlight it on the car",
-    "Open the race lobby — I want to race",
   ]
 
   return (
@@ -313,8 +312,7 @@ export function EngineerPanel({ engineer }: { engineer: ReturnType<typeof useEng
                 <p className="empty-title">Hi, I&apos;m Lena, your race engineer at {team.name}.</p>
                 <p>
                   Ask me how any part of the {team.car} works, what {team.name}&apos;s latest upgrades changed, or what the 2026 rules mean for the car.
-                  I&apos;ll show you on the car as I explain. Switch on Deep analysis for the full technical briefing, or ask me to open the race lobby
-                  when you want to drive.
+                  I&apos;ll show you on the car as I explain. Switch on Deep analysis when you want the full technical briefing.
                 </p>
                 {suggest && (
                   <button

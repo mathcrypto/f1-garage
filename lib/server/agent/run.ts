@@ -104,11 +104,13 @@ export async function runAgent(turns: ChatTurn[], emit: Emit, signal: AbortSigna
   const snapshot = await standingsNote(lastUser, priorUser, live, season)
   if (snapshot) messages.push({ role: "system", content: snapshot })
 
-  let thinking = deep
-  const step = async (final: boolean) => {
-    // Answer steps don't use thinking: Nemotron can put the whole reply in
-    // reasoning_content, which would never reach the voice.
-    const useThinking = thinking && !final
+  let thinkingSwitch = true
+  const step = async (first: boolean, final: boolean) => {
+    // Thinking only for planning the first step in Deep analysis. Nemotron
+    // thinks by default, so it is switched off explicitly everywhere else:
+    // once tool results are in, it tends to start the reply in
+    // reasoning_content, and that part would never reach the voice.
+    const useThinking = deep && first && !final
     const body = {
       model: env.nebius.model,
       messages,
@@ -116,14 +118,14 @@ export async function runAgent(turns: ChatTurn[], emit: Emit, signal: AbortSigna
       max_tokens: deep ? 16000 : 8000,
       temperature: deep ? 0.5 : 0.6,
       stream: true as const,
-      ...(useThinking ? { chat_template_kwargs: { enable_thinking: true } } : {}),
+      ...(thinkingSwitch ? { chat_template_kwargs: { enable_thinking: useThinking } } : {}),
     }
     try {
       return await nebius().chat.completions.create(body, { signal })
     } catch (error) {
       // Not every deployment accepts the thinking switch; retry once without it.
-      if (!useThinking || !(error instanceof OpenAI.BadRequestError)) throw error
-      thinking = false
+      if (!thinkingSwitch || !(error instanceof OpenAI.BadRequestError)) throw error
+      thinkingSwitch = false
       const { chat_template_kwargs: _ignored, ...plain } = body as typeof body & { chat_template_kwargs?: unknown }
       return nebius().chat.completions.create(plain, { signal })
     }
@@ -142,7 +144,7 @@ export async function runAgent(turns: ChatTurn[], emit: Emit, signal: AbortSigna
     for (let toolSteps = 0; ; toolSteps++) {
       const final = toolSteps >= MAX_TOOL_STEPS
       if (final) messages.push({ role: "system", content: "Tool budget used. Answer now from the results above, in plain text." })
-      const stream = await step(final)
+      const stream = await step(toolSteps === 0, final)
       const split = thinkSplitter()
       let content = ""
       let reasoning = ""

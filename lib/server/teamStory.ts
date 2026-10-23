@@ -24,7 +24,6 @@ export type TeamStory = {
   teamName: string
   car: string
   fetchedAt: string
-  cached: boolean
   available: boolean
   bullets: StoryBullet[]
   sources: StorySource[]
@@ -32,7 +31,6 @@ export type TeamStory = {
 }
 
 const STORY_TTL_S = 2700
-const FRESH_MS = 10_000 // younger than this counts as freshly fetched
 
 function outletOf(url: string): string {
   try {
@@ -130,7 +128,7 @@ async function runQuery(query: string, domains: string[], opts?: { fiaOnly?: boo
   }))
 }
 
-function buildStory(teamId: string, hits: SearchHit[], cached: boolean): TeamStory {
+function buildStory(teamId: string, hits: SearchHit[]): TeamStory {
   const team = teamById(teamId)
   const site = teamSite(teamId)
   const allow = storyAllowDomains(teamId)
@@ -165,7 +163,6 @@ function buildStory(teamId: string, hits: SearchHit[], cached: boolean): TeamSto
     teamName: team.name,
     car: team.car,
     fetchedAt: new Date().toISOString(),
-    cached,
     available: true,
     bullets,
     sources: sources.slice(0, 8),
@@ -180,7 +177,6 @@ function unavailableStory(teamId: string): TeamStory {
     teamName: team.name,
     car: team.car,
     fetchedAt: new Date().toISOString(),
-    cached: false,
     available: false,
     bullets: [],
     sources: [],
@@ -201,7 +197,7 @@ async function loadTeamStory(teamId: string): Promise<TeamStory | null> {
   ])
   if (results.every((r) => r === null)) return null // search is down: don't cache an empty briefing
   const [fia, newsA, newsB] = results.map((r) => r ?? [])
-  return buildStory(team.id, [...newsA, ...newsB, ...fia], false)
+  return buildStory(team.id, [...newsA, ...newsB, ...fia])
 }
 
 const cachedStory = cachedLoader(loadTeamStory, ["team-story", "v7"], { revalidate: STORY_TTL_S, tags: ["team-story"] })
@@ -209,9 +205,7 @@ const cachedStory = cachedLoader(loadTeamStory, ["team-story", "v7"], { revalida
 export async function fetchTeamStory(teamId: string): Promise<TeamStory> {
   const id = teamById(teamId).id
   if (!searchAvailable()) return unavailableStory(id)
-  const story = await cachedStory(id)
-  if (!story) return unavailableStory(id)
-  return { ...story, cached: Date.now() - new Date(story.fetchedAt).getTime() > FRESH_MS }
+  return (await cachedStory(id)) ?? unavailableStory(id)
 }
 
 /** The briefing as data for the agent (behaviour rules are in its prompt). */

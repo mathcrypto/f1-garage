@@ -762,7 +762,6 @@ p { margin: 0; }
 .upgrade-row small { color: var(--muted); font-size: 12px; line-height: 1.35; }
 .upgrade-row.compact { padding: 8px 10px; margin-top: 8px; }
 .part-upgrades { margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--line); }
-.diary-cta { margin-top: 8px; }
 .all-specs { margin-top: 14px; }
 .all-specs summary { cursor: pointer; color: var(--muted); font: 600 12.5px/1 var(--display); }
 .all-specs .specs { margin-top: 10px; }
