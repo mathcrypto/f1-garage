@@ -501,7 +501,7 @@ function resolveWallContacts() {
     c.lat = sign * WALL_HIT
     c.latTarget = sign * (WALL_HIT - Math.min(1.2, 0.4 + pen))
     c.v *= Math.max(0.45, 1 - 0.55 * Math.min(1, pen + 0.2))
-    c.motion.brake = Math.max(c.motion.brake, 0.7)
+    c.motion.braking = Math.max(c.motion.braking, 0.7)
   }
 }
 
