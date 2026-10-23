@@ -258,9 +258,7 @@ export function EngineerPanel({ engineer }: { engineer: ReturnType<typeof useEng
   const [input, setInput] = useState("")
   const logRef = useRef<HTMLDivElement>(null)
   const teamId = useGarage((s) => s.teamId)
-  const selected = useGarage((s) => s.selected)
   const team = teamById(teamId)
-  const part = selected ? partById(selected) : undefined
   const partsSeen = useProgress((s) => s.parts)
   const lessonsSeen = useProgress((s) => s.lessons)
   const regsSeen = useProgress((s) => s.regs)
@@ -269,12 +267,6 @@ export function EngineerPanel({ engineer }: { engineer: ReturnType<typeof useEng
   useEffect(() => {
     logRef.current?.scrollTo({ top: logRef.current.scrollHeight, behavior: "smooth" })
   }, [messages])
-
-  const quick = [
-    `Walk me through ${team.name}'s latest upgrade package on the car`,
-    part ? `Take apart the ${part.name.toLowerCase()} and explain it` : "Show me how active aero works",
-    "Explain the 2026 power split regulation and highlight it on the car",
-  ]
 
   return (
     <div className="engineer">
@@ -381,13 +373,6 @@ export function EngineerPanel({ engineer }: { engineer: ReturnType<typeof useEng
         })}
       </div>
 
-      <div className="quick">
-        {quick.map((q) => (
-          <button key={q} className="chip" disabled={busy} onClick={() => ask(q)}>
-            {q}
-          </button>
-        ))}
-      </div>
       <form
         className="composer"
         onSubmit={(e) => {
