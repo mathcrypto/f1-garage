@@ -3,7 +3,7 @@ import { TEAMS, teamById } from "./teams"
 
 // Real 2026 upgrades, one entry per declared package. Every entry comes from
 // the FIA's per-event "car presentation submissions" document or from F1
-// media reporting it, and links its source. Nothing here is invented: when a
+// media reporting it, and links its sources. Nothing here is invented: when a
 // report doesn't say which part changed, the entry is left out. Lena uses
 // get_team_story / web_search for anything newer than this list.
 
@@ -18,7 +18,8 @@ export type UpgradePackage = {
   title: string
   summary: string
   parts: { id: string; note: string }[]
-  source: UpgradeSource
+  /** Where to check it: the FIA document and/or the reports it came from. */
+  sources: UpgradeSource[]
 }
 
 const fia = (event: string, slug: string): UpgradeSource => ({
@@ -38,7 +39,7 @@ function pkg(
   title: string,
   summary: string,
   parts: [string, string][],
-  source: UpgradeSource,
+  source: UpgradeSource | UpgradeSource[],
 ): UpgradePackage {
   return {
     id: `${teamId}-${key}`,
@@ -48,7 +49,7 @@ function pkg(
     title,
     summary,
     parts: parts.filter(([pid]) => PART_IDS.includes(pid)).map(([pid, note]) => ({ id: pid, note })),
-    source,
+    sources: Array.isArray(source) ? source : [source],
   }
 }
 
@@ -127,9 +128,12 @@ const UPGRADES: UpgradePackage[] = [
     [["front-wing", "Revised"]],
     fia("Japanese GP", "japanese")),
   pkg("astonmartin", "hungary", "Hungarian", "2026-07-24", "Sixteen-part B-spec",
-    "Sixteen declared updates, including a reworked front wing, a new nose and changes across all the permitted floor surfaces.",
-    [["front-wing", "Reworked"], ["nose", "New nose"], ["floor", "All floor surfaces"]],
-    { title: "Motorsport Week: Aston Martin B-spec AMR26 in Budapest", url: "https://www.motorsportweek.com/2026/07/24/aston-martin-f1-upgrades/" }),
+    "Sixteen declared updates, including a much slimmer nose, front wing changes and revised floor surfaces, aimed at giving the diffuser a more robust airflow.",
+    [["front-wing", "Revised"], ["nose", "Much slimmer nose"], ["floor", "Revised floor surfaces"], ["diffuser", "More robust airflow"]],
+    [
+      { title: "Formula1.com: A closer look at Aston Martin's major upgrades", url: "https://www.formula1.com/en/latest/article/a-closer-look-at-aston-martins-major-upgrades-and-the-overall-theme-they-are-chasing.6Ob4CsAvJA3H4ZoB7YYRlk" },
+      { title: "Motorsport Week: Aston Martin B-spec AMR26 in Budapest", url: "https://www.motorsportweek.com/2026/07/24/aston-martin-f1-upgrades/" },
+    ]),
 
   // Alpine
   pkg("alpine", "dutch", "Dutch", "2026-08-21", "First major package",
@@ -218,7 +222,7 @@ export function upgradeMonth(u: UpgradePackage): string {
 export function formatUpgrade(u: UpgradePackage): string {
   const team = teamById(u.teamId)
   const parts = u.parts.map((p) => `${p.id}: ${p.note}`).join("; ")
-  return `[${u.id}] ${u.event} GP, ${upgradeMonth(u)}: ${u.title} (${team.name})\n${u.summary}\nParts: ${parts}\nSource: ${u.source.title} (${u.source.url})`
+  return `[${u.id}] ${u.event} GP, ${upgradeMonth(u)}: ${u.title} (${team.name})\n${u.summary}\nParts: ${parts}\nSources: ${u.sources.map((s) => `${s.title} (${s.url})`).join("; ")}`
 }
 
 /** Spoken briefing if the model highlights but never writes an answer. */
@@ -251,4 +255,4 @@ export function upgradesIndex(): string {
 }
 
 /** Source links for a list of packages, shown as Lena's source chips. */
-export const upgradeSources = (list: UpgradePackage[]) => list.map((u) => u.source)
+export const upgradeSources = (list: UpgradePackage[]) => list.flatMap((u) => u.sources)

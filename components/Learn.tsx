@@ -62,7 +62,20 @@ function FactCard() {
   )
 }
 
-/** The team's curated upgrade packages as a timeline; tapping one lights it up on the car. */
+/** Links to check an upgrade: the FIA document and/or the reports it came from. */
+function UpgradeSources({ u }: { u: UpgradePackage }) {
+  return (
+    <span className="upgrade-sources">
+      {u.sources.map((s) => (
+        <a key={s.url} href={s.url} target="_blank" rel="noreferrer" title={s.title}>
+          Check source: {s.title.split(":")[0]} ↗
+        </a>
+      ))}
+    </span>
+  )
+}
+
+/** The team's sourced 2026 upgrades as a timeline; tapping one lights it up on the car. */
 function Upgrades() {
   const teamId = useGarage((s) => s.teamId)
   const highlights = useGarage((s) => s.highlights)
@@ -107,9 +120,7 @@ function Upgrades() {
                 ))}
               </span>
             </button>
-            <a className="upgrade-source" href={u.source.url} target="_blank" rel="noreferrer">
-              Source: {u.source.title}
-            </a>
+            <UpgradeSources u={u} />
           </li>
         ))}
       </ol>
@@ -238,17 +249,15 @@ export function PartCard({ onAsk }: { onAsk: (q: string) => void }) {
           <div className="part-upgrades">
             <p className="eyebrow">{team.name} upgrades to this part</p>
             {teamPacks.map((u) => (
-              <button
-                key={u.id}
-                type="button"
-                className="upgrade-row compact"
-                onClick={() => useGarage.getState().setHighlights(u.parts)}
-              >
-                <b>
-                  {u.event} GP: {u.title}
-                </b>
-                <small>{u.parts.find((p) => p.id === part.id)?.note ?? u.summary}</small>
-              </button>
+              <div key={u.id}>
+                <button type="button" className="upgrade-row compact" onClick={() => useGarage.getState().setHighlights(u.parts)}>
+                  <b>
+                    {u.event} GP: {u.title}
+                  </b>
+                  <small>{u.parts.find((p) => p.id === part.id)?.note ?? u.summary}</small>
+                </button>
+                <UpgradeSources u={u} />
+              </div>
             ))}
           </div>
         )}
