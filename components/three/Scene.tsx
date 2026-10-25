@@ -4,7 +4,7 @@
  */
 "use client"
 
-import { CameraControls, ContactShadows, Environment, MeshReflectorMaterial } from "@react-three/drei"
+import { CameraControls, ContactShadows, Environment, Lightformer, MeshReflectorMaterial } from "@react-three/drei"
 import { Canvas, useFrame, useThree } from "@react-three/fiber"
 import { Bloom, EffectComposer, SSAO, Vignette } from "@react-three/postprocessing"
 import { BlendFunction } from "postprocessing"
@@ -94,20 +94,38 @@ function Studio() {
       <mesh rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
         <circleGeometry args={[14, 64]} />
         <MeshReflectorMaterial
-          blur={[400, 120]}
-          resolution={512}
-          mixBlur={1}
-          mixStrength={8}
-          roughness={0.92}
-          depthScale={0.9}
+          blur={[300, 90]}
+          resolution={1024}
+          mixBlur={0.8}
+          mixStrength={14}
+          roughness={0.78}
+          depthScale={1.1}
           minDepthThreshold={0.4}
-          maxDepthThreshold={1.2}
-          color="#0a0b0f"
-          metalness={0.35}
-          mirror={0.28}
+          maxDepthThreshold={1.3}
+          color="#030304"
+          metalness={0.5}
+          mirror={0.45}
+          envMapIntensity={0.05}
         />
       </mesh>
     </>
+  )
+}
+
+/**
+ * What the car reflects in the garage: the studio HDR plus large softboxes, the
+ * way car product shots are lit. The long overhead strip and side panels draw
+ * the smooth highlights along the bodywork; the rim light outlines the car.
+ */
+function StudioReflections() {
+  return (
+    <Environment files="/models/studio.hdr" resolution={512} background={false} environmentIntensity={0.55}>
+      <Lightformer form="rect" intensity={1.5} color="#ffffff" position={[0, 6, 0]} rotation-x={Math.PI / 2} scale={[12, 3, 1]} />
+      <Lightformer form="rect" intensity={1.4} color="#ffffff" position={[0, 5, -6]} rotation-x={Math.PI / 3} scale={[10, 1.2, 1]} />
+      <Lightformer form="rect" intensity={1.6} color="#f2f5ff" position={[-7, 2, 0]} rotation-y={Math.PI / 2} scale={[14, 2, 1]} />
+      <Lightformer form="rect" intensity={1.6} color="#fff6ec" position={[7, 2, 0]} rotation-y={-Math.PI / 2} scale={[14, 2, 1]} />
+      <Lightformer form="ring" intensity={0.8} color="#ffffff" position={[0, 3, 9]} scale={4} />
+    </Environment>
   )
 }
 
@@ -145,11 +163,11 @@ export default function Scene() {
     >
       <color attach="background" args={[technical ? "#0b0303" : onTrack ? "#87b5d9" : "#08090c"]} />
       <fog attach="fog" args={[technical ? "#0b0303" : onTrack ? "#a8c8e0" : "#08090c", onTrack ? 140 : 16, onTrack ? 1100 : 32]} />
-      <ambientLight intensity={onTrack ? 0.55 : 0.32} />
+      <ambientLight intensity={onTrack ? 0.55 : 0.12} />
       {/* Studio: soft key/fill. Track: daylight sun + sky. */}
       <directionalLight
         position={onTrack ? [60, 90, 40] : [4, 10, 3]}
-        intensity={onTrack ? 1.85 : 0.95}
+        intensity={onTrack ? 1.85 : 1}
         color={onTrack ? "#fff4e0" : "#ffffff"}
         castShadow={!onTrack}
         shadow-mapSize={[2048, 2048]}
@@ -164,10 +182,14 @@ export default function Scene() {
       {onTrack && <hemisphereLight args={["#cfe6ff", "#6b8f4e", 0.55]} />}
       {onTrack && <directionalLight position={[-40, 30, -50]} intensity={0.35} color="#a8c4e0" />}
       <spotLight position={[-6, 5, -6]} intensity={onTrack ? 0 : 8} angle={0.55} penumbra={1} color={team.livery.primary} />
-      {!onTrack && <spotLight position={[4, 8, 5]} intensity={7} angle={0.65} penumbra={1} color="#f4f6fa" />}
+      {!onTrack && <spotLight position={[4, 8, 5]} intensity={5} angle={0.65} penumbra={1} color="#f4f6fa" />}
 
       <Suspense fallback={null}>
-        <Environment files="/models/studio.hdr" resolution={512} background={false} blur={0.85} environmentIntensity={onTrack ? 0.45 : 0.28} />
+        {onTrack ? (
+          <Environment files="/models/studio.hdr" resolution={512} background={false} blur={0.85} environmentIntensity={0.45} />
+        ) : (
+          <StudioReflections />
+        )}
         {/* key forces a clean remount if HMR left stale scenery in the scene graph. */}
         <group visible={onTrack}><Circuit key="circuit-monza-no-trees" /></group>
         {onTrack ? (
@@ -182,7 +204,7 @@ export default function Scene() {
             <Ring color={team.livery.primary} />
             <Airflow />
             <Blueprint />
-            <ContactShadows position={[0, 0.004, 0]} opacity={0.55} scale={10} blur={3.2} far={1.8} resolution={1024} frames={1} />
+            <ContactShadows position={[0, 0.004, 0]} opacity={0.8} scale={10} blur={2.4} far={1.6} resolution={1024} frames={1} />
           </>
         )}
         <Smoke />

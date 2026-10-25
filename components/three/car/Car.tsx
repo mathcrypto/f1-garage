@@ -96,15 +96,16 @@ function cachedLivery(id: string, design: ReturnType<typeof liveryFor>) {
 }
 
 function finishParams(finish: "gloss" | "matte" | "satin") {
-  // Tuned toward product-shot refs: soft satin body, readable colour, no chrome.
+  // Automotive paint: a coloured base under a clear coat that catches the
+  // studio softboxes. Matte liveries keep a little sheen but no mirror.
   if (finish === "matte") {
     return {
       metalness: 0.04,
-      roughness: 0.72,
-      clearcoat: 0.08,
-      clearcoatRoughness: 0.65,
-      reflectivity: 0.12,
-      envMapIntensity: 0.28,
+      roughness: 0.62,
+      clearcoat: 0.15,
+      clearcoatRoughness: 0.5,
+      reflectivity: 0.2,
+      envMapIntensity: 0.55,
       sheen: 0.2,
       sheenRoughness: 0.8,
       sheenColor: new THREE.Color("#b8b8bc"),
@@ -113,24 +114,23 @@ function finishParams(finish: "gloss" | "matte" | "satin") {
   if (finish === "satin") {
     return {
       metalness: 0.08,
-      roughness: 0.48,
-      clearcoat: 0.22,
-      clearcoatRoughness: 0.35,
-      reflectivity: 0.22,
-      envMapIntensity: 0.4,
+      roughness: 0.42,
+      clearcoat: 0.6,
+      clearcoatRoughness: 0.2,
+      reflectivity: 0.35,
+      envMapIntensity: 0.8,
       sheen: 0.06,
       sheenRoughness: 0.6,
       sheenColor: new THREE.Color("#b8b8bc"),
     }
   }
-  // “Gloss” still kept restrained — soft automotive, not wet mirror.
   return {
     metalness: 0.1,
-    roughness: 0.38,
-    clearcoat: 0.4,
-    clearcoatRoughness: 0.18,
-    reflectivity: 0.28,
-    envMapIntensity: 0.45,
+    roughness: 0.34,
+    clearcoat: 1,
+    clearcoatRoughness: 0.06,
+    reflectivity: 0.45,
+    envMapIntensity: 1,
     sheen: 0,
     sheenRoughness: 0.5,
     sheenColor: new THREE.Color("#b8b8bc"),
@@ -185,11 +185,11 @@ function useMaterials(team: Team) {
         map: carbonMap,
         normalMap: carbonNormal,
         normalScale: new THREE.Vector2(0.55, 0.55),
-        roughness: 0.48,
+        roughness: 0.42,
         metalness: 0.28,
-        clearcoat: 0.4,
-        clearcoatRoughness: 0.28,
-        envMapIntensity: 0.4,
+        clearcoat: 0.85,
+        clearcoatRoughness: 0.1,
+        envMapIntensity: 0.75,
       }),
       floorCarbon: new THREE.MeshPhysicalMaterial({
         color: "#121316",
@@ -210,20 +210,20 @@ function useMaterials(team: Team) {
         map: carbonMap,
         normalMap: carbonNormal,
         normalScale: new THREE.Vector2(0.7, 0.7),
-        roughness: 0.78,
-        metalness: 0.12,
-        clearcoat: 0.12,
-        clearcoatRoughness: 0.55,
-        envMapIntensity: 0.22,
+        roughness: 0.6,
+        metalness: 0.15,
+        clearcoat: 0.45,
+        clearcoatRoughness: 0.25,
+        envMapIntensity: 0.5,
       }),
       // Halo colour from livery (Ferrari 2026 show car = black; others often white).
       halo: new THREE.MeshPhysicalMaterial({
         color: design.halo ?? "#f2f2f4",
-        roughness: 0.5,
+        roughness: 0.4,
         metalness: 0.12,
-        clearcoat: 0.18,
-        clearcoatRoughness: 0.42,
-        envMapIntensity: 0.32,
+        clearcoat: 0.7,
+        clearcoatRoughness: 0.12,
+        envMapIntensity: 0.75,
       }),
       matte: new THREE.MeshStandardMaterial({ color: "#121316", roughness: 0.78, metalness: 0.06 }),
       inlet: new THREE.MeshStandardMaterial({ color: "#030304", roughness: 0.95, metalness: 0 }),
@@ -238,7 +238,7 @@ function useMaterials(team: Team) {
         sheenColor: new THREE.Color("#2a2a2e"),
         envMapIntensity: 0.2,
       }),
-      rim: new THREE.MeshPhysicalMaterial({ color: "#2a2c32", roughness: 0.32, metalness: 0.85, clearcoat: 0.3, clearcoatRoughness: 0.28, envMapIntensity: 0.55 }),
+      rim: new THREE.MeshPhysicalMaterial({ color: "#3a3d44", roughness: 0.26, metalness: 0.9, clearcoat: 0.5, clearcoatRoughness: 0.15, envMapIntensity: 0.9 }),
       metal: new THREE.MeshStandardMaterial({ color: "#b0b5bc", roughness: 0.32, metalness: 0.9, envMapIntensity: 0.55 }),
       titanium: new THREE.MeshPhysicalMaterial({ color: "#6a6e75", roughness: 0.35, metalness: 0.85, clearcoat: 0.25, clearcoatRoughness: 0.35 }),
       brass: new THREE.MeshStandardMaterial({ color: "#b8925a", roughness: 0.35, metalness: 0.9 }),
@@ -385,6 +385,9 @@ function Wheel({ geo, m, side, front }: { geo: Geo; m: Mats; side: 1 | -1; front
           </mesh>
           <mesh material={m.rim} rotation={[0, 0, Math.PI / 2]} position={[side * (half + 0.002), 0, 0]}>
             <cylinderGeometry args={[0.048, 0.048, 0.028, 20]} />
+          </mesh>
+          <mesh material={m.rim} rotation={[0, Math.PI / 2, 0]} position={[side * (half - 0.004), 0, 0]}>
+            <torusGeometry args={[0.222, 0.011, 10, 64]} />
           </mesh>
           <mesh material={m.pirelli} rotation={[0, Math.PI / 2, 0]} position={[side * (half + 0.004), 0, 0]}>
             <torusGeometry args={[0.295, 0.008, 8, 64]} />
