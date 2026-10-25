@@ -2,9 +2,10 @@ import * as THREE from "three"
 import monza from "./circuits/monza.json"
 
 /**
- * Active circuit: Autodromo Nazionale Monza at near-FIA length (~5.8 km).
- * Centerline from open bacinger/f1-circuits GeoJSON (not affiliated with F1/FIA).
- * Mild parkland elevation is synthesised — the source outline is 2D.
+ * Active circuit: Autodromo Nazionale Monza, raced clockwise.
+ * Centerline from bacinger/f1-circuits (MIT, not affiliated with F1/FIA),
+ * scaled so the lap is the official 5793 m. The source outline is 2D, so the
+ * track is flat rather than guessing elevation.
  */
 
 export type CircuitDef = {
@@ -13,10 +14,19 @@ export type CircuitDef = {
   control: [number, number][]
 }
 
+/** Official lap length in metres (FIA; same as the source dataset). */
+const OFFICIAL_LENGTH = monza.lengthTarget
+
+const spline = (points: [number, number][]) =>
+  new THREE.CatmullRomCurve3(points.map(([x, z]) => new THREE.Vector3(x, 0, z)), true, "centripetal")
+
+// Spline smoothing shortens the outline slightly; scale it back to the real lap.
+const scale = OFFICIAL_LENGTH / spline(monza.control as [number, number][]).getLength()
+
 export const ACTIVE_CIRCUIT: CircuitDef = {
   id: monza.id,
   name: monza.name,
-  control: monza.control as [number, number][],
+  control: (monza.control as [number, number][]).map(([x, z]) => [x * scale, z * scale]),
 }
 
 export const ROAD_WIDTH = 14
@@ -29,11 +39,7 @@ const A_LAT = 40
 const A_BRAKE = 48
 const accel = (v: number) => 4 + 13 * (1 - v / VMAX)
 
-const curve = new THREE.CatmullRomCurve3(
-  ACTIVE_CIRCUIT.control.map(([x, z]) => new THREE.Vector3(x, 0, z)),
-  true,
-  "centripetal",
-)
+const curve = spline(ACTIVE_CIRCUIT.control)
 export const LENGTH = Math.round(curve.getLength())
 const N = LENGTH
 
@@ -58,13 +64,9 @@ const startU = (() => {
   return best
 })()
 
-/** Soft Monza-like undulation (metres) — keep amplitude small so scenery stays clear. */
-const elev = (u: number) => 0.55 * Math.sin(u * Math.PI * 2) + 0.25 * Math.sin(u * Math.PI * 4 + 0.9)
-
 for (let i = 0; i < N; i++) {
   const u = (startU + i / N) % 1
   const p = curve.getPointAt(u)
-  p.y = elev(u)
   pos.push(p)
   tan.push(curve.getTangentAt(u).normalize())
 }
