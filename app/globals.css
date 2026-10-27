@@ -204,6 +204,8 @@ p { margin: 0; }
 .offline-card p { color: var(--muted); font-size: 13px; line-height: 1.5; }
 .offline-card button { grid-column: 2; justify-self: start; margin-top: 8px; padding: 8px 14px; border-radius: 10px; border: 1px solid var(--line-strong); font: 700 12.5px/1 var(--display); letter-spacing: 0.04em; transition: border-color 0.2s; }
 .offline-card button:hover { border-color: var(--team); }
+.data-note { margin-top: 10px; padding: 8px 10px; border-radius: 8px; background: color-mix(in srgb, var(--warn) 10%, transparent); color: #f3dfa2; font-size: 12.5px; line-height: 1.4; }
+.data-source { margin-top: 8px; color: var(--muted); font-size: 11px; }
 .pcard { padding: 16px; border-radius: 14px; background: var(--raised); border: 1px solid var(--line); }
 .pcard header { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; margin-bottom: 10px; }
 .pcard h4 { font: 700 12px/1 var(--display); letter-spacing: 0.12em; text-transform: uppercase; display: flex; align-items: center; gap: 6px; }

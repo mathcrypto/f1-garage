@@ -103,7 +103,10 @@ async function loadTeamNews(teamId: string): Promise<NewsItem[] | null> {
     if (!isRelevantTeamArticle(hit.title, hit.content ?? "", team.id, hit.url)) continue
     scored.push({ hit, score: newsScore(hit.title, hit.content ?? "", hit.url) })
   }
-  scored.sort((a, b) => b.score - a.score)
+  // Newest first: a relevant article from yesterday beats a better match from
+  // three weeks ago. Undated hits go last.
+  const time = (d?: string) => (d ? Date.parse(d) || 0 : 0)
+  scored.sort((a, b) => time(b.hit.publishedDate) - time(a.hit.publishedDate) || b.score - a.score)
   return scored.slice(0, 8).map(({ hit }) => ({
     title: hit.title,
     url: hit.url,
@@ -112,4 +115,4 @@ async function loadTeamNews(teamId: string): Promise<NewsItem[] | null> {
   }))
 }
 
-export const teamNews = cachedLoader(loadTeamNews, ["team-news", "v8"], { revalidate: 900, tags: ["team-news"] })
+export const teamNews = cachedLoader(loadTeamNews, ["team-news", "v9"], { revalidate: 900, tags: ["team-news"] })

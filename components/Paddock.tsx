@@ -5,8 +5,13 @@ import { useGarage } from "@/lib/store"
 import { teamById } from "@/lib/teams"
 
 type Paddock = {
-  calendar: { season: string; next: { round: number; name: string; circuit: string; place: string; start: string }[]; totalRounds: number } | null
-  lastResult: { name: string; podium: { position: number; driver: string; team: string }[] } | null
+  calendar: {
+    season: string
+    next: { round: number; name: string; circuit: string; place: string; start: string }[]
+    last: { round: number; name: string; start: string } | null
+    totalRounds: number
+  } | null
+  lastResult: { name: string; date: string; source: string; podium: { position: number; driver: string; team: string }[] } | null
   standings: { afterRound: number | null; constructors: { position: string; team: string; id?: string; points: number; wins: number }[] } | null
   news: { title: string; url: string; publishedDate: string; summary: string }[] | null
 }
@@ -92,6 +97,11 @@ export function PaddockPanel() {
   if (loading) return <div className="paddock"><div className="skeleton" /><div className="skeleton" /><div className="skeleton short" /></div>
 
   const next = data?.calendar?.next[0]
+  // The schedule knows which race finished last; the results and standings
+  // sources can lag behind it. Say so instead of passing old data off as new.
+  const lastRun = data?.calendar?.last ?? null
+  const resultsBehind = Boolean(lastRun && data?.lastResult && lastRun.start.slice(0, 10) > data.lastResult.date)
+  const standingsBehind = Boolean(lastRun && data?.standings?.afterRound && data.standings.afterRound < lastRun.round)
   // Nothing live came back: one clear offline card instead of several empty ones.
   const offline = !data?.calendar && !data?.standings
   return (
@@ -116,10 +126,12 @@ export function PaddockPanel() {
 
       {data?.lastResult && (
         <section className="pcard">
-          <header><h4>Last race</h4><span className="muted">{data.lastResult.name}</span></header>
+          <header><h4>{resultsBehind ? "Latest published result" : "Last race"}</h4><span className="muted">{data.lastResult.name} · {fmtDate(`${data.lastResult.date}T12:00:00Z`)}</span></header>
           <ol className="podium">
             {data.lastResult.podium.map((p) => <li key={p.position}><b>P{p.position}</b> {p.driver} <span className="muted">{p.team}</span></li>)}
           </ol>
+          {resultsBehind && lastRun && <p className="data-note">{lastRun.name} results aren&apos;t published by our data sources yet.</p>}
+          <p className="data-source">Source: {data.lastResult.source}</p>
         </section>
       )}
 
@@ -154,6 +166,8 @@ export function PaddockPanel() {
               )
             })}
           </ol>
+          {standingsBehind && lastRun && <p className="data-note">Round {lastRun.round} ({lastRun.name}) isn&apos;t in the table yet.</p>}
+          <p className="data-source">Source: Jolpica-F1</p>
         </section>
       )}
 
