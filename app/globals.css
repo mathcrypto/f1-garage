@@ -73,7 +73,7 @@ p { margin: 0; }
 
 .stage-tools { position: absolute; right: 20px; top: 20px; display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
 .seg { display: inline-flex; padding: 3px; border-radius: 10px; background: var(--surface); border: 1px solid var(--line); backdrop-filter: blur(12px); }
-.seg button { padding: 7px 12px; border-radius: 7px; font: 600 12.5px/1 var(--display); letter-spacing: 0.04em; color: var(--muted); text-transform: capitalize; transition: all 0.2s; }
+.seg button { padding: 7px 12px; border-radius: 7px; font: 600 12.5px/1 var(--display); letter-spacing: 0.04em; color: var(--muted); transition: all 0.2s; }
 .seg button:hover { color: var(--ink); }
 .seg button.on { background: var(--ink); color: var(--bg); }
 .tool { padding: 9px 14px; border-radius: 10px; background: var(--surface); border: 1px solid var(--line); backdrop-filter: blur(12px); font: 600 12.5px/1 var(--display); letter-spacing: 0.04em; transition: all 0.2s; }
@@ -551,6 +551,7 @@ p { margin: 0; }
 .engineer-id strong { display: block; font: 700 14px/1.2 var(--display); }
 .engineer-id small { color: var(--muted); font-size: 12px; }
 .empty-hero { display: flex; gap: 14px; align-items: center; }
+.empty-hero .link { display: inline-block; text-align: left; line-height: 1.35; }
 
 /* ── Specs ─────────────────────────────────────────────────────────────── */
 .specs { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; margin: 14px 0 0; border-radius: 10px; overflow: hidden; border: 1px solid var(--line); background: var(--line); }
@@ -801,7 +802,7 @@ p { margin: 0; }
 
 
 .dock[hidden], .stage-title[hidden] { display: none; }
-.swatch { display: inline-block; flex-shrink: 0; width: 14px; height: 14px; border-radius: 4px; }
+.swatch { display: inline-block; flex-shrink: 0; width: 14px; height: 14px; border-radius: 4px; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.28); }
 
 /* Race setup */
 .race-sheet { width: min(640px, 100%); }

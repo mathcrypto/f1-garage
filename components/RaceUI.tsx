@@ -153,7 +153,7 @@ export function RaceSetup() {
     <div className="picker" role="dialog" aria-modal="true" aria-label="Race setup" onClick={(e) => e.target === e.currentTarget && useRaceSetup.setState({ open: false })}>
       <div className="picker-sheet race-sheet lobby">
         <header>
-          <div><p className="eyebrow">Grand Prix · night circuit · {grid.length} cars</p><h2>Race weekend</h2></div>
+          <div><p className="eyebrow">{track.name} · {grid.length} cars</p><h2>Race weekend</h2></div>
           <button className="cam-close" onClick={() => useRaceSetup.setState({ open: false })} aria-label="Close">×</button>
         </header>
 
@@ -214,7 +214,7 @@ export function RaceSetup() {
                     <span className="grid-actions">
                       <button onClick={() => move(i, -1)} disabled={i === 0} aria-label={`Move ${t.name} up`}>▲</button>
                       <button onClick={() => move(i, 1)} disabled={i === order.length - 1} aria-label={`Move ${t.name} down`}>▼</button>
-                      <button onClick={() => toggle(id)} aria-pressed={!off}>{off ? "Add" : "In"}</button>
+                      <button onClick={() => toggle(id)} aria-label={off ? `Add ${teamById(id).name} to the grid` : `Remove ${teamById(id).name} from the grid`}>{off ? "Add" : "Remove"}</button>
                     </span>
                   </li>
                 )

@@ -88,22 +88,23 @@ function CameraRig({ reducedMotion }: { reducedMotion: boolean }) {
   )
 }
 
-/** Studio colour the floor and fog fade into, so the stage has no visible edge. */
+/** Studio colours the floor and fog fade into, so the stage has no visible edge. */
 const STUDIO_BG = "#07080b"
+const XRAY_BG = "#0b0303"
 
 /**
  * The reflective floor ignores fog, so its edge would show as a hard line.
  * This disc sits just above it: clear around the car, fading to the studio
  * colour further out, so the floor melts into the backdrop.
  */
-function FloorFade() {
+function FloorFade({ color }: { color: string }) {
   const texture = useMemo(() => {
     const size = 512
     const canvas = document.createElement("canvas")
     canvas.width = canvas.height = size
     const ctx = canvas.getContext("2d")!
     const g = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2)
-    const [r, gr, b] = [1, 3, 5].map((i) => parseInt(STUDIO_BG.slice(i, i + 2), 16))
+    const [r, gr, b] = [1, 3, 5].map((i) => parseInt(color.slice(i, i + 2), 16))
     g.addColorStop(0, `rgba(${r},${gr},${b},0)`)
     g.addColorStop(0.16, `rgba(${r},${gr},${b},0)`)
     g.addColorStop(0.42, `rgba(${r},${gr},${b},1)`)
@@ -113,7 +114,7 @@ function FloorFade() {
     const t = new THREE.CanvasTexture(canvas)
     t.colorSpace = THREE.SRGBColorSpace
     return t
-  }, [])
+  }, [color])
   useEffect(() => () => texture.dispose(), [texture])
   return (
     <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.002, 0]} renderOrder={1}>
@@ -123,10 +124,10 @@ function FloorFade() {
   )
 }
 
-function Studio() {
+function Studio({ background }: { background: string }) {
   return (
     <>
-      <FloorFade />
+      <FloorFade color={background} />
       <mesh rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
         <circleGeometry args={[14, 96]} />
         <MeshReflectorMaterial
@@ -197,8 +198,8 @@ export default function Scene() {
       gl={{ antialias: true, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 0.95 }}
       onPointerMissed={() => useGarage.getState().select(null)}
     >
-      <color attach="background" args={[technical ? "#0b0303" : onTrack ? "#87b5d9" : STUDIO_BG]} />
-      <fog attach="fog" args={[technical ? "#0b0303" : onTrack ? "#a8c8e0" : STUDIO_BG, onTrack ? 140 : 11, onTrack ? 1100 : 30]} />
+      <color attach="background" args={[technical ? XRAY_BG : onTrack ? "#87b5d9" : STUDIO_BG]} />
+      <fog attach="fog" args={[technical ? XRAY_BG : onTrack ? "#a8c8e0" : STUDIO_BG, onTrack ? 140 : 11, onTrack ? 1100 : 30]} />
       <ambientLight intensity={onTrack ? 0.55 : 0.12} />
       {/* Studio: soft key/fill. Track: daylight sun + sky. */}
       <directionalLight
@@ -236,7 +237,7 @@ export default function Scene() {
         ) : (
           <>
             <TeamCar team={team} />
-            <Studio />
+            <Studio background={technical ? XRAY_BG : STUDIO_BG} />
             <Ring color={team.livery.primary} />
             <Airflow />
             <Blueprint />
