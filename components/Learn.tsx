@@ -220,9 +220,9 @@ export function PartCard({ onAsk }: { onAsk: (q: string) => void }) {
 
       <div className="key-specs">
         {part.specs.slice(0, 3).map(([k, v]) => (
-          <div key={k} className={v.length > 18 ? "long" : ""}>
-            <b>{v}</b>
+          <div key={k}>
             <small>{k}</small>
+            <b>{v}</b>
           </div>
         ))}
       </div>

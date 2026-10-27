@@ -88,23 +88,59 @@ function CameraRig({ reducedMotion }: { reducedMotion: boolean }) {
   )
 }
 
+/** Studio colour the floor and fog fade into, so the stage has no visible edge. */
+const STUDIO_BG = "#07080b"
+
+/**
+ * The reflective floor ignores fog, so its edge would show as a hard line.
+ * This disc sits just above it: clear around the car, fading to the studio
+ * colour further out, so the floor melts into the backdrop.
+ */
+function FloorFade() {
+  const texture = useMemo(() => {
+    const size = 512
+    const canvas = document.createElement("canvas")
+    canvas.width = canvas.height = size
+    const ctx = canvas.getContext("2d")!
+    const g = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2)
+    const [r, gr, b] = [1, 3, 5].map((i) => parseInt(STUDIO_BG.slice(i, i + 2), 16))
+    g.addColorStop(0, `rgba(${r},${gr},${b},0)`)
+    g.addColorStop(0.16, `rgba(${r},${gr},${b},0)`)
+    g.addColorStop(0.42, `rgba(${r},${gr},${b},1)`)
+    g.addColorStop(1, `rgba(${r},${gr},${b},1)`)
+    ctx.fillStyle = g
+    ctx.fillRect(0, 0, size, size)
+    const t = new THREE.CanvasTexture(canvas)
+    t.colorSpace = THREE.SRGBColorSpace
+    return t
+  }, [])
+  useEffect(() => () => texture.dispose(), [texture])
+  return (
+    <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.002, 0]} renderOrder={1}>
+      <circleGeometry args={[30, 96]} />
+      <meshBasicMaterial map={texture} transparent depthWrite={false} toneMapped={false} fog={false} />
+    </mesh>
+  )
+}
+
 function Studio() {
   return (
     <>
+      <FloorFade />
       <mesh rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
-        <circleGeometry args={[14, 64]} />
+        <circleGeometry args={[14, 96]} />
         <MeshReflectorMaterial
           blur={[300, 90]}
           resolution={1024}
           mixBlur={0.8}
-          mixStrength={14}
+          mixStrength={6}
           roughness={0.78}
           depthScale={1.1}
           minDepthThreshold={0.4}
           maxDepthThreshold={1.3}
           color="#030304"
           metalness={0.5}
-          mirror={0.45}
+          mirror={0.35}
           envMapIntensity={0.05}
         />
       </mesh>
@@ -132,8 +168,8 @@ function StudioReflections() {
 function Ring({ color }: { color: string }) {
   return (
     <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.003, 0]}>
-      <ringGeometry args={[3.5, 3.54, 160]} />
-      <meshBasicMaterial color={color} toneMapped={false} transparent opacity={0.85} />
+      <ringGeometry args={[3.5, 3.53, 160]} />
+      <meshBasicMaterial color={color} toneMapped={false} transparent opacity={0.5} />
     </mesh>
   )
 }
@@ -161,8 +197,8 @@ export default function Scene() {
       gl={{ antialias: true, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 0.95 }}
       onPointerMissed={() => useGarage.getState().select(null)}
     >
-      <color attach="background" args={[technical ? "#0b0303" : onTrack ? "#87b5d9" : "#08090c"]} />
-      <fog attach="fog" args={[technical ? "#0b0303" : onTrack ? "#a8c8e0" : "#08090c", onTrack ? 140 : 16, onTrack ? 1100 : 32]} />
+      <color attach="background" args={[technical ? "#0b0303" : onTrack ? "#87b5d9" : STUDIO_BG]} />
+      <fog attach="fog" args={[technical ? "#0b0303" : onTrack ? "#a8c8e0" : STUDIO_BG, onTrack ? 140 : 11, onTrack ? 1100 : 30]} />
       <ambientLight intensity={onTrack ? 0.55 : 0.12} />
       {/* Studio: soft key/fill. Track: daylight sun + sky. */}
       <directionalLight

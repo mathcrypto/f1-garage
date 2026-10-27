@@ -22,7 +22,7 @@ import { readString, STORAGE_KEYS, write } from "@/lib/storage"
 
 const Scene = dynamic(() => import("./three/Scene"), {
   ssr: false,
-  loading: () => <div className="scene-loading"><span className="spinner" />Building the car…</div>,
+  loading: () => <div className="scene-loading"><span className="load-bar" aria-hidden /><span>Rolling the car out</span></div>,
 })
 
 // Black or white text, whichever reads better on the team's colour.
@@ -108,6 +108,12 @@ export function Garage() {
   const [tab, setTab] = useState<"part" | "engineer" | "paddock">("part")
   const [panelOpen, setPanelOpen] = useState(true)
   // The race takes the full screen, like a game; the panel comes back after.
+  // Keep the selected part visible in the parts strip (it scrolls on small screens).
+  const dockRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    dockRef.current?.querySelector(".dock-item.on")?.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" })
+  }, [selected])
+
   const panelBeforeRace = useRef<boolean | null>(null)
   useEffect(() => {
     if (mode === "race") setPanelOpen((open) => { panelBeforeRace.current ??= open; return false })
@@ -209,7 +215,7 @@ export function Garage() {
         {mode === "race" && <RaceHud />}
         <EngineerCam />
 
-        <div className="dock" aria-label="Car parts" hidden={mode !== "studio"}>
+        <div className="dock" ref={dockRef} aria-label="Car parts" hidden={mode !== "studio"}>
           {PARTS.map((p) => (
             <button key={p.id} className={p.id === selected ? "dock-item on" : "dock-item"} data-system={p.system} title={p.system} onClick={() => { if (exploded) setExploded(false); select(p.id === selected ? null : p.id) }}>
               <i className="sys" aria-hidden />

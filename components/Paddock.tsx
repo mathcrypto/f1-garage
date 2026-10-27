@@ -75,6 +75,7 @@ export function PaddockPanel() {
   const team = teamById(teamId)
   const [data, setData] = useState<Paddock | null>(null)
   const [loading, setLoading] = useState(true)
+  const [attempt, setAttempt] = useState(0)
 
   useEffect(() => {
     // Switching team cancels the previous request.
@@ -86,11 +87,13 @@ export function PaddockPanel() {
       .catch(() => { if (!controller.signal.aborted) setData(null) })
       .finally(() => { if (!controller.signal.aborted) setLoading(false) })
     return () => controller.abort()
-  }, [teamId])
+  }, [teamId, attempt])
 
   if (loading) return <div className="paddock"><div className="skeleton" /><div className="skeleton" /><div className="skeleton short" /></div>
 
   const next = data?.calendar?.next[0]
+  // Nothing live came back: one clear offline card instead of several empty ones.
+  const offline = !data?.calendar && !data?.standings
   return (
     <div className="paddock">
       {next && (
@@ -154,6 +157,7 @@ export function PaddockPanel() {
         </section>
       )}
 
+      {!(offline && !data?.news?.length) && (
       <section className="pcard news-card" aria-label={`${team.name} news`}>
         <div className="news-head">
           <div>
@@ -183,9 +187,21 @@ export function PaddockPanel() {
           </p>
         )}
       </section>
+      )}
 
-      {!data?.calendar && !data?.standings && (
-        <p className="muted small">Calendar and standings aren’t available right now. Try again shortly.</p>
+      {offline && (
+        <section className="pcard offline-card" aria-live="polite">
+          <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden>
+            <path d="M2 8.5a15 15 0 0 1 20 0M5.5 12a10 10 0 0 1 13 0M9 15.5a5 5 0 0 1 6 0" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+            <circle cx="12" cy="19" r="1.4" fill="currentColor" />
+            <path d="M4 4l16 16" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+          </svg>
+          <div>
+            <h4>Live timing is offline</h4>
+            <p>The calendar and championship table couldn&apos;t be reached just now. The garage, Lena and the race still work.</p>
+          </div>
+          <button type="button" onClick={() => setAttempt((n) => n + 1)}>Try again</button>
+        </section>
       )}
     </div>
   )
