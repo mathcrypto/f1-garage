@@ -91,9 +91,10 @@ export function GltfCar({ url, team }: { url: string; team: Team }) {
 
     const liveryMap = paintLivery(design)
     const paint = teamPaint(design, liveryMap)
-    const rubber = solidMat("#1a1a1e", 0.9, 0.02)
-    const carbon = solidMat("#2a2c32", 0.55, 0.2)
-    const metal = solidMat("#3a3d44", 0.3, 0.9)
+    // Lifted a little from true black so the parts read against the dark studio.
+    const rubber = solidMat("#26272c", 0.82, 0.02)
+    const carbon = solidMat("#3a3e47", 0.42, 0.25, 0.75)
+    const metal = solidMat("#7a808a", 0.28, 0.9)
 
     /** Material by what the piece is; null keeps the model's own (e.g. glowing LEDs). */
     const materialFor = (partId: string | null, nameHint: string): THREE.Material | null => {
@@ -233,17 +234,37 @@ export function GltfCar({ url, team }: { url: string; team: Team }) {
     }
   })
 
+  // Taking it apart: every piece gets its own <Part> and moves along its own
+  // direction (its part's offset, mirrored to its side, plus a spread away from
+  // the car's centre), like an exploded diagram. One label per part.
+  const pieces = useMemo(() => {
+    const centre = new THREE.Vector3()
+    return prepared.parts.flatMap(({ partId, objects, also, explode }) =>
+      objects.map((obj, i) => {
+        if (explode) return { partId, obj, also, explode, label: i === 0 }
+        obj.updateMatrixWorld(true)
+        new THREE.Box3().setFromObject(obj).getCenter(centre)
+        const [bx, by, bz] = explodeFor(partId)
+        const side = Math.abs(centre.x) < 0.08 ? 0 : Math.sign(centre.x)
+        const spread: THREE.Vector3Tuple = [
+          (bx === 0 ? 0 : Math.abs(bx) * side) + centre.x * 0.45,
+          by + Math.max(0, centre.y - 0.35) * 0.6,
+          bz + centre.z * 0.18,
+        ]
+        return { partId, obj, also, explode: spread, label: i === 0 }
+      }),
+    )
+  }, [prepared])
+
   if (prepared.mode === "whole" || prepared.parts.length === 0) {
     return <primitive key={team.id} object={prepared.root} />
   }
 
   return (
     <group key={`${team.id}-${prepared.mode}`}>
-      {prepared.parts.map(({ partId, objects, also, explode }) => (
-        <Part key={`${partId}-${also ? "body" : "part"}`} id={partId} also={also} explode={explode ?? explodeFor(partId)}>
-          {objects.map((obj) => (
-            <primitive key={obj.uuid} object={obj} />
-          ))}
+      {pieces.map(({ partId, obj, also, explode, label }) => (
+        <Part key={obj.uuid} id={partId} also={also} explode={explode} label={label}>
+          <primitive object={obj} />
         </Part>
       ))}
       {prepared.mode === "named" ? <primitive object={prepared.root} /> : null}
@@ -251,14 +272,14 @@ export function GltfCar({ url, team }: { url: string; team: Team }) {
   )
 }
 
-function solidMat(color: string, roughness: number, metalness: number) {
+function solidMat(color: string, roughness: number, metalness: number, clearcoat = 0.2) {
   return new THREE.MeshPhysicalMaterial({
     color,
     roughness,
     metalness,
-    clearcoat: 0.2,
-    clearcoatRoughness: 0.4,
-    envMapIntensity: 0.7,
+    clearcoat,
+    clearcoatRoughness: 0.25,
+    envMapIntensity: 1,
     side: THREE.DoubleSide,
   })
 }
