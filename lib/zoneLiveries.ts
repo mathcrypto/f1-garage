@@ -28,10 +28,19 @@ export type ZoneLivery = {
   /** Sweeping line along the flank from nose to tail. */
   stripe?: string
   stripeWidth?: number
-  /** Lighter mottled pattern over the base (Red Bull's 2026 jacquard). */
+  /** Mottled pattern over the base (Red Bull's 2026 jacquard). */
   speckle?: string
   /** Darker strakes over the sidepods (McLaren's tiger-stripe carbon). */
   tiger?: string
+  /** Side-facing surfaces behind the nose in this colour; tops keep `base`. */
+  flank?: string
+  /** Flash low on the rear flank, ahead of the rear wheel. */
+  rearFlash?: string
+  halo?: string
+  /** Where the nose-tip colour starts along the car (default 2.1; tip at 2.7). */
+  noseTipFrom?: number
+  /** Raise the lower-body line towards the rear (metres). */
+  lowerRise?: number
   /** Wing endplates in livery colour; carbon when unset. */
   wings?: string
   /**
@@ -45,18 +54,22 @@ export type ZoneLivery = {
 const CARBON = "#111215"
 
 export const ZONE_LIVERIES: Record<string, ZoneLivery> = {
-  // Gloss blue (a return to gloss) with a lighter blue jacquard pattern; yellow
-  // nose tip and airbox, red bull graphic on the engine cover, blue endplates.
+  // Gloss royal blue (a return to gloss) with a darker navy jacquard pattern; yellow
+  // nose tip and airbox, red on the engine-cover flanks, black halo, carbon lower
+  // sidepods, blue endplates. Yellow, red and navy sampled from the launch photo.
   redbull: {
     finish: "gloss",
-    base: "#1b2a6e",
+    base: "#1a2f8a",
     lower: CARBON,
-    noseTip: "#f5b414",
-    airbox: "#f5b414",
-    cover: "#c8102e",
+    lowerRise: 0.14,
+    noseTip: "#fca608",
+    noseTipFrom: 1.95,
+    airbox: "#fca608",
+    cover: "#d6080a",
     coverSides: true,
-    speckle: "#3d5fd6",
-    wings: "#1b2a6e",
+    halo: CARBON,
+    speckle: "#081b5a",
+    wings: "#1a2f8a",
     // Charging bull on the engine-cover flanks and on the nose, as in the launch photo.
     emblems: [
       { z: -0.95, y: 0.8, w: 1.15 },
@@ -85,14 +98,20 @@ export const ZONE_LIVERIES: Record<string, ZoneLivery> = {
     stripe: "#00d2be",
     stripeWidth: 0.03,
   },
-  // Papaya over anthracite, papaya wrapping round the cockpit, tiger-stripe
-  // carbon effect on the sidepods.
+  // Papaya with anthracite sidepod sides, a papaya flash low on the rear flank,
+  // black nose tip, airbox and halo, papaya endplates. Papaya sampled from the
+  // launch photo.
   mclaren: {
     finish: "gloss",
-    base: "#ff8000",
-    lower: "#26292e",
-    cockpit: "#ff8000",
-    tiger: "#26292e",
+    base: "#f78d01",
+    lower: "#151619",
+    flank: "#1c1d21",
+    rearFlash: "#f78d01",
+    noseTip: "#151619",
+    noseTipFrom: 2.5,
+    airbox: "#151619",
+    halo: "#151619",
+    wings: "#f78d01",
   },
   // British Racing Green, satin finish.
   astonmartin: {
@@ -142,11 +161,11 @@ export const ZONE_LIVERIES: Record<string, ZoneLivery> = {
     lower: "#c8102e",
     cover: "#141516",
   },
-  // Two-sided black and white.
+  // Two-sided: black on the left flank, white on the right (Robb Report).
   cadillac: {
     finish: "gloss",
-    base: "#f0efeb",
-    right: "#0d0d0e",
+    base: "#0d0d0e",
+    right: "#f0efeb",
     lower: CARBON,
   },
 }

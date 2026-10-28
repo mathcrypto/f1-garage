@@ -99,6 +99,14 @@ export function zonePaint(d: ZoneLivery) {
       ],
     },
     uStripeWidth: { value: d.stripeWidth ?? 0.03 },
+    uFlank: { value: color(d.flank, d.base) },
+    uFlankOn: { value: d.flank ? 1 : 0 },
+    uRearFlash: { value: color(d.rearFlash, d.base) },
+    uRearFlashOn: { value: d.rearFlash ? 1 : 0 },
+    uHalo: { value: color(d.halo, d.base) },
+    uHaloOn: { value: d.halo ? 1 : 0 },
+    uNoseTipZ: { value: d.noseTipFrom ?? 2.1 },
+    uLowerRise: { value: d.lowerRise ?? 0 },
     uEmblem: { value: NO_EMBLEM as THREE.Texture },
     // Per placement: centre z, centre y, width, height (0 = unused).
     uEmblemBox: { value: Array.from({ length: MAX_EMBLEMS }, () => new THREE.Vector4(0, 0, 0, 0)) },
@@ -140,6 +148,8 @@ varying vec3 vCarNormal;
 uniform vec3 uBase, uRight, uFadeTo, uLower, uNoseTip, uCockpit, uAirbox, uCover, uSidepod, uStripe, uSpeckle, uTiger, uCarbon;
 uniform float uOn[11];
 uniform float uStripeWidth;
+uniform vec3 uFlank, uRearFlash, uHalo;
+uniform float uFlankOn, uRearFlashOn, uHaloOn, uNoseTipZ, uLowerRise;
 uniform sampler2D uEmblem;
 uniform vec4 uEmblemBox[${MAX_EMBLEMS}];
 
@@ -175,6 +185,14 @@ vec3 liveryColor(vec3 p, vec3 n) {
   float sp = lvNoise(p * 26.0) * 0.6 + lvNoise(p * 70.0) * 0.4;
   c = mix(c, uSpeckle, uOn[6] * smoothstep(0.55, 0.7, sp) * 0.5);
 
+  // Sidepod sides in a second colour, below the pod shoulder; tops keep the base.
+  float flank = smoothstep(0.35, 0.6, abs(n.x)) * lvIn(-1.7, 0.65, p.z) * smoothstep(0.7, 0.64, p.y) * smoothstep(0.3, 0.38, ax);
+  c = mix(c, uFlank, uFlankOn * flank);
+
+  // Flash low on the rear flank, ahead of the rear wheel.
+  float rearFlash = side * lvIn(-2.45, -1.15, p.z) * lvIn(0.3, mix(0.62, 0.5, (p.z + 2.45) / 1.3), p.y);
+  c = mix(c, uRearFlash, uRearFlashOn * rearFlash);
+
   // Sidepods (inlet to the coke-bottle), between the floor and the pod top.
   float pod = lvIn(-1.3, 0.62, p.z) * smoothstep(0.3, 0.36, ax) * lvIn(0.18, 0.7, p.y);
   c = mix(c, uSidepod, uOn[4] * pod);
@@ -194,8 +212,12 @@ vec3 liveryColor(vec3 p, vec3 n) {
   c = mix(c, uAirbox, uOn[2] * airbox);
 
   // Nose tip.
-  float tip = smoothstep(2.1, 2.14, p.z + 0.25 * (p.y - 0.4));
+  float tip = smoothstep(uNoseTipZ, uNoseTipZ + 0.04, p.z + 0.25 * (p.y - 0.4));
   c = mix(c, uNoseTip, uOn[0] * tip);
+
+  // Halo: the hoop over the cockpit, ahead of the airbox.
+  float halo = lvIn(-0.2, 0.78, p.z) * smoothstep(0.8, 0.84, p.y);
+  c = mix(c, uHalo, uHaloOn * halo);
 
   // Flow line along the flanks.
   float stripe = side * (1.0 - smoothstep(uStripeWidth, uStripeWidth + 0.01, abs(p.y - lvFlowLine(p.z))));
@@ -203,7 +225,7 @@ vec3 liveryColor(vec3 p, vec3 n) {
   c = mix(c, uStripe, uOn[5] * stripe);
 
   // Lower body: underside of the nose and below the sidepod line.
-  float lowerLine = p.z > 0.9 ? 0.0 : (p.z > -1.4 ? 0.3 : 0.36);
+  float lowerLine = p.z > 0.9 ? 0.0 : (p.z > -1.4 ? 0.3 + uLowerRise * clamp((0.6 - p.z) / 2.0, 0.0, 1.0) : 0.36 + uLowerRise);
   float lower = max(smoothstep(-0.2, -0.4, n.y) * step(0.1, p.y), smoothstep(lowerLine + 0.01, lowerLine - 0.01, p.y));
   c = mix(c, uLower, lower);
 
