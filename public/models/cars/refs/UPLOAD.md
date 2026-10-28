@@ -27,11 +27,8 @@ Tips for a clean mesh:
 
 1. Save the export as **`public/models/cars/base.glb`**  
    (optional: `ferrari.glb`, `mclaren.glb`, … only if you want different shapes per team)
-2. In `.env` / `.env.local`:
-   ```bash
-   NEXT_PUBLIC_AI_CAR=1
-   ```
-3. Restart `npm run dev`
+2. Restart `npm run dev`: the file is used automatically for the showroom view
+   (`NEXT_PUBLIC_AI_CAR=0` turns it off).
 4. Switch teams — each gets the same mesh with that team's wrap
 
 Loader order: `{teamId}.glb` → `base.glb` → `white_mesh.glb`
@@ -55,4 +52,4 @@ Blender naming beats spatial split (cleaner cuts, flaps, tyres). Spatial split i
 
 ## When to stay procedural
 
-Keep `NEXT_PUBLIC_AI_CAR` unset if the Hunyuan mesh looks melted, or you need crisp X/Z flaps and selectable PU labels. Procedural remains the default for teaching.
+Set `NEXT_PUBLIC_AI_CAR=0` if the mesh looks melted. Taking the car apart, selecting a part and the X-ray always use the code-built car, which has solid parts.

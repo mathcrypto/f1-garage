@@ -1,10 +1,9 @@
 import { PART_IDS } from "./parts"
 
 /**
- * Optional AI cars (NVIDIA PartPacker / Hunyuan3D / TRELLIS). Off by default — the procedural
- * `Car` looks better for this garage (crisp parts, liveries, active aero).
- *
- * Enable with NEXT_PUBLIC_AI_CAR=1, then place under `public/models/cars/`:
+ * AI car meshes (NVIDIA PartPacker / Hunyuan3D / TRELLIS) for the showroom view;
+ * the code-built `Car` handles taking it apart. On by default when a file exists
+ * (NEXT_PUBLIC_AI_CAR=0 turns it off). Files under `public/models/cars/`:
  *   - `{teamId}.glb`  — team-specific (preferred)
  *   - `base.glb`      — shared fallback
  *

@@ -2,19 +2,25 @@
 
 import { Suspense, useEffect, useState } from "react"
 import { findCarModelUrl } from "@/lib/carAssets"
+import { useGarage } from "@/lib/store"
 import type { Team } from "@/lib/teams"
 import { Car } from "./Car"
 import { GltfCar, preloadCarModel } from "./GltfCar"
 
 /**
- * Default: procedural car (sharp parts, liveries, X/Z flaps, clean dismantle).
- * AI GLBs are optional: NVIDIA PartPacker (already split into parts) or a
- * fused Hunyuan/TRELLIS mesh. See public/models/README.md.
- * Opt in: NEXT_PUBLIC_AI_CAR=1 + public/models/cars/partpacker.glb (or base.glb)
+ * Two cars, each where it looks best:
+ * - Showroom: the AI-generated mesh (public/models/cars/, see README there) in
+ *   the team livery. It is a single outer surface, so it looks realistic whole
+ *   but would come apart as hollow shells.
+ * - Engineering: the code-built car with solid parts, used whenever the car is
+ *   taken apart, a part is selected or the X-ray is on.
+ * Opt out of the AI mesh with NEXT_PUBLIC_AI_CAR=0; without a mesh file the
+ * code-built car is always used.
  */
 export function TeamCar({ team }: { team: Team }) {
-  const aiEnabled = process.env.NEXT_PUBLIC_AI_CAR === "1"
+  const aiEnabled = process.env.NEXT_PUBLIC_AI_CAR !== "0"
   const [url, setUrl] = useState<string | null>(null)
+  const engineering = useGarage((s) => s.exploded || s.selected !== null || s.technical)
 
   useEffect(() => {
     if (!aiEnabled) {
@@ -33,7 +39,7 @@ export function TeamCar({ team }: { team: Team }) {
     }
   }, [team.id, aiEnabled])
 
-  if (!aiEnabled || !url) return <Car team={team} />
+  if (!url || engineering) return <Car team={team} />
 
   return (
     <Suspense fallback={<Car team={team} />}>
