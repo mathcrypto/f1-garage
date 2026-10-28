@@ -93,7 +93,7 @@ export function GltfCar({ url, team }: { url: string; team: Team }) {
     const paint = teamPaint(design, liveryMap)
     // Lifted a little from true black so the parts read against the dark studio.
     const rubber = solidMat("#26272c", 0.82, 0.02)
-    const carbon = solidMat("#3a3e47", 0.42, 0.25, 0.75)
+    const carbon = solidMat("#4a4f59", 0.4, 0.25, 0.8)
     const metal = solidMat("#7a808a", 0.28, 0.9)
 
     /** Material by what the piece is; null keeps the model's own (e.g. glowing LEDs). */
@@ -244,12 +244,15 @@ export function GltfCar({ url, team }: { url: string; team: Team }) {
         if (explode) return { partId, obj, also, explode, label: i === 0 }
         obj.updateMatrixWorld(true)
         new THREE.Box3().setFromObject(obj).getCenter(centre)
+        // Classic exploded diagram: each piece moves out in proportion to its
+        // distance from the car's centre, plus half its part's offset (mirrored
+        // to its side) so neighbouring pieces separate clearly.
         const [bx, by, bz] = explodeFor(partId)
         const side = Math.abs(centre.x) < 0.08 ? 0 : Math.sign(centre.x)
         const spread: THREE.Vector3Tuple = [
-          (bx === 0 ? 0 : Math.abs(bx) * side) + centre.x * 0.45,
-          by + Math.max(0, centre.y - 0.35) * 0.6,
-          bz + centre.z * 0.18,
+          (bx === 0 ? 0 : Math.abs(bx) * side) * 0.5 + centre.x * 1.1,
+          by * 0.5 + (centre.y - 0.4) * 1.4 + 0.15,
+          bz * 0.5 + centre.z * 0.55,
         ]
         return { partId, obj, also, explode: spread, label: i === 0 }
       }),

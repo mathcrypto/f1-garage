@@ -63,7 +63,7 @@ function CameraRig({ reducedMotion }: { reducedMotion: boolean }) {
   }, [selected])
 
   useEffect(() => {
-    if (exploded) controls.current?.setLookAt(9.2, 8.4, 10.2, 0, 0.3, -0.1, true)
+    if (exploded) controls.current?.setLookAt(10.2, 8.8, 11.4, 0, 0.4, -0.1, true)
   }, [exploded])
 
   useFrame((_, dt) => {
@@ -154,9 +154,9 @@ function Studio({ background }: { background: string }) {
  * way car product shots are lit. The long overhead strip and side panels draw
  * the smooth highlights along the bodywork; the rim light outlines the car.
  */
-function StudioReflections() {
+function StudioReflections({ bright }: { bright: boolean }) {
   return (
-    <Environment files="/models/studio.hdr" resolution={512} background={false} environmentIntensity={0.55}>
+    <Environment files="/models/studio.hdr" resolution={512} background={false} environmentIntensity={bright ? 1.1 : 0.55}>
       <Lightformer form="rect" intensity={1.5} color="#ffffff" position={[0, 6, 0]} rotation-x={Math.PI / 2} scale={[12, 3, 1]} />
       <Lightformer form="rect" intensity={1.4} color="#ffffff" position={[0, 5, -6]} rotation-x={Math.PI / 3} scale={[10, 1.2, 1]} />
       <Lightformer form="rect" intensity={1.6} color="#f2f5ff" position={[-7, 2, 0]} rotation-y={Math.PI / 2} scale={[14, 2, 1]} />
@@ -179,6 +179,8 @@ export default function Scene() {
   const teamId = useGarage((s) => s.teamId)
   const mode = useGarage((s) => s.mode)
   const technical = useGarage((s) => s.technical)
+  // Taken apart: brighter studio so every piece reads against the background.
+  const exploded = useGarage((s) => s.exploded)
   const team = teamById(teamId)
   const reducedMotion = useMemo(() => typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches, [])
   const onTrack = mode !== "studio"
@@ -200,7 +202,7 @@ export default function Scene() {
     >
       <color attach="background" args={[technical ? XRAY_BG : onTrack ? "#87b5d9" : STUDIO_BG]} />
       <fog attach="fog" args={[technical ? XRAY_BG : onTrack ? "#a8c8e0" : STUDIO_BG, onTrack ? 140 : 11, onTrack ? 1100 : 30]} />
-      <ambientLight intensity={onTrack ? 0.55 : 0.12} />
+      <ambientLight intensity={onTrack ? 0.55 : exploded ? 0.5 : 0.12} />
       {/* Studio: soft key/fill. Track: daylight sun + sky. */}
       <directionalLight
         position={onTrack ? [60, 90, 40] : [4, 10, 3]}
@@ -225,7 +227,7 @@ export default function Scene() {
         {onTrack ? (
           <Environment files="/models/studio.hdr" resolution={512} background={false} blur={0.85} environmentIntensity={0.45} />
         ) : (
-          <StudioReflections />
+          <StudioReflections bright={exploded} />
         )}
         {/* key forces a clean remount if HMR left stale scenery in the scene graph. */}
         <group visible={onTrack}><Circuit key="circuit-monza-no-trees" /></group>
