@@ -4,7 +4,7 @@ import { useGLTF } from "@react-three/drei"
 import { useMemo } from "react"
 import * as THREE from "three"
 import { resolvePartId } from "@/lib/carAssets"
-import { splitMeshByParts } from "@/lib/partitionCar"
+import { classifyPoint, splitMeshByParts } from "@/lib/partitionCar"
 import { liveryFor } from "@/lib/liveries"
 import type { Team } from "@/lib/teams"
 import { applySideUVs, paintLivery } from "./livery"
@@ -13,8 +13,9 @@ import { Part } from "./Part"
 type Bucket = { partId: string; objects: THREE.Object3D[] }
 
 /**
- * AI mesh (Hunyuan3D · TRELLIS): fit to studio, team livery wrap.
- * Named meshes explode by id; fused exports are auto-partitioned in world space.
+ * AI mesh (NVIDIA PartPacker · Hunyuan3D · TRELLIS): fit to studio, team livery wrap.
+ * Named meshes explode by id; unnamed pieces are filed by position; one fused
+ * mesh is sliced into parts by region.
  */
 export function GltfCar({ url, team }: { url: string; team: Team }) {
   const gltf = useGLTF(url)
@@ -93,7 +94,25 @@ export function GltfCar({ url, team }: { url: string; team: Team }) {
       return { root, parts, mode: "named" as const }
     }
 
-    // Fused Hunyuan: bake world-space parts so scale matches the garage.
+    // Several unnamed pieces (PartPacker generates the car already split into
+    // parts): keep each piece whole and file it under the part it sits in.
+    if (unlabeled.length > 1) {
+      const centre = new THREE.Vector3()
+      for (const mesh of unlabeled) {
+        mesh.updateWorldMatrix(true, false)
+        if (!mesh.geometry.boundingBox) mesh.geometry.computeBoundingBox()
+        mesh.geometry.boundingBox!.getCenter(centre).applyMatrix4(mesh.matrixWorld)
+        const partId = classifyPoint(centre.x, centre.y, centre.z)
+        applyLiveryUVs(mesh)
+        mesh.material = materialFor(partId, mesh.name)
+        const bucket = parts.find((p) => p.partId === partId)
+        if (bucket) bucket.objects.push(detachWorld(mesh))
+        else parts.push({ partId, objects: [detachWorld(mesh)] })
+      }
+      return { root, parts, mode: "pieces" as const }
+    }
+
+    // One fused mesh (Hunyuan, TRELLIS): slice it into parts by region.
     for (const mesh of unlabeled) {
       const slices = splitMeshByParts(mesh)
       mesh.visible = false

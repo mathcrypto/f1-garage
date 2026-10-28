@@ -1,7 +1,7 @@
 import { PART_IDS } from "./parts"
 
 /**
- * Optional AI cars (Hunyuan3D / TRELLIS). Off by default — the procedural
+ * Optional AI cars (NVIDIA PartPacker / Hunyuan3D / TRELLIS). Off by default — the procedural
  * `Car` looks better for this garage (crisp parts, liveries, active aero).
  *
  * Enable with NEXT_PUBLIC_AI_CAR=1, then place under `public/models/cars/`:
@@ -57,9 +57,10 @@ export function resolvePartId(raw: string | undefined | null): string | null {
 
 /** Candidate URLs to probe for a team (first hit wins). */
 export function carModelCandidates(teamId: string): string[] {
-  // One Hunyuan `base.glb` covers every team via livery wrap; per-team files optional.
+  // One shared file covers every team via the livery wrap; per-team files optional.
   return [
     `${CAR_MODEL_BASE}/${teamId}.glb`,
+    `${CAR_MODEL_BASE}/partpacker.glb`,
     `${CAR_MODEL_BASE}/base.glb`,
     `${CAR_MODEL_BASE}/white_mesh.glb`,
   ]
