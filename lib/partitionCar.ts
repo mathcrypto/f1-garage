@@ -86,8 +86,10 @@ export function splitMeshByParts(mesh: THREE.Mesh): Map<string, THREE.BufferGeom
     }
     const g = new THREE.BufferGeometry()
     g.setAttribute("position", new THREE.BufferAttribute(positions, 3))
+    // Keep the model's own (smooth) normals; recomputing on unindexed triangles
+    // would facet the surface.
     if (srcNormal) g.setAttribute("normal", new THREE.BufferAttribute(normals, 3))
-    g.computeVertexNormals()
+    else g.computeVertexNormals()
     out.set(id, g)
   }
 

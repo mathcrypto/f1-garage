@@ -1,13 +1,10 @@
 import { PART_IDS } from "./parts"
 
 /**
- * AI car meshes (NVIDIA PartPacker / Hunyuan3D / TRELLIS) for the showroom view;
- * the code-built `Car` handles taking it apart. On by default when a file exists
- * (NEXT_PUBLIC_AI_CAR=0 turns it off). Files under `public/models/cars/`:
- *   - `{teamId}.glb`  — team-specific (preferred)
- *   - `base.glb`      — shared fallback
- *
- * Name meshes with part ids from `lib/parts.ts` for Explore/explode.
+ * 3D car models for the showroom view; the code-built `Car` handles taking it
+ * apart. Used when a file is found (NEXT_PUBLIC_CAR_MODEL=0 turns it off).
+ * Tag meshes with a `part` extra (or name them) using ids from `lib/parts.ts`;
+ * `part: "split"` marks a one-piece bodywork that is sliced by region.
  */
 
 export const CAR_MODEL_BASE = "/models/cars"
@@ -54,14 +51,20 @@ export function resolvePartId(raw: string | undefined | null): string | null {
   return null
 }
 
-/** Candidate URLs to probe for a team (first hit wins). */
+/**
+ * Candidate URLs to probe for a team (first hit wins). One shared file covers
+ * every team via the livery wrap.
+ * - NEXT_PUBLIC_CAR_MODEL_URL: the licensed car hosted outside the public repo.
+ * - f1-2026.glb: the same file locally (git-ignored, never committed).
+ * - {teamId}.glb, ai.glb: optional team-specific or AI-generated meshes.
+ */
 export function carModelCandidates(teamId: string): string[] {
-  // One shared file covers every team via the livery wrap; per-team files optional.
+  const hosted = process.env.NEXT_PUBLIC_CAR_MODEL_URL
   return [
+    ...(hosted ? [hosted] : []),
+    `${CAR_MODEL_BASE}/f1-2026.glb`,
     `${CAR_MODEL_BASE}/${teamId}.glb`,
-    `${CAR_MODEL_BASE}/partpacker.glb`,
-    `${CAR_MODEL_BASE}/base.glb`,
-    `${CAR_MODEL_BASE}/white_mesh.glb`,
+    `${CAR_MODEL_BASE}/ai.glb`,
   ]
 }
 

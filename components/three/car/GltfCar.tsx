@@ -1,21 +1,71 @@
 "use client"
 
 import { useGLTF } from "@react-three/drei"
+import { useFrame } from "@react-three/fiber"
 import { useMemo } from "react"
 import * as THREE from "three"
 import { resolvePartId } from "@/lib/carAssets"
 import { classifyPoint, splitMeshByParts } from "@/lib/partitionCar"
 import { liveryFor } from "@/lib/liveries"
 import type { Team } from "@/lib/teams"
+import { IDLE, useMotion } from "./CarMotion"
 import { applySideUVs, paintLivery } from "./livery"
 import { Part } from "./Part"
 
 type Bucket = { partId: string; objects: THREE.Object3D[] }
+/** One road wheel: `steer` turns about the vertical axis, `spin` about the axle. */
+type Wheel = { steer: THREE.Group; spin: THREE.Group; front: boolean }
+
+const CORNERS = ["front_left", "front_right", "rear_left", "rear_right"] as const
+
+/** "front_left" etc. from a mesh's own name, else its parent's (exporters move shapes into unnamed children). */
+function cornerOf(mesh: THREE.Mesh): (typeof CORNERS)[number] | null {
+  for (const name of [mesh.name, mesh.parent?.name ?? ""]) {
+    const n = name.toLowerCase()
+    const axle = n.includes("front") ? "front" : n.includes("rear") ? "rear" : null
+    const side = n.includes("left") ? "left" : n.includes("right") ? "right" : null
+    if (axle && side) return `${axle}_${side}`
+  }
+  return null
+}
 
 /**
- * AI mesh (NVIDIA PartPacker · Hunyuan3D · TRELLIS): fit to studio, team livery wrap.
- * Named meshes explode by id; unnamed pieces are filed by position; one fused
- * mesh is sliced into parts by region.
+ * Groups each corner's tyre, rim and wheel nuts so they can spin and steer.
+ * Wheel covers are left out: on 2026 cars they don't rotate.
+ */
+function buildWheels(parts: Bucket[], hintOf: (mesh: THREE.Mesh) => string): Wheel[] {
+  const wheels: Wheel[] = []
+  for (const bucket of parts) {
+    if (bucket.partId !== "front-tyres" && bucket.partId !== "rear-tyres") continue
+    const byCorner = new Map<string, THREE.Mesh[]>()
+    const rest: THREE.Object3D[] = []
+    for (const obj of bucket.objects) {
+      const mesh = obj as THREE.Mesh
+      const corner = mesh.isMesh && !/cover/i.test(hintOf(mesh)) ? cornerOf(mesh) : null
+      if (!corner) { rest.push(obj); continue }
+      byCorner.set(corner, [...(byCorner.get(corner) ?? []), mesh])
+    }
+    for (const [corner, meshes] of byCorner) {
+      const box = new THREE.Box3()
+      for (const m of meshes) { m.updateMatrixWorld(true); box.expandByObject(m) }
+      const steer = new THREE.Group()
+      const spin = new THREE.Group()
+      box.getCenter(steer.position)
+      steer.add(spin)
+      steer.updateMatrixWorld(true)
+      for (const m of meshes) spin.attach(m)
+      rest.push(steer)
+      wheels.push({ steer, spin, front: corner.startsWith("front") })
+    }
+    bucket.objects = rest
+  }
+  return wheels
+}
+
+/**
+ * A 3D car model, fitted to the studio and painted in the team livery. Tagged or
+ * named meshes are filed under their part; unnamed pieces by position; a
+ * one-piece body or fused AI mesh is sliced into parts by region.
  */
 export function GltfCar({ url, team }: { url: string; team: Team }) {
   const gltf = useGLTF(url)
@@ -36,9 +86,14 @@ export function GltfCar({ url, team }: { url: string; team: Team }) {
     const paint = teamPaint(design, liveryMap)
     const rubber = solidMat("#1a1a1e", 0.9, 0.02)
     const carbon = solidMat("#2a2c32", 0.55, 0.2)
+    const metal = solidMat("#3a3d44", 0.3, 0.9)
 
-    const materialFor = (partId: string | null, nameHint: string) => {
+    /** Material by what the piece is; null keeps the model's own (e.g. glowing LEDs). */
+    const materialFor = (partId: string | null, nameHint: string): THREE.Material | null => {
       const n = nameHint.toLowerCase()
+      if (/\bled|led_/.test(n)) return null
+      if (/rim|nut/.test(n)) return metal
+      if (/cover|seat|steering|halo|mirror|tpod|antenna|cam|barge|rips|exhaust/.test(n)) return carbon
       if (partId === "front-tyres" || partId === "rear-tyres" || /tyre|tire|rubber|wheel/.test(n)) return rubber
       if (
         partId === "floor" ||
@@ -56,6 +111,9 @@ export function GltfCar({ url, team }: { url: string; team: Team }) {
 
     const named = new Map<string, THREE.Mesh[]>()
     const unlabeled: THREE.Mesh[] = []
+    // Pieces tagged "split" (a one-piece bodywork) are sliced into parts by region.
+    const toSplit: THREE.Mesh[] = []
+    const hintOf = (mesh: THREE.Mesh) => `${mesh.parent?.name ?? ""}/${mesh.name}`
 
     root.traverse((obj) => {
       const mesh = obj as THREE.Mesh
@@ -68,6 +126,10 @@ export function GltfCar({ url, team }: { url: string; team: Team }) {
 
       const parentPart = typeof mesh.parent?.userData?.part === "string" ? mesh.parent.userData.part : null
       const fromData = typeof mesh.userData?.part === "string" ? mesh.userData.part : parentPart
+      if (fromData === "split") {
+        toSplit.push(mesh)
+        return
+      }
       const partId = resolvePartId(fromData) ?? resolvePartId(mesh.name) ?? resolvePartId(mesh.parent?.name)
       if (partId) {
         const list = named.get(partId) ?? []
@@ -80,19 +142,39 @@ export function GltfCar({ url, team }: { url: string; team: Team }) {
 
     const parts: Bucket[] = []
 
+    // `bodywork`: slices of a modelled one-piece body are all painted (only the
+    // floor underneath is carbon); slices of a fused AI blob get per-part materials.
+    const addSlices = (mesh: THREE.Mesh, bodywork = false) => {
+      mesh.visible = false
+      for (const [partId, geometry] of splitMeshByParts(mesh)) {
+        applyLiveryUVsToGeometry(geometry)
+        const material = bodywork ? (partId === "floor" ? carbon : paint) : (materialFor(partId, partId) ?? paint)
+        const piece = new THREE.Mesh(geometry, material)
+        piece.castShadow = true
+        piece.receiveShadow = true
+        piece.name = partId
+        const bucket = parts.find((p) => p.partId === partId)
+        if (bucket) bucket.objects.push(piece)
+        else parts.push({ partId, objects: [piece] })
+      }
+    }
+
     if (named.size > 0) {
       for (const [partId, meshes] of named) {
         for (const mesh of meshes) {
           applyLiveryUVs(mesh)
-          mesh.material = materialFor(partId, mesh.name)
+          const material = materialFor(partId, hintOf(mesh))
+          if (material) mesh.material = material
         }
         parts.push({
           partId,
           objects: meshes.map((mesh) => detachWorld(mesh)),
         })
       }
-      return { root, parts, mode: "named" as const }
+      toSplit.forEach((mesh) => addSlices(mesh, true))
+      return { root, parts, wheels: buildWheels(parts, hintOf), mode: "named" as const }
     }
+    unlabeled.push(...toSplit)
 
     // Several unnamed pieces (PartPacker generates the car already split into
     // parts): keep each piece whole and file it under the part it sits in.
@@ -104,29 +186,16 @@ export function GltfCar({ url, team }: { url: string; team: Team }) {
         mesh.geometry.boundingBox!.getCenter(centre).applyMatrix4(mesh.matrixWorld)
         const partId = classifyPoint(centre.x, centre.y, centre.z)
         applyLiveryUVs(mesh)
-        mesh.material = materialFor(partId, mesh.name)
+        mesh.material = materialFor(partId, hintOf(mesh)) ?? mesh.material
         const bucket = parts.find((p) => p.partId === partId)
         if (bucket) bucket.objects.push(detachWorld(mesh))
         else parts.push({ partId, objects: [detachWorld(mesh)] })
       }
-      return { root, parts, mode: "pieces" as const }
+      return { root, parts, wheels: [] as Wheel[], mode: "pieces" as const }
     }
 
     // One fused mesh (Hunyuan, TRELLIS): slice it into parts by region.
-    for (const mesh of unlabeled) {
-      const slices = splitMeshByParts(mesh)
-      mesh.visible = false
-      for (const [partId, geometry] of slices) {
-        applyLiveryUVsToGeometry(geometry)
-        const piece = new THREE.Mesh(geometry, materialFor(partId, partId))
-        piece.castShadow = true
-        piece.receiveShadow = true
-        piece.name = partId
-        const bucket = parts.find((p) => p.partId === partId)
-        if (bucket) bucket.objects.push(piece)
-        else parts.push({ partId, objects: [piece] })
-      }
-    }
+    unlabeled.forEach((mesh) => addSlices(mesh))
 
     // If partition failed, still show the fitted whole mesh with paint.
     if (parts.length === 0) {
@@ -135,11 +204,23 @@ export function GltfCar({ url, team }: { url: string; team: Team }) {
         applyLiveryUVs(mesh)
         mesh.material = paint
       }
-      return { root, parts: [], mode: "whole" as const }
+      return { root, parts: [], wheels: [] as Wheel[], mode: "whole" as const }
     }
 
-    return { root, parts, mode: "spatial" as const }
+    return { root, parts, wheels: [] as Wheel[], mode: "spatial" as const }
   }, [gltf.scene, design, team.id])
+
+  // On track the wheels turn with the car's speed and the fronts steer (same
+  // limits as the code-built car, so fast spins don't strobe).
+  const motion = useMotion()
+  useFrame((_, dt) => {
+    const m = motion ?? IDLE
+    const spinBoost = m.wheelspin * 70
+    for (const w of prepared.wheels) {
+      w.spin.rotation.x += Math.min(m.speed / 3.6 / 0.36 + (w.front ? 0 : spinBoost), 14) * dt
+      if (w.front) w.steer.rotation.y = THREE.MathUtils.damp(w.steer.rotation.y, m.steer, 4, dt)
+    }
+  })
 
   if (prepared.mode === "whole" || prepared.parts.length === 0) {
     return <primitive key={team.id} object={prepared.root} />

@@ -25,13 +25,13 @@ Tips for a clean mesh:
 
 ## Drop into the app (all teams)
 
-1. Save the export as **`public/models/cars/base.glb`**  
+1. Save the export as **`public/models/cars/ai.glb`**  
    (optional: `ferrari.glb`, `mclaren.glb`, … only if you want different shapes per team)
 2. Restart `npm run dev`: the file is used automatically for the showroom view
-   (`NEXT_PUBLIC_AI_CAR=0` turns it off).
+   (`NEXT_PUBLIC_CAR_MODEL=0` turns it off). The licensed `f1-2026.glb` takes priority when present.
 4. Switch teams — each gets the same mesh with that team's wrap
 
-Loader order: `{teamId}.glb` → `base.glb` → `white_mesh.glb`
+Loader order: `NEXT_PUBLIC_CAR_MODEL_URL` → `f1-2026.glb` → `{teamId}.glb` → `ai.glb`
 
 ## Dismantle / Explore
 
@@ -52,4 +52,4 @@ Blender naming beats spatial split (cleaner cuts, flaps, tyres). Spatial split i
 
 ## When to stay procedural
 
-Set `NEXT_PUBLIC_AI_CAR=0` if the mesh looks melted. Taking the car apart, selecting a part and the X-ray always use the code-built car, which has solid parts.
+Set `NEXT_PUBLIC_CAR_MODEL=0` if the mesh looks melted. Taking the car apart, selecting a part and the X-ray always use the code-built car, which has solid parts.

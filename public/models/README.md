@@ -1,44 +1,42 @@
-# AI 3D assets (Hunyuan3D-2.1 · TRELLIS · Audio2Face)
+# 3D assets
 
 ## Two cars
 
-- **Showroom:** the AI mesh in `cars/` (when present), painted in each team's livery. It is a single outer surface: realistic whole, but hollow if sliced.
-- **Engineering:** the code-built car with solid parts and moving Straight/Corner Mode flaps. Used whenever the car is taken apart, a part is selected or the X-ray is on, and whenever no mesh file is present.
+- **Showroom:** a licensed 3D car model, painted in each team's livery. Its bodywork is one outer surface: realistic whole, hollow if taken apart.
+- **Engineering:** the code-built car with solid parts and moving Straight/Corner Mode flaps. Used whenever the car is taken apart, a part is selected or the X-ray is on, and whenever no model file is found.
 
-## Optional: NVIDIA PartPacker car (recommended AI option)
+## The showroom car (not in this repo)
 
-[PartPacker](https://huggingface.co/nvidia/PartPacker) (NVIDIA research) turns one image into a 3D object that is already split into parts, which suits taking the car apart.
+The model is a paid, licensed asset ("F1 2026 Generic Formula 1 Car", CGTrader), so it is never committed: anyone cloning the public repo gets the code-built car.
 
-1. Open NVIDIA's demo: https://huggingface.co/spaces/nvidia/PartPacker
-2. Upload one image of a modern F1 car: three-quarter front view, the whole car in frame, plain background, no people or other cars.
-3. Generate, then download the GLB.
-4. Save it as `cars/partpacker.glb`.
-5. Restart or redeploy. The file is used automatically (`NEXT_PUBLIC_AI_CAR=0` turns AI cars off).
+The app looks for, in order:
 
-`GltfCar` keeps each generated piece whole and files it under the car part it sits in (nose, sidepods, floor, wings, wheels), paints the bodywork in the team livery and the aero parts in carbon. Without the file or the variable, the code-built car is used.
+1. `NEXT_PUBLIC_CAR_MODEL_URL`: the model hosted outside the repo (for a deployed site, e.g. a Vercel Blob URL).
+2. `cars/f1-2026.glb`: the same file locally. It is git-ignored.
+3. `cars/{teamId}.glb`, `cars/ai.glb`: optional team-specific or AI-generated meshes.
 
-**Licence:** the PartPacker model is under the NVIDIA Non-Commercial License. Fine for the hackathon; replace this file with a commercially licensed model before any commercial use.
+`NEXT_PUBLIC_CAR_MODEL=0` always uses the code-built car.
 
-## Optional: one Hunyuan mesh for every team
+### Preparing the file from the purchase
 
-1. Generate on [Hunyuan3D-2.1](https://huggingface.co/spaces/tencent/Hunyuan3D-2.1) using refs in `cars/refs/` (see `cars/refs/UPLOAD.md`).
-2. Save as `cars/base.glb`.
-3. Restart the dev server. It is used automatically (`NEXT_PUBLIC_AI_CAR=0` turns AI cars off).
+The web file is exported from the `.blend` with Blender's Python module (`pip install bpy`): modifiers applied, the heaviest pieces decimated, and each object tagged with a `part` extra (an id from `lib/parts.ts`, or `"split"` for the one-piece bodywork, which the app slices by region for highlights). Then compress the geometry:
 
-`TeamCar` loads `{teamId}.glb` → `base.glb` → `white_mesh.glb`. **One `base.glb` is enough** — each team gets that team's livery wrap.
+```bash
+npx @gltf-transform/cli optimize f1-2026-raw.glb f1-2026.glb --compress meshopt --texture-compress false --simplify false --join false --flatten false --instance false
+```
 
-### Dismantle
+Result: about 300k triangles, 1.6 MB. The app paints its own materials (team livery, carbon, rubber, metal), so the model's textures are not needed.
 
-- **Named meshes** (Blender): use part ids from `lib/parts.ts`.
-- **Fused blob** (raw Hunyuan): `GltfCar` auto-partitions by spatial regions so Explore / explode still works.
+## Optional: an AI-generated car
+
+[NVIDIA PartPacker](https://huggingface.co/nvidia/PartPacker) turns one image into a 3D object already split into parts; [Hunyuan3D](https://huggingface.co/spaces/tencent/Hunyuan3D-2.1) produces one fused mesh. Save either as `cars/ai.glb`. `GltfCar` files separate pieces under the part they sit in and slices a fused mesh by region. PartPacker is under the NVIDIA Non-Commercial License.
 
 | File | Source |
 |------|--------|
-| `cars/base.glb` / `white_mesh.glb` | HF Hunyuan / TRELLIS export |
 | `studio.hdr` | Poly Haven Studio Small 09 (CC0) |
-| `cars/refs/` | Upload images + Ferrari 2026 inspiration |
+| `cars/refs/` | Reference images for AI generation |
 
-## Lena lip-sync — NVIDIA Audio2Face
+## Lena lip-sync: NVIDIA Audio2Face
 
 Live path (wired): TTS → Web Audio analyser → `mouthOpen` / `mouthShape`.
 
