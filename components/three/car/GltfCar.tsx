@@ -6,11 +6,11 @@ import { useMemo } from "react"
 import * as THREE from "three"
 import { resolvePartId } from "@/lib/carAssets"
 import { classifyPoint, splitMeshByParts } from "@/lib/partitionCar"
-import { liveryFor } from "@/lib/liveries"
+import { zoneLiveryFor } from "@/lib/zoneLiveries"
 import type { Team } from "@/lib/teams"
 import { IDLE, useMotion } from "./CarMotion"
-import { applySideUVs, paintLivery } from "./livery"
 import { Part } from "./Part"
+import { applyCarSpace, zonePaint } from "./zonePaint"
 
 type Bucket = { partId: string; objects: THREE.Object3D[]; also?: string[]; explode?: THREE.Vector3Tuple }
 
@@ -76,7 +76,7 @@ function buildWheels(parts: Bucket[], hintOf: (mesh: THREE.Mesh) => string): Whe
  */
 export function GltfCar({ url, team }: { url: string; team: Team }) {
   const gltf = useGLTF(url)
-  const design = liveryFor(team.id)
+  const design = zoneLiveryFor(team.id)
 
   const prepared = useMemo(() => {
     const root = gltf.scene.clone(true)
@@ -89,18 +89,20 @@ export function GltfCar({ url, team }: { url: string; team: Team }) {
 
     fitToStudio(root)
 
-    const liveryMap = paintLivery(design)
-    const paint = teamPaint(design, liveryMap)
+    const paint = zonePaint(design)
     // Lifted a little from true black so the parts read against the dark studio.
-    const rubber = solidMat("#26272c", 0.82, 0.02)
-    const carbon = solidMat("#4a4f59", 0.4, 0.25, 0.8)
-    const metal = solidMat("#7a808a", 0.28, 0.9)
+    const rubber = solidMat("#17181b", 0.8, 0.02)
+    const carbon = solidMat("#1d2026", 0.42, 0.1, 0.6, 0.45)
+    const metal = solidMat("#8a9099", 0.25, 0.95)
+    // Wing endplates in livery colour where the team runs them that way.
+    const endplate = design.wings ? solidMat(design.wings, 0.3, 0.1, 0.8) : carbon
 
     /** Material by what the piece is; null keeps the model's own (e.g. glowing LEDs). */
     const materialFor = (partId: string | null, nameHint: string): THREE.Material | null => {
       const n = nameHint.toLowerCase()
       if (/\bled|led_/.test(n)) return null
       if (/rim|nut/.test(n)) return metal
+      if (/endplate(?!_)/.test(n)) return endplate
       if (/cover|seat|steering|halo|mirror|tpod|antenna|cam|barge|rips|exhaust/.test(n)) return carbon
       if (partId === "front-tyres" || partId === "rear-tyres" || /tyre|tire|rubber|wheel/.test(n)) return rubber
       if (
@@ -220,7 +222,7 @@ export function GltfCar({ url, team }: { url: string; team: Team }) {
     }
 
     return { root, parts, wheels: [] as Wheel[], mode: "spatial" as const }
-  }, [gltf.scene, design, team.id])
+  }, [gltf.scene, design])
 
   // On track the wheels turn with the car's speed and the fronts steer (same
   // limits as the code-built car, so fast spins don't strobe).
@@ -275,40 +277,25 @@ export function GltfCar({ url, team }: { url: string; team: Team }) {
   )
 }
 
-function solidMat(color: string, roughness: number, metalness: number, clearcoat = 0.2) {
+function solidMat(color: string, roughness: number, metalness: number, clearcoat = 0.2, envMapIntensity = 1) {
   return new THREE.MeshPhysicalMaterial({
     color,
     roughness,
     metalness,
     clearcoat,
     clearcoatRoughness: 0.25,
-    envMapIntensity: 1,
-    side: THREE.DoubleSide,
-  })
-}
-
-function teamPaint(design: ReturnType<typeof liveryFor>, map: THREE.Texture) {
-  const gloss = design.finish === "matte" ? 0.2 : design.finish === "satin" ? 0.35 : 0.55
-  const rough = design.finish === "matte" ? 0.55 : design.finish === "satin" ? 0.38 : 0.28
-  return new THREE.MeshPhysicalMaterial({
-    map,
-    color: "#ffffff",
-    metalness: 0.08,
-    roughness: rough,
-    clearcoat: gloss,
-    clearcoatRoughness: design.finish === "gloss" ? 0.12 : 0.3,
-    envMapIntensity: 0.85,
+    envMapIntensity,
     side: THREE.DoubleSide,
   })
 }
 
 function applyLiveryUVs(mesh: THREE.Mesh) {
   mesh.updateWorldMatrix(true, false)
-  applySideUVs(mesh.geometry, mesh.matrixWorld)
+  applyCarSpace(mesh.geometry, mesh.matrixWorld)
 }
 
 function applyLiveryUVsToGeometry(geometry: THREE.BufferGeometry) {
-  applySideUVs(geometry)
+  applyCarSpace(geometry)
 }
 
 function fitToStudio(root: THREE.Object3D) {

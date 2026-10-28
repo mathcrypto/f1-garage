@@ -89,7 +89,7 @@ function CameraRig({ reducedMotion }: { reducedMotion: boolean }) {
 }
 
 /** Studio colours the floor and fog fade into, so the stage has no visible edge. */
-const STUDIO_BG = "#22252c"
+const STUDIO_BG = "#07080a"
 const XRAY_BG = "#0b0303"
 
 /**
@@ -124,9 +124,61 @@ function FloorFade({ color }: { color: string }) {
   )
 }
 
-function Studio({ background }: { background: string }) {
+/** Radial white-to-clear texture for the light pool and beam. */
+function useGlowTexture(vertical: boolean) {
+  const texture = useMemo(() => {
+    const size = 256
+    const canvas = document.createElement("canvas")
+    canvas.width = canvas.height = size
+    const ctx = canvas.getContext("2d")!
+    const g = vertical
+      ? ctx.createLinearGradient(0, 0, 0, size)
+      : ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2)
+    if (vertical) {
+      g.addColorStop(0, "rgba(255,255,255,1)")
+      g.addColorStop(0.6, "rgba(255,255,255,0.25)")
+      g.addColorStop(1, "rgba(255,255,255,0)")
+    } else {
+      g.addColorStop(0, "rgba(255,255,255,1)")
+      g.addColorStop(0.55, "rgba(255,255,255,0.55)")
+      g.addColorStop(1, "rgba(255,255,255,0)")
+    }
+    ctx.fillStyle = g
+    ctx.fillRect(0, 0, size, size)
+    const t = new THREE.CanvasTexture(canvas)
+    t.colorSpace = THREE.SRGBColorSpace
+    return t
+  }, [vertical])
+  useEffect(() => () => texture.dispose(), [texture])
+  return texture
+}
+
+/**
+ * The film-set look: one light straight above the car. A soft pool of light
+ * on the floor and a faint beam through the air; the rest falls off to black.
+ */
+function OverheadLight({ wide }: { wide: boolean }) {
+  const pool = useGlowTexture(false)
+  const beam = useGlowTexture(true)
+  const radius = wide ? 6.5 : 4.6
   return (
     <>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.006, 0]} renderOrder={2}>
+        <circleGeometry args={[radius, 96]} />
+        <meshBasicMaterial map={pool} color="#fff6ea" transparent opacity={0.08} blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false} fog={false} />
+      </mesh>
+      <mesh position={[0, 5.5, 0]} renderOrder={3}>
+        <cylinderGeometry args={[0.9, radius * 0.95, 11, 64, 1, true]} />
+        <meshBasicMaterial map={beam} color="#fff3e0" transparent opacity={0.018} blending={THREE.AdditiveBlending} side={THREE.DoubleSide} depthWrite={false} toneMapped={false} fog={false} />
+      </mesh>
+    </>
+  )
+}
+
+function Studio({ background, wide, beam }: { background: string; wide: boolean; beam: boolean }) {
+  return (
+    <>
+      {beam && <OverheadLight wide={wide} />}
       <FloorFade color={background} />
       <mesh rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
         <circleGeometry args={[14, 96]} />
@@ -134,14 +186,14 @@ function Studio({ background }: { background: string }) {
           blur={[300, 90]}
           resolution={1024}
           mixBlur={0.8}
-          mixStrength={6}
-          roughness={0.78}
+          mixStrength={3.5}
+          roughness={0.85}
           depthScale={1.1}
           minDepthThreshold={0.4}
           maxDepthThreshold={1.3}
-          color="#3a3e46"
+          color="#0a0b0e"
           metalness={0.5}
-          mirror={0.35}
+          mirror={0.5}
           envMapIntensity={0.05}
         />
       </mesh>
@@ -150,18 +202,17 @@ function Studio({ background }: { background: string }) {
 }
 
 /**
- * What the car reflects in the garage: the studio HDR plus large softboxes, the
- * way car product shots are lit. The long overhead strip and side panels draw
- * the smooth highlights along the bodywork; the rim light outlines the car.
+ * What the car reflects in the garage: a dim studio HDR and one big softbox
+ * overhead, so highlights run along the top of the bodywork and the sides fall
+ * off into shadow.
  */
 function StudioReflections({ bright }: { bright: boolean }) {
   return (
-    <Environment files="/models/studio.hdr" resolution={512} background={false} environmentIntensity={bright ? 1.25 : 0.95}>
-      <Lightformer form="rect" intensity={1.5} color="#ffffff" position={[0, 6, 0]} rotation-x={Math.PI / 2} scale={[12, 3, 1]} />
-      <Lightformer form="rect" intensity={1.4} color="#ffffff" position={[0, 5, -6]} rotation-x={Math.PI / 3} scale={[10, 1.2, 1]} />
-      <Lightformer form="rect" intensity={1.6} color="#f2f5ff" position={[-7, 2, 0]} rotation-y={Math.PI / 2} scale={[14, 2, 1]} />
-      <Lightformer form="rect" intensity={1.6} color="#fff6ec" position={[7, 2, 0]} rotation-y={-Math.PI / 2} scale={[14, 2, 1]} />
-      <Lightformer form="ring" intensity={0.8} color="#ffffff" position={[0, 3, 9]} scale={4} />
+    <Environment files="/models/studio.hdr" resolution={512} background={false} environmentIntensity={bright ? 0.6 : 0.4}>
+      <Lightformer form="rect" intensity={4} color="#fff8ee" position={[0, 7, 0]} rotation-x={Math.PI / 2} scale={[9, 4, 1]} />
+      <Lightformer form="rect" intensity={0.5} color="#ffffff" position={[0, 5, -6]} rotation-x={Math.PI / 3} scale={[10, 1.2, 1]} />
+      <Lightformer form="rect" intensity={0.35} color="#e8eeff" position={[-7, 2, 0]} rotation-y={Math.PI / 2} scale={[14, 1.5, 1]} />
+      <Lightformer form="rect" intensity={0.35} color="#fff2e4" position={[7, 2, 0]} rotation-y={-Math.PI / 2} scale={[14, 1.5, 1]} />
     </Environment>
   )
 }
@@ -197,31 +248,33 @@ export default function Scene() {
       shadows
       dpr={[1, 2]}
       camera={{ position: [7.2, 2.9, 7.6], fov: 32, near: 0.1, far: 2800 }}
-      gl={{ antialias: true, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.1 }}
+      gl={{ antialias: true, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.05 }}
       onPointerMissed={() => useGarage.getState().select(null)}
     >
       <color attach="background" args={[technical ? XRAY_BG : onTrack ? "#87b5d9" : STUDIO_BG]} />
       <fog attach="fog" args={[technical ? XRAY_BG : onTrack ? "#a8c8e0" : STUDIO_BG, onTrack ? 140 : 11, onTrack ? 1100 : 30]} />
-      <ambientLight intensity={onTrack ? 0.55 : exploded ? 0.6 : 0.35} />
-      {/* Studio: soft key/fill. Track: daylight sun + sky. */}
-      <directionalLight
-        position={onTrack ? [60, 90, 40] : [4, 10, 3]}
-        intensity={onTrack ? 1.85 : 1.4}
-        color={onTrack ? "#fff4e0" : "#ffffff"}
-        castShadow={!onTrack}
-        shadow-mapSize={[2048, 2048]}
-        shadow-bias={-0.0002}
-        shadow-camera-left={-5}
-        shadow-camera-right={5}
-        shadow-camera-top={5}
-        shadow-camera-bottom={-5}
-      />
-      {!onTrack && <directionalLight position={[-6, 5, -2]} intensity={0.5} color="#d0d8e8" />}
-      {!onTrack && <directionalLight position={[1, 3, -7]} intensity={0.35} color="#ffe8d0" />}
+      <ambientLight intensity={onTrack ? 0.55 : exploded ? 0.22 : 0.08} />
+      {/* Track: daylight sun + sky. */}
+      {onTrack && <directionalLight position={[60, 90, 40]} intensity={1.85} color="#fff4e0" />}
+      {/* Studio: one spotlight straight above the car, a faint fill and a cool rim. */}
+      {!onTrack && (
+        <spotLight
+          position={[0, 10, 0.3]}
+          angle={exploded ? 0.6 : 0.46}
+          penumbra={0.95}
+          decay={0}
+          intensity={technical ? 1.2 : 3}
+          color="#fff6ea"
+          castShadow
+          shadow-mapSize={[2048, 2048]}
+          shadow-bias={-0.0002}
+        />
+      )}
+      {!onTrack && <directionalLight position={[3, 3, 8]} intensity={exploded ? 0.45 : 0.2} color="#dfe6f2" />}
+      {!onTrack && <directionalLight position={[-2, 2.5, -8]} intensity={0.35} color="#cfdcf0" />}
       {onTrack && <hemisphereLight args={["#cfe6ff", "#6b8f4e", 0.55]} />}
       {onTrack && <directionalLight position={[-40, 30, -50]} intensity={0.35} color="#a8c4e0" />}
-      <spotLight position={[-6, 5, -6]} intensity={onTrack ? 0 : 8} angle={0.55} penumbra={1} color={team.livery.primary} />
-      {!onTrack && <spotLight position={[4, 8, 5]} intensity={5} angle={0.65} penumbra={1} color="#f4f6fa" />}
+      <spotLight position={[-6, 4, -6]} intensity={onTrack ? 0 : 6} angle={0.5} penumbra={1} color={team.livery.primary} />
 
       <Suspense fallback={null}>
         {onTrack ? (
@@ -239,7 +292,7 @@ export default function Scene() {
         ) : (
           <>
             <TeamCar team={team} />
-            <Studio background={technical ? XRAY_BG : STUDIO_BG} />
+            <Studio background={technical ? XRAY_BG : STUDIO_BG} wide={exploded} beam={!technical} />
             <Ring color={team.livery.primary} />
             <Airflow />
             <Blueprint />
@@ -266,7 +319,7 @@ export default function Scene() {
           />
         )}
         <Bloom mipmapBlur intensity={onTrack ? 0.06 : 0.12} radius={0.3} luminanceThreshold={1.25} luminanceSmoothing={0.35} />
-        <Vignette offset={0.3} darkness={onTrack ? 0.28 : 0.32} />
+        <Vignette offset={0.25} darkness={onTrack ? 0.28 : 0.6} />
       </EffectComposer>
     </Canvas>
   )

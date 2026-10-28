@@ -25,7 +25,7 @@ The web file is exported from the `.blend` with Blender's Python module (`pip in
 npx @gltf-transform/cli optimize f1-2026-raw.glb f1-2026.glb --compress meshopt --texture-compress false --simplify false --join false --flatten false --instance false
 ```
 
-Result: about 300k triangles, 1.6 MB. The app paints its own materials (team livery, carbon, rubber, metal), so the model's textures are not needed.
+Result: about 300k triangles, 1.6 MB. The app paints its own materials (carbon, rubber, metal) and each team's 2026 livery by zone (nose tip, cockpit, airbox, engine cover, sidepods, flow line, lower body; see `lib/zoneLiveries.ts` and `components/three/car/zonePaint.ts`), so the model's textures are not needed. Sponsor and team logos are not reproduced.
 
 ## Optional: an AI-generated car
 
