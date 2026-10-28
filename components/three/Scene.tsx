@@ -89,7 +89,7 @@ function CameraRig({ reducedMotion }: { reducedMotion: boolean }) {
 }
 
 /** Studio colours the floor and fog fade into, so the stage has no visible edge. */
-const STUDIO_BG = "#07080b"
+const STUDIO_BG = "#22252c"
 const XRAY_BG = "#0b0303"
 
 /**
@@ -139,7 +139,7 @@ function Studio({ background }: { background: string }) {
           depthScale={1.1}
           minDepthThreshold={0.4}
           maxDepthThreshold={1.3}
-          color="#030304"
+          color="#3a3e46"
           metalness={0.5}
           mirror={0.35}
           envMapIntensity={0.05}
@@ -156,7 +156,7 @@ function Studio({ background }: { background: string }) {
  */
 function StudioReflections({ bright }: { bright: boolean }) {
   return (
-    <Environment files="/models/studio.hdr" resolution={512} background={false} environmentIntensity={bright ? 1.1 : 0.55}>
+    <Environment files="/models/studio.hdr" resolution={512} background={false} environmentIntensity={bright ? 1.25 : 0.95}>
       <Lightformer form="rect" intensity={1.5} color="#ffffff" position={[0, 6, 0]} rotation-x={Math.PI / 2} scale={[12, 3, 1]} />
       <Lightformer form="rect" intensity={1.4} color="#ffffff" position={[0, 5, -6]} rotation-x={Math.PI / 3} scale={[10, 1.2, 1]} />
       <Lightformer form="rect" intensity={1.6} color="#f2f5ff" position={[-7, 2, 0]} rotation-y={Math.PI / 2} scale={[14, 2, 1]} />
@@ -197,16 +197,16 @@ export default function Scene() {
       shadows
       dpr={[1, 2]}
       camera={{ position: [7.2, 2.9, 7.6], fov: 32, near: 0.1, far: 2800 }}
-      gl={{ antialias: true, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 0.95 }}
+      gl={{ antialias: true, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.1 }}
       onPointerMissed={() => useGarage.getState().select(null)}
     >
       <color attach="background" args={[technical ? XRAY_BG : onTrack ? "#87b5d9" : STUDIO_BG]} />
       <fog attach="fog" args={[technical ? XRAY_BG : onTrack ? "#a8c8e0" : STUDIO_BG, onTrack ? 140 : 11, onTrack ? 1100 : 30]} />
-      <ambientLight intensity={onTrack ? 0.55 : exploded ? 0.5 : 0.12} />
+      <ambientLight intensity={onTrack ? 0.55 : exploded ? 0.6 : 0.35} />
       {/* Studio: soft key/fill. Track: daylight sun + sky. */}
       <directionalLight
         position={onTrack ? [60, 90, 40] : [4, 10, 3]}
-        intensity={onTrack ? 1.85 : 1}
+        intensity={onTrack ? 1.85 : 1.4}
         color={onTrack ? "#fff4e0" : "#ffffff"}
         castShadow={!onTrack}
         shadow-mapSize={[2048, 2048]}
@@ -266,7 +266,7 @@ export default function Scene() {
           />
         )}
         <Bloom mipmapBlur intensity={onTrack ? 0.06 : 0.12} radius={0.3} luminanceThreshold={1.25} luminanceSmoothing={0.35} />
-        <Vignette offset={0.28} darkness={onTrack ? 0.28 : 0.5} />
+        <Vignette offset={0.3} darkness={onTrack ? 0.28 : 0.32} />
       </EffectComposer>
     </Canvas>
   )
