@@ -12,7 +12,14 @@ import { IDLE, useMotion } from "./CarMotion"
 import { applySideUVs, paintLivery } from "./livery"
 import { Part } from "./Part"
 
-type Bucket = { partId: string; objects: THREE.Object3D[] }
+type Bucket = { partId: string; objects: THREE.Object3D[]; also?: string[]; explode?: THREE.Vector3Tuple }
+
+/**
+ * A modelled one-piece bodywork (tagged `part: "split"`) is kept whole: it is
+ * the nose, sidepods, engine cover and floor at once, and stays in place when
+ * the car is taken apart while the model's separate pieces come off around it.
+ */
+const BODYWORK = { partId: "sidepods", also: ["nose", "engine-cover", "floor"], explode: [0, 0, 0] as THREE.Vector3Tuple }
 /** One road wheel: `steer` turns about the vertical axis, `spin` about the axle. */
 type Wheel = { steer: THREE.Group; spin: THREE.Group; front: boolean }
 
@@ -111,8 +118,8 @@ export function GltfCar({ url, team }: { url: string; team: Team }) {
 
     const named = new Map<string, THREE.Mesh[]>()
     const unlabeled: THREE.Mesh[] = []
-    // Pieces tagged "split" (a one-piece bodywork) are sliced into parts by region.
-    const toSplit: THREE.Mesh[] = []
+    // Pieces tagged "split": a one-piece bodywork (kept whole, see BODYWORK).
+    const bodywork: THREE.Mesh[] = []
     const hintOf = (mesh: THREE.Mesh) => `${mesh.parent?.name ?? ""}/${mesh.name}`
 
     root.traverse((obj) => {
@@ -127,7 +134,7 @@ export function GltfCar({ url, team }: { url: string; team: Team }) {
       const parentPart = typeof mesh.parent?.userData?.part === "string" ? mesh.parent.userData.part : null
       const fromData = typeof mesh.userData?.part === "string" ? mesh.userData.part : parentPart
       if (fromData === "split") {
-        toSplit.push(mesh)
+        bodywork.push(mesh)
         return
       }
       const partId = resolvePartId(fromData) ?? resolvePartId(mesh.name) ?? resolvePartId(mesh.parent?.name)
@@ -142,14 +149,12 @@ export function GltfCar({ url, team }: { url: string; team: Team }) {
 
     const parts: Bucket[] = []
 
-    // `bodywork`: slices of a modelled one-piece body are all painted (only the
-    // floor underneath is carbon); slices of a fused AI blob get per-part materials.
-    const addSlices = (mesh: THREE.Mesh, bodywork = false) => {
+    // A fused AI mesh has no parts of its own: slice it by region.
+    const addSlices = (mesh: THREE.Mesh) => {
       mesh.visible = false
       for (const [partId, geometry] of splitMeshByParts(mesh)) {
         applyLiveryUVsToGeometry(geometry)
-        const material = bodywork ? (partId === "floor" ? carbon : paint) : (materialFor(partId, partId) ?? paint)
-        const piece = new THREE.Mesh(geometry, material)
+        const piece = new THREE.Mesh(geometry, materialFor(partId, partId) ?? paint)
         piece.castShadow = true
         piece.receiveShadow = true
         piece.name = partId
@@ -171,10 +176,16 @@ export function GltfCar({ url, team }: { url: string; team: Team }) {
           objects: meshes.map((mesh) => detachWorld(mesh)),
         })
       }
-      toSplit.forEach((mesh) => addSlices(mesh, true))
+      if (bodywork.length) {
+        for (const mesh of bodywork) {
+          applyLiveryUVs(mesh)
+          mesh.material = paint
+        }
+        parts.push({ ...BODYWORK, objects: bodywork.map((mesh) => detachWorld(mesh)) })
+      }
       return { root, parts, wheels: buildWheels(parts, hintOf), mode: "named" as const }
     }
-    unlabeled.push(...toSplit)
+    unlabeled.push(...bodywork)
 
     // Several unnamed pieces (PartPacker generates the car already split into
     // parts): keep each piece whole and file it under the part it sits in.
@@ -228,8 +239,8 @@ export function GltfCar({ url, team }: { url: string; team: Team }) {
 
   return (
     <group key={`${team.id}-${prepared.mode}`}>
-      {prepared.parts.map(({ partId, objects }) => (
-        <Part key={partId} id={partId} explode={explodeFor(partId)}>
+      {prepared.parts.map(({ partId, objects, also, explode }) => (
+        <Part key={`${partId}-${also ? "body" : "part"}`} id={partId} also={also} explode={explode ?? explodeFor(partId)}>
           {objects.map((obj) => (
             <primitive key={obj.uuid} object={obj} />
           ))}

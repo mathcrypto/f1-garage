@@ -4,7 +4,7 @@ import { PART_IDS } from "./parts"
  * 3D car models for the showroom view; the code-built `Car` handles taking it
  * apart. Used when a file is found (NEXT_PUBLIC_CAR_MODEL=0 turns it off).
  * Tag meshes with a `part` extra (or name them) using ids from `lib/parts.ts`;
- * `part: "split"` marks a one-piece bodywork that is sliced by region.
+ * `part: "split"` marks a one-piece bodywork, kept whole (see GltfCar).
  */
 
 export const CAR_MODEL_BASE = "/models/cars"

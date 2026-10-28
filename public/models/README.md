@@ -2,8 +2,8 @@
 
 ## Two cars
 
-- **Showroom:** a licensed 3D car model, painted in each team's livery. Its bodywork is one outer surface: realistic whole, hollow if taken apart.
-- **Engineering:** the code-built car with solid parts and moving Straight/Corner Mode flaps. Used whenever the car is taken apart, a part is selected or the X-ray is on, and whenever no model file is found.
+- **The licensed 3D car** is used everywhere (garage, take-apart, X-ray, track), painted in each team's livery. Taking it apart moves the model's own separate pieces (wings, suspension, wheels, halo, cockpit parts…); its one-piece bodywork stays whole and stands for the nose, sidepods, engine cover and floor.
+- **The code-built car** is only a fallback when no model file is found.
 
 ## The showroom car (not in this repo)
 
@@ -19,7 +19,7 @@ The app looks for, in order:
 
 ### Preparing the file from the purchase
 
-The web file is exported from the `.blend` with Blender's Python module (`pip install bpy`): modifiers applied, the heaviest pieces decimated, and each object tagged with a `part` extra (an id from `lib/parts.ts`, or `"split"` for the one-piece bodywork, which the app slices by region for highlights). Then compress the geometry:
+The web file is exported from the `.blend` with Blender's Python module (`pip install bpy`): modifiers applied, the heaviest pieces decimated, and each object tagged with a `part` extra (an id from `lib/parts.ts`, or `"split"` for the one-piece bodywork, which the app keeps whole). Then compress the geometry:
 
 ```bash
 npx @gltf-transform/cli optimize f1-2026-raw.glb f1-2026.glb --compress meshopt --texture-compress false --simplify false --join false --flatten false --instance false

@@ -22,14 +22,19 @@ type Mat = THREE.MeshStandardMaterial & {
 
 // One selectable component. Several <Part>s can share an id (left and right
 // sidepods); they move together but each slides along its own direction.
-type PartProps = { id: string; explode: THREE.Vector3Tuple; children: ReactNode; label?: boolean }
+// `also`: other part ids this piece stands for (a one-piece bodywork is the
+// nose, sidepods and engine cover at once); it lights and focuses for those too.
+type PartProps = { id: string; explode: THREE.Vector3Tuple; children: ReactNode; label?: boolean; also?: string[] }
 
 export function Part(props: PartProps) {
   // On the track and in races the car is just a car: no picking or labels.
   return useContext(PlainParts) ? <group>{props.children}</group> : <InteractivePart {...props} />
 }
 
-function InteractivePart({ id, explode, children, label = true }: PartProps) {
+const NONE: string[] = []
+
+function InteractivePart({ id, explode, children, label = true, also = NONE }: PartProps) {
+  const is = (other: string | null | undefined) => other === id || (other != null && also.includes(other))
   const group = useRef<THREE.Group>(null!)
   const mats = useRef<Mat[]>([])
   const teamId = useGarage((s) => s.teamId)
@@ -86,7 +91,8 @@ function InteractivePart({ id, explode, children, label = true }: PartProps) {
     const box = new THREE.Box3().setFromObject(group.current)
     const all = boxes.get(id)?.clone().union(box) ?? box
     boxes.set(id, all)
-    partCentres.set(id, all.getCenter(new THREE.Vector3()).toArray())
+    const centreOfAll = all.getCenter(new THREE.Vector3()).toArray()
+    for (const pid of [id, ...also]) partCentres.set(pid, centreOfAll)
     setCentre(group.current.worldToLocal(box.getCenter(new THREE.Vector3())).toArray())
     return () => list.forEach((m) => m.dispose())
   }, [teamId, id])
@@ -106,14 +112,14 @@ function InteractivePart({ id, explode, children, label = true }: PartProps) {
     p.y = THREE.MathUtils.damp(p.y, active ? explode[1] : 0, 5, dt)
     p.z = THREE.MathUtils.damp(p.z, active ? explode[2] : 0, 5, dt)
 
-    const ghost = Boolean(s.selected) && !s.exploded && s.selected !== id
-    const focus = s.selected === id || s.hovered === id
+    const ghost = Boolean(s.selected) && !s.exploded && !is(s.selected)
+    const focus = is(s.selected) || is(s.hovered)
     for (const l of edges.current) {
       l.visible = s.technical
       l.material = focus ? EDGE_ACTIVE : EDGE
     }
-    const lit = s.highlights.some((h) => h.id === id)
-    const hovered = s.hovered === id
+    const lit = s.highlights.some((h) => is(h.id))
+    const hovered = is(s.hovered)
     const pulse = 0.35 + 0.25 * Math.sin(state.clock.elapsedTime * 4)
     for (const m of mats.current) {
       // Decal textures load after the clone was made (fonts, team logos).
@@ -141,11 +147,11 @@ function InteractivePart({ id, explode, children, label = true }: PartProps) {
     if (s.exploded) s.setExploded(false)
   }
 
-  const index = highlights.findIndex((h) => h.id === id)
-  const part = partById(id)
-  const hovered = useGarage((s) => s.hovered === id)
+  const index = highlights.findIndex((h) => is(h.id))
+  const part = partById(index >= 0 ? highlights[index].id : selected && is(selected) ? selected : id)
+  const hovered = useGarage((s) => is(s.hovered))
   // Blueprint tags only for the part under the cursor or in focus, to keep the drawing readable.
-  const showSpec = label && technical && index < 0 && (selected ? selected === id : hovered)
+  const showSpec = label && technical && index < 0 && (selected ? is(selected) : hovered)
   return (
     <group ref={group} onPointerOver={onOver} onPointerOut={onOut} onClick={onClick}>
       {children}
@@ -161,7 +167,7 @@ function InteractivePart({ id, explode, children, label = true }: PartProps) {
         <Html position={centre} zIndexRange={[15, 0]} className="spec-tag-wrap">
           <div className="spec-tag">
             <b>{part.name}</b>
-            {part.specs.slice(0, selected === id ? 6 : 1).map(([k, v]) => <span key={k}><i>{k}</i>{v}</span>)}
+            {part.specs.slice(0, is(selected) ? 6 : 1).map(([k, v]) => <span key={k}><i>{k}</i>{v}</span>)}
           </div>
         </Html>
       )}
