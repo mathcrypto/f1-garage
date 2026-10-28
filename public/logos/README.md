@@ -14,5 +14,6 @@ Team and sponsor logos are trademarks, so none are bundled. If you have the righ
 
 - `main` replaces the team wordmark on the sidepods and both sides of the shark fin.
 - `sponsor` goes on the front-wing and rear-wing main planes.
+- `emblem` (e.g. `redbull/emblem.png`, a transparent PNG facing left) is painted on the engine-cover flanks and the nose of the licensed 3D car, at the spots set in `lib/zoneLiveries.ts`.
 
 Teams without an entry keep the generated wordmarks.

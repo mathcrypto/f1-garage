@@ -2,7 +2,7 @@
 
 import { useGLTF } from "@react-three/drei"
 import { useFrame } from "@react-three/fiber"
-import { useMemo } from "react"
+import { useEffect, useMemo } from "react"
 import * as THREE from "three"
 import { resolvePartId } from "@/lib/carAssets"
 import { classifyPoint, splitMeshByParts } from "@/lib/partitionCar"
@@ -10,7 +10,8 @@ import { zoneLiveryFor } from "@/lib/zoneLiveries"
 import type { Team } from "@/lib/teams"
 import { IDLE, useMotion } from "./CarMotion"
 import { Part } from "./Part"
-import { applyCarSpace, zonePaint } from "./zonePaint"
+import { useTeamEmblem } from "./livery"
+import { applyCarSpace, setEmblem, zonePaint } from "./zonePaint"
 
 type Bucket = { partId: string; objects: THREE.Object3D[]; also?: string[]; explode?: THREE.Vector3Tuple }
 
@@ -77,6 +78,9 @@ function buildWheels(parts: Bucket[], hintOf: (mesh: THREE.Mesh) => string): Whe
 export function GltfCar({ url, team }: { url: string; team: Team }) {
   const gltf = useGLTF(url)
   const design = zoneLiveryFor(team.id)
+  const paint = useMemo(() => zonePaint(design), [design])
+  const emblem = useTeamEmblem(team.id)
+  useEffect(() => setEmblem(paint, emblem), [paint, emblem])
 
   const prepared = useMemo(() => {
     const root = gltf.scene.clone(true)
@@ -89,7 +93,6 @@ export function GltfCar({ url, team }: { url: string; team: Team }) {
 
     fitToStudio(root)
 
-    const paint = zonePaint(design)
     // Lifted a little from true black so the parts read against the dark studio.
     const rubber = solidMat("#17181b", 0.8, 0.02)
     const carbon = solidMat("#1d2026", 0.42, 0.1, 0.6, 0.45)
@@ -222,7 +225,7 @@ export function GltfCar({ url, team }: { url: string; team: Team }) {
     }
 
     return { root, parts, wheels: [] as Wheel[], mode: "spatial" as const }
-  }, [gltf.scene, design])
+  }, [gltf.scene, design, paint])
 
   // On track the wheels turn with the car's speed and the fronts steer (same
   // limits as the code-built car, so fast spins don't strobe).

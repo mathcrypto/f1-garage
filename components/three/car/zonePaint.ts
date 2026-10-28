@@ -49,6 +49,16 @@ const FINISH = {
 
 const color = (hex: string | undefined, fallback: string) => new THREE.Color(hex ?? fallback)
 
+const NO_EMBLEM = new THREE.DataTexture(new Uint8Array([0, 0, 0, 0]), 1, 1)
+NO_EMBLEM.needsUpdate = true
+const MAX_EMBLEMS = 3
+
+/** Show the team emblem image (or none) on a material from `zonePaint`. */
+export function setEmblem(material: THREE.Material, texture: THREE.Texture | null) {
+  const set = material.userData.setEmblem as ((t: THREE.Texture | null) => void) | undefined
+  set?.(texture)
+}
+
 export function zonePaint(d: ZoneLivery) {
   const material = new THREE.MeshPhysicalMaterial({
     color: "#ffffff",
@@ -89,6 +99,19 @@ export function zonePaint(d: ZoneLivery) {
       ],
     },
     uStripeWidth: { value: d.stripeWidth ?? 0.03 },
+    uEmblem: { value: NO_EMBLEM as THREE.Texture },
+    // Per placement: centre z, centre y, width, height (0 = unused).
+    uEmblemBox: { value: Array.from({ length: MAX_EMBLEMS }, () => new THREE.Vector4(0, 0, 0, 0)) },
+  }
+  const placements = (d.emblems ?? []).slice(0, MAX_EMBLEMS)
+  material.userData.setEmblem = (texture: THREE.Texture | null) => {
+    const image = texture?.image as { width?: number; height?: number } | undefined
+    const aspect = image?.width && image?.height ? image.height / image.width : 0.5
+    uniforms.uEmblem.value = texture ?? NO_EMBLEM
+    uniforms.uEmblemBox.value.forEach((box, i) => {
+      const p = texture ? placements[i] : undefined
+      box.set(p?.z ?? 0, p?.y ?? 0, p?.w ?? 0, p ? p.w * aspect : 0)
+    })
   }
 
   material.onBeforeCompile = (shader) => {
@@ -117,6 +140,8 @@ varying vec3 vCarNormal;
 uniform vec3 uBase, uRight, uFadeTo, uLower, uNoseTip, uCockpit, uAirbox, uCover, uSidepod, uStripe, uSpeckle, uTiger, uCarbon;
 uniform float uOn[11];
 uniform float uStripeWidth;
+uniform sampler2D uEmblem;
+uniform vec4 uEmblemBox[${MAX_EMBLEMS}];
 
 float lvHash(vec3 p) { return fract(sin(dot(p, vec3(127.1, 311.7, 74.7))) * 43758.5453); }
 float lvNoise(vec3 p) {
@@ -184,6 +209,16 @@ vec3 liveryColor(vec3 p, vec3 n) {
 
   // Floor edge and plank stay carbon.
   c = mix(c, uCarbon, smoothstep(0.13, 0.1, p.y));
+
+  // Team emblem, projected onto both flanks facing forward.
+  for (int i = 0; i < ${MAX_EMBLEMS}; i++) {
+    vec4 b = uEmblemBox[i];
+    if (b.z <= 0.0) continue;
+    vec2 uv = vec2(0.5 - (p.z - b.x) / b.z, (p.y - b.y) / b.w + 0.5);
+    if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) continue;
+    vec4 e = texture2D(uEmblem, uv);
+    c = mix(c, e.rgb, e.a * smoothstep(0.15, 0.35, abs(n.x)));
+  }
   return c;
 }`,
       )

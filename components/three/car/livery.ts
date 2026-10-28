@@ -320,8 +320,30 @@ export function useWordmark(text: string, color: string, sub?: string) {
   return tex
 }
 
-type LogoManifest = Record<string, { main?: string; sponsor?: string }>
+type LogoManifest = Record<string, { main?: string; sponsor?: string; emblem?: string }>
 let manifest: Promise<LogoManifest> | null = null
+
+/** The team emblem image from public/logos/manifest.json (`emblem`), if supplied. */
+export function useTeamEmblem(teamId: string) {
+  const [emblem, setEmblem] = useState<THREE.Texture | null>(null)
+  useEffect(() => {
+    let alive = true
+    setEmblem(null)
+    manifest ??= fetch("/logos/manifest.json").then((r) => (r.ok ? r.json() : {})).catch(() => ({}))
+    manifest.then((m: LogoManifest) => {
+      const path = m[teamId]?.emblem
+      if (!path) return
+      new THREE.TextureLoader().load(`/logos/${path}`, (t) => {
+        t.colorSpace = THREE.SRGBColorSpace
+        t.anisotropy = 8
+        t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping
+        if (alive) setEmblem(t)
+      })
+    })
+    return () => { alive = false }
+  }, [teamId])
+  return emblem
+}
 
 export function useTeamLogos(teamId: string) {
   const [logos, setLogos] = useState<{ main?: THREE.Texture; sponsor?: THREE.Texture }>({})

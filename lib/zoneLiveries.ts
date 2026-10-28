@@ -34,6 +34,12 @@ export type ZoneLivery = {
   tiger?: string
   /** Wing endplates in livery colour; carbon when unset. */
   wings?: string
+  /**
+   * Where the team emblem goes, on both flanks (centre along the car `z`,
+   * height `y`, width `w` in metres). Only drawn when the emblem image is
+   * supplied in public/logos (logos are trademarks and are not bundled).
+   */
+  emblems?: { z: number; y: number; w: number }[]
 }
 
 const CARBON = "#111215"
@@ -51,6 +57,11 @@ export const ZONE_LIVERIES: Record<string, ZoneLivery> = {
     coverSides: true,
     speckle: "#3d5fd6",
     wings: "#1b2a6e",
+    // Charging bull on the engine-cover flanks and on the nose, as in the launch photo.
+    emblems: [
+      { z: -0.95, y: 0.8, w: 1.15 },
+      { z: 1.95, y: 0.46, w: 0.55 },
+    ],
   },
   // Almost all red, black accents removed, extra white around the cockpit and
   // airbox running back over the engine cover, subtle yellow pinstripes.
