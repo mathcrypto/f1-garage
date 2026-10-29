@@ -14,7 +14,7 @@ export type TeamSite = {
   pathIncludes?: string[]
 }
 
-export const TEAM_SITES: Record<string, TeamSite> = {
+const TEAM_SITES: Record<string, TeamSite> = {
   ferrari: {
     domain: "ferrari.com",
     home: "https://www.ferrari.com/en-EN/formula1",
@@ -95,6 +95,3 @@ export function storyAllowDomains(teamId: string): string[] {
   const site = TEAM_SITES[teamId]
   return site ? [...STORY_MEDIA_DOMAINS, site.domain] : [...STORY_MEDIA_DOMAINS]
 }
-
-/** @deprecated use storyAllowDomains */
-export const storyPreferDomains = storyAllowDomains

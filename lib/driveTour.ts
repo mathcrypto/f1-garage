@@ -1,9 +1,6 @@
 import { BURNOUT, DRIVE_TOUR, ENGINE_START } from "./drive"
 
-// Guided systems lap — HUD change and Lena’s line land together.
-export { DRIVE_TOUR }
-
-export type HudFocus = "aero" | "ers" | "battery" | "brake" | null
+type HudFocus = "aero" | "ers" | "battery" | "brake" | null
 
 export type TourPhase = {
   until: number
@@ -29,7 +26,7 @@ const L = ENGINE_START + BURNOUT
  * Each mode: show it + say it immediately, then hold so you can watch.
  * No silent “look first” gap — that made the radio feel late.
  */
-export const TOUR_PHASES: TourPhase[] = [
+const TOUR_PHASES: TourPhase[] = [
   {
     until: ENGINE_START,
     ers: 0,

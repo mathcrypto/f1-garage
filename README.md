@@ -111,10 +111,10 @@ On track she talks like a real race engineer — mostly quiet. She calls the gri
 
 The engine is only heard on track (Drive and Race). It uses real recordings from the free [Sonniss GDC Game Audio bundles](https://sonniss.com/gdc-bundle-license/) (royalty-free, no attribution needed): a Ferrari 812 Superfast V12 start-up every time a car rolls out, then Ferrari 458 engine loops recorded from idle to 9,000 rpm, on and off throttle, crossfaded by revs and throttle the way racing games do it, mapped so the top of each gear on our car is the 458's scream. Gear shifts, exhaust pops and crackles are recorded too; the turbo whistle is added live. Onboard is loud and raw; the TV and helicopter cameras hear a distant car. Details and licences are in `public/audio/README.md`. If the recordings can't load, a physical model of the V6 (`lib/engineWorklet.ts`) takes over.
 
-## Music and logos
+## Music
 
 - Music is public domain: "Limit 70" by Kevin MacLeod in the garage (`public/audio/theme.mp3`) and "Apex" by Alexander Nakarada on the race grid (`public/audio/grid.mp3`), both from FreePD. The garage track plays while you explore and through the showcase; it stops whenever Lena speaks and picks up where it left off a moment after she's finished. The grid track fades out once the cars are moving. The official F1 theme and the F1 film soundtrack are copyrighted and aren't used; replace either file with a track you're licensed to use if you like.
-- Team and sponsor logos are trademarks, so none are bundled; the car shows generated wordmarks instead. If you have the rights, drop the files into `public/logos/` and list them in `public/logos/manifest.json` (see `public/logos/README.md`). They then replace the wordmarks on the sidepods, shark fin and wings.
+- Team and sponsor logos are trademarks, so none are bundled: the car shows drawn text wordmarks (`lib/sponsors.ts`).
 
 ## About the 3D model
 

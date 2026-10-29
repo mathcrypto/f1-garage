@@ -103,7 +103,7 @@ export async function getLastResult(): Promise<LastResult | null> {
 }
 
 /** Season path segment for Jolpica: a year like 2025, or "current". */
-export function standingsSeasonPath(season?: number | string | null): string {
+function standingsSeasonPath(season?: number | string | null): string {
   if (season == null || season === "" || season === "current") return "current"
   const y = Number(season)
   if (Number.isFinite(y) && y >= 1950 && y <= 2100) return String(y)

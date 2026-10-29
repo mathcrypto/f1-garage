@@ -128,7 +128,7 @@ function Upgrades() {
   )
 }
 
-export function Explore() {
+function Explore() {
   const teamId = useGarage((s) => s.teamId)
   const lesson = useEngineerState((s) => s.lesson)
   const team = teamById(teamId)

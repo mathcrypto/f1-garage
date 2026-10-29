@@ -6,12 +6,13 @@ import { useEffect, useMemo } from "react"
 import * as THREE from "three"
 import { resolvePartId } from "@/lib/carAssets"
 import { classifyPoint, splitMeshByParts } from "@/lib/partitionCar"
+import { sponsorsFor } from "@/lib/sponsors"
 import { zoneLiveryFor } from "@/lib/zoneLiveries"
 import type { Team } from "@/lib/teams"
 import { IDLE, useMotion } from "./CarMotion"
 import { Part } from "./Part"
-import { useTeamEmblem } from "./livery"
-import { applyCarSpace, setEmblem, zonePaint } from "./zonePaint"
+import { useSponsorAtlas } from "./livery"
+import { applyCarSpace, attachDecals, zonePaint } from "./zonePaint"
 
 type Bucket = { partId: string; objects: THREE.Object3D[]; also?: string[]; explode?: THREE.Vector3Tuple }
 
@@ -78,9 +79,13 @@ function buildWheels(parts: Bucket[], hintOf: (mesh: THREE.Mesh) => string): Whe
 export function GltfCar({ url, team }: { url: string; team: Team }) {
   const gltf = useGLTF(url)
   const design = zoneLiveryFor(team.id)
-  const paint = useMemo(() => zonePaint(design), [design])
-  const emblem = useTeamEmblem(team.id)
-  useEffect(() => setEmblem(paint, emblem), [paint, emblem])
+  const sponsorSlots = useMemo(() => sponsorsFor(team.id), [team.id])
+  const paint = useMemo(() => zonePaint(design, sponsorSlots), [design, sponsorSlots])
+  const sponsors = useSponsorAtlas(sponsorSlots)
+  useEffect(() => {
+    const set = paint.userData.setSponsors as ((atlas: typeof sponsors) => void) | undefined
+    set?.(sponsors)
+  }, [paint, sponsors])
 
   const prepared = useMemo(() => {
     const root = gltf.scene.clone(true)
@@ -99,6 +104,11 @@ export function GltfCar({ url, team }: { url: string; team: Team }) {
     const metal = solidMat("#8a9099", 0.25, 0.95)
     // Wing endplates in livery colour where the team runs them that way.
     const endplate = design.wings ? solidMat(design.wings, 0.3, 0.1, 0.8) : carbon
+    const decals = paint.userData.decals
+    if (decals) {
+      attachDecals(carbon, decals)
+      attachDecals(endplate, decals)
+    }
 
     /** Material by what the piece is; null keeps the model's own (e.g. glowing LEDs). */
     const materialFor = (partId: string | null, nameHint: string): THREE.Material | null => {

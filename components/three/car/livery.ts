@@ -1,17 +1,17 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
+import type { SponsorAtlas } from "./zonePaint"
 import * as THREE from "three"
 import type { LiveryDesign } from "@/lib/liveries"
 
 // Side-projected wrap: canvas x = car length (z), canvas y = height.
 // Both flanks live in one texture (left lower half, right mirrored upper half).
-export const SIDE_UV = { zMin: -3, zLen: 6, yMax: 1.25 } as const
-const Z_MIN = SIDE_UV.zMin, Z_LEN = SIDE_UV.zLen, Y_MAX = SIDE_UV.yMax
+const Z_MIN = -3, Z_LEN = 6, Y_MAX = 1.25
 const W = 2048, H = 512
 
 /** Map a car-space point to livery UV (u along length, v half-height per flank). */
-export function sideUvAt(x: number, y: number, z: number): [number, number] {
+function sideUvAt(x: number, y: number, z: number): [number, number] {
   const h = Math.min(1, Math.max(0, y / Y_MAX)) * 0.5
   return [(z - Z_MIN) / Z_LEN, x >= 0 ? h : 1 - h]
 }
@@ -27,28 +27,6 @@ export function sideUV(geometry: THREE.BufferGeometry) {
   }
   geometry.setAttribute("uv", new THREE.BufferAttribute(uv, 2))
   return geometry
-}
-
-/** Write side-projected UVs; optional world matrix for GLB meshes in world space. */
-export function applySideUVs(geometry: THREE.BufferGeometry, worldMatrix?: THREE.Matrix4) {
-  const pos = geometry.attributes.position
-  if (!pos) return
-  const uv = new Float32Array(pos.count * 2)
-  const p = new THREE.Vector3()
-  for (let i = 0; i < pos.count; i++) {
-    if (worldMatrix) {
-      p.fromBufferAttribute(pos, i).applyMatrix4(worldMatrix)
-      const [u, v] = sideUvAt(p.x, p.y, p.z)
-      uv[i * 2] = u
-      uv[i * 2 + 1] = v
-    } else {
-      const [u, v] = sideUvAt(pos.getX(i), pos.getY(i), pos.getZ(i))
-      uv[i * 2] = u
-      uv[i * 2 + 1] = v
-    }
-  }
-  geometry.setAttribute("uv", new THREE.BufferAttribute(uv, 2))
-  if (geometry.attributes.uv) geometry.attributes.uv.needsUpdate = true
 }
 
 const X = (z: number) => ((z - Z_MIN) / Z_LEN) * W
@@ -320,50 +298,99 @@ export function useWordmark(text: string, color: string, sub?: string) {
   return tex
 }
 
-type LogoManifest = Record<string, { main?: string; sponsor?: string; emblem?: string }>
-let manifest: Promise<LogoManifest> | null = null
+export type SponsorSlot = { label: string; ink?: "white"; color?: string }
 
-/** The team emblem image from public/logos/manifest.json (`emblem`), if supplied. */
-export function useTeamEmblem(teamId: string) {
-  const [emblem, setEmblem] = useState<THREE.Texture | null>(null)
-  useEffect(() => {
-    let alive = true
-    setEmblem(null)
-    manifest ??= fetch("/logos/manifest.json").then((r) => (r.ok ? r.json() : {})).catch(() => ({}))
-    manifest.then((m: LogoManifest) => {
-      const path = m[teamId]?.emblem
-      if (!path) return
-      new THREE.TextureLoader().load(`/logos/${path}`, (t) => {
-        t.colorSpace = THREE.SRGBColorSpace
-        t.anisotropy = 8
-        t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping
-        if (alive) setEmblem(t)
-      })
-    })
-    return () => { alive = false }
-  }, [teamId])
-  return emblem
+const MARK_FONT = `italic 700 110px "Titillium Web", sans-serif`
+
+/** Draw one crisp wordmark tile (transparent backdrop). */
+function drawWordmarkTile(label: string, ink?: "white", color?: string) {
+  const h = 160
+  const probe = document.createElement("canvas")
+  const pg = probe.getContext("2d")!
+  pg.font = MARK_FONT
+  const textW = Math.max(24, pg.measureText(label).width)
+  const w = Math.ceil(textW + 40)
+  const tile = document.createElement("canvas")
+  tile.width = w
+  tile.height = h
+  const g = tile.getContext("2d")!
+  g.clearRect(0, 0, w, h)
+  g.font = MARK_FONT
+  g.textAlign = "center"
+  g.textBaseline = "middle"
+  const cx = w / 2
+  const cy = h / 2
+  const fill = ink === "white" ? "#ffffff" : (color ?? "#ffffff")
+  // Dark outline keeps light marks readable on white paint.
+  g.lineJoin = "round"
+  g.miterLimit = 2
+  g.lineWidth = 10
+  g.strokeStyle = "rgba(0,0,0,0.55)"
+  g.strokeText(label, cx, cy)
+  g.fillStyle = "rgba(0,0,0,0.4)"
+  g.fillText(label, cx + 2, cy + 2)
+  g.fillStyle = fill
+  g.fillText(label, cx, cy)
+  return tile
 }
 
-export function useTeamLogos(teamId: string) {
-  const [logos, setLogos] = useState<{ main?: THREE.Texture; sponsor?: THREE.Texture }>({})
+/** Pack drawn sponsor wordmarks into one texture. `rects` lines up with `slots`. */
+export function useSponsorAtlas(slots: SponsorSlot[]) {
+  const key = slots.map((s) => `${s.label}:${s.ink ?? ""}:${s.color ?? ""}`).join("|")
+  const [atlas, setAtlas] = useState<SponsorAtlas | null>(null)
+  const [fontReady, setFontReady] = useState(false)
   useEffect(() => {
     let alive = true
-    setLogos({})
-    manifest ??= fetch("/logos/manifest.json").then((r) => (r.ok ? r.json() : {})).catch(() => ({}))
-    manifest.then((m: LogoManifest) => {
-      const entry = m[teamId]
-      if (!entry) return
-      const loader = new THREE.TextureLoader()
-      const load = (path?: string) =>
-        path
-          ? new Promise<THREE.Texture | undefined>((res) =>
-              loader.load(`/logos/${path}`, (t) => { t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8; res(t) }, undefined, () => res(undefined)),
-            )
-          : Promise.resolve(undefined)
-      Promise.all([load(entry.main), load(entry.sponsor)]).then(([main, sponsor]) => alive && setLogos({ main, sponsor }))
+    const ready = () => alive && setFontReady(true)
+    if (document.fonts?.load) document.fonts.load(MARK_FONT).then(ready, ready)
+    else ready()
+    return () => {
+      alive = false
+    }
+  }, [])
+  useEffect(() => {
+    if (!slots.length) {
+      setAtlas(null)
+      return
+    }
+    if (!fontReady) return
+    const tiles = slots.map((s) => drawWordmarkTile(s.label, s.ink, s.color))
+    const height = 160
+    const gap = 10
+    const widths = tiles.map((t) => t.width)
+    const total = widths.reduce((sum, w) => sum + w, 0) + gap * Math.max(0, widths.length - 1)
+    if (!total) {
+      setAtlas(null)
+      return
+    }
+    const canvas = document.createElement("canvas")
+    canvas.width = total
+    canvas.height = height
+    const ctx = canvas.getContext("2d")!
+    let x = 0
+    const rects = tiles.map((tile, i) => {
+      const w = widths[i]
+      ctx.drawImage(tile, x, 0)
+      const rect = {
+        u: x / total,
+        v: 0,
+        su: w / total,
+        sv: 1,
+        aspect: height / w,
+      }
+      x += w + gap
+      return rect
     })
-    return () => { alive = false }
-  }, [teamId])
-  return logos
+    const texture = new THREE.CanvasTexture(canvas)
+    texture.colorSpace = THREE.SRGBColorSpace
+    texture.anisotropy = 16
+    texture.generateMipmaps = false
+    texture.minFilter = THREE.LinearFilter
+    texture.magFilter = THREE.LinearFilter
+    texture.wrapS = texture.wrapT = THREE.ClampToEdgeWrapping
+    texture.needsUpdate = true
+    setAtlas({ texture, rects })
+  }, [key, fontReady])
+  useEffect(() => () => atlas?.texture.dispose(), [atlas])
+  return atlas
 }

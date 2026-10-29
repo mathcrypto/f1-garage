@@ -1,7 +1,3 @@
-/**
- * @file Scene.tsx
- * @description The main scene component that renders the 3D garage and track circuit.
- */
 "use client"
 
 import { CameraControls, ContactShadows, Environment, Lightformer, MeshReflectorMaterial } from "@react-three/drei"
@@ -247,12 +243,12 @@ export default function Scene() {
     <Canvas
       shadows
       dpr={[1, 2]}
-      camera={{ position: [7.2, 2.9, 7.6], fov: 32, near: 0.1, far: 2800 }}
+      camera={{ position: [7.2, 2.9, 7.6], fov: 32, near: 0.1, far: 4500 }}
       gl={{ antialias: true, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.05 }}
       onPointerMissed={() => useGarage.getState().select(null)}
     >
       <color attach="background" args={[technical ? XRAY_BG : onTrack ? "#87b5d9" : STUDIO_BG]} />
-      <fog attach="fog" args={[technical ? XRAY_BG : onTrack ? "#a8c8e0" : STUDIO_BG, onTrack ? 140 : 11, onTrack ? 1100 : 30]} />
+      <fog attach="fog" args={[technical ? XRAY_BG : onTrack ? "#a8c8e0" : STUDIO_BG, onTrack ? 220 : 11, onTrack ? 2200 : 30]} />
       <ambientLight intensity={onTrack ? 0.55 : exploded ? 0.22 : 0.08} />
       {/* Track: daylight sun + sky. */}
       {onTrack && <directionalLight position={[60, 90, 40]} intensity={1.85} color="#fff4e0" />}

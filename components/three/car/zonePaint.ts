@@ -1,6 +1,7 @@
 "use client"
 
 import * as THREE from "three"
+import type { SponsorDecal } from "@/lib/sponsors"
 import type { ZoneLivery } from "@/lib/zoneLiveries"
 
 /**
@@ -49,17 +50,128 @@ const FINISH = {
 
 const color = (hex: string | undefined, fallback: string) => new THREE.Color(hex ?? fallback)
 
-const NO_EMBLEM = new THREE.DataTexture(new Uint8Array([0, 0, 0, 0]), 1, 1)
-NO_EMBLEM.needsUpdate = true
-const MAX_EMBLEMS = 3
+const NO_ATLAS = new THREE.DataTexture(new Uint8Array([0, 0, 0, 0]), 1, 1)
+NO_ATLAS.needsUpdate = true
+const MAX_DECALS = 12
 
-/** Show the team emblem image (or none) on a material from `zonePaint`. */
-export function setEmblem(material: THREE.Material, texture: THREE.Texture | null) {
-  const set = material.userData.setEmblem as ((t: THREE.Texture | null) => void) | undefined
-  set?.(texture)
+type DecalRect = { u: number; v: number; su: number; sv: number; aspect: number }
+export type SponsorAtlas = { texture: THREE.Texture; rects: DecalRect[] }
+
+type DecalUniforms = {
+  uAtlas: { value: THREE.Texture }
+  uBox: { value: THREE.Vector4[] }
+  uUv: { value: THREE.Vector4[] }
+  uFlag: { value: THREE.Vector4[] }
 }
 
-export function zonePaint(d: ZoneLivery) {
+function decalUniforms(): DecalUniforms {
+  return {
+    uAtlas: { value: NO_ATLAS },
+    uBox: { value: Array.from({ length: MAX_DECALS }, () => new THREE.Vector4()) },
+    uUv: { value: Array.from({ length: MAX_DECALS }, () => new THREE.Vector4()) },
+    uFlag: { value: Array.from({ length: MAX_DECALS }, () => new THREE.Vector4()) },
+  }
+}
+
+const DECAL_GLSL = `
+uniform sampler2D uAtlas;
+uniform vec4 uBox[${MAX_DECALS}];
+uniform vec4 uUv[${MAX_DECALS}];
+uniform vec4 uFlag[${MAX_DECALS}];
+vec3 applyDecals(vec3 c, vec3 p, vec3 n) {
+  if (p.y < 0.12) return c;
+  for (int i = 0; i < ${MAX_DECALS}; i++) {
+    vec4 b = uBox[i];
+    if (b.z <= 0.0 || b.w <= 0.0) continue;
+    float side = uFlag[i].x;
+    float facing = side > 1.5
+      ? abs(n.y)
+      : side > 0.5
+        ? n.x
+        : side < -0.5
+          ? -n.x
+          : abs(n.x);
+    // Keep marks on true flanks / tops — skip nose/tail faces that mirror text.
+    if (side < 1.5 && abs(n.z) > abs(n.x) * 0.95) continue;
+    if (side > 1.5 && abs(n.y) < 0.45) continue;
+    float mask = side > 1.5
+      ? smoothstep(0.45, 0.7, facing)
+      : smoothstep(0.18, 0.4, facing);
+    if (side > 1.5 && abs(p.y - b.y) > 0.18) continue;
+    if (side < 1.5 && abs(p.x) < 0.22) continue;
+    // Flanks are the side view (z, y). Top surfaces are the plan view (z, x).
+    // Flip from car position so curved pods don't reverse the word mid-letter.
+    float along = (p.z - b.x) / b.z;
+    float u = p.x > 0.0 ? 0.5 - along : 0.5 + along;
+    float v = side > 1.5 ? p.x / b.w + 0.5 : (p.y - b.y) / b.w + 0.5;
+    vec2 uv = vec2(u, v);
+    if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) continue;
+    vec4 r = uUv[i];
+    vec4 e = texture2D(uAtlas, r.xy + uv * r.zw);
+    float cover = clamp(e.a * mask * 1.15, 0.0, 1.0);
+    c = mix(c, e.rgb, cover);
+  }
+  return c;
+}`
+
+/** Keep the compiled livery/decal shader when a part clones its material. */
+function keepShader(material: THREE.MeshPhysicalMaterial) {
+  const compile = material.onBeforeCompile
+  const key = material.customProgramCacheKey
+  material.clone = function (this: THREE.MeshPhysicalMaterial) {
+    const copy = THREE.MeshPhysicalMaterial.prototype.clone.call(this)
+    copy.onBeforeCompile = compile
+    copy.customProgramCacheKey = key
+    copy.clone = this.clone
+    return copy
+  }
+}
+
+function applySponsorAtlas(uniforms: DecalUniforms, placements: SponsorDecal[], atlas: SponsorAtlas | null) {
+  const rects = atlas?.rects ?? []
+  uniforms.uAtlas.value = atlas?.texture ?? NO_ATLAS
+  uniforms.uBox.value.forEach((box, i) => {
+    const place = atlas ? placements[i] : undefined
+    const rect = rects[i]
+    const h = place && rect && rect.aspect > 0 ? place.w * rect.aspect : 0
+    box.set(place?.z ?? 0, place?.y ?? 0, h > 0 ? place!.w : 0, h)
+    uniforms.uUv.value[i].set(rect?.u ?? 0, rect?.v ?? 0, rect?.su ?? 0, rect?.sv ?? 0)
+    uniforms.uFlag.value[i].set(place?.side ?? 0, 0, 0, 0)
+  })
+}
+
+/** Project the same sponsor atlas onto a solid material (wings, endplates). */
+export function attachDecals(material: THREE.MeshPhysicalMaterial, uniforms: DecalUniforms) {
+  material.onBeforeCompile = (shader) => {
+    Object.assign(shader.uniforms, uniforms)
+    shader.vertexShader = shader.vertexShader
+      .replace(
+        "#include <common>",
+        `#include <common>
+attribute vec3 carPos;
+attribute vec3 carNormal;
+varying vec3 vCarPos;
+varying vec3 vCarNormal;`,
+      )
+      .replace(
+        "#include <begin_vertex>",
+        `#include <begin_vertex>
+vCarPos = carPos;
+vCarNormal = carNormal;`,
+      )
+    shader.fragmentShader = shader.fragmentShader
+      .replace("#include <common>", `#include <common>\nvarying vec3 vCarPos;\nvarying vec3 vCarNormal;\n${DECAL_GLSL}`)
+      .replace(
+        "#include <color_fragment>",
+        `#include <color_fragment>
+diffuseColor.rgb = applyDecals(diffuseColor.rgb, vCarPos, normalize(vCarNormal));`,
+      )
+  }
+  material.customProgramCacheKey = () => "solid-decals-v13"
+  keepShader(material)
+}
+
+export function zonePaint(d: ZoneLivery, placements: SponsorDecal[] = []) {
   const material = new THREE.MeshPhysicalMaterial({
     color: "#ffffff",
     metalness: 0.06,
@@ -107,23 +219,15 @@ export function zonePaint(d: ZoneLivery) {
     uHaloOn: { value: d.halo ? 1 : 0 },
     uNoseTipZ: { value: d.noseTipFrom ?? 2.1 },
     uLowerRise: { value: d.lowerRise ?? 0 },
-    uEmblem: { value: NO_EMBLEM as THREE.Texture },
-    // Per placement: centre z, centre y, width, height (0 = unused).
-    uEmblemBox: { value: Array.from({ length: MAX_EMBLEMS }, () => new THREE.Vector4(0, 0, 0, 0)) },
   }
-  const placements = (d.emblems ?? []).slice(0, MAX_EMBLEMS)
-  material.userData.setEmblem = (texture: THREE.Texture | null) => {
-    const image = texture?.image as { width?: number; height?: number } | undefined
-    const aspect = image?.width && image?.height ? image.height / image.width : 0.5
-    uniforms.uEmblem.value = texture ?? NO_EMBLEM
-    uniforms.uEmblemBox.value.forEach((box, i) => {
-      const p = texture ? placements[i] : undefined
-      box.set(p?.z ?? 0, p?.y ?? 0, p?.w ?? 0, p ? p.w * aspect : 0)
-    })
-  }
+  const decals = decalUniforms()
+  const spots = placements.slice(0, MAX_DECALS)
+  material.userData.decals = decals
+  material.userData.spots = spots
+  material.userData.setSponsors = (atlas: SponsorAtlas | null) => applySponsorAtlas(decals, spots, atlas)
 
   material.onBeforeCompile = (shader) => {
-    Object.assign(shader.uniforms, uniforms)
+    Object.assign(shader.uniforms, uniforms, decals)
     shader.vertexShader = shader.vertexShader
       .replace(
         "#include <common>",
@@ -150,8 +254,7 @@ uniform float uOn[11];
 uniform float uStripeWidth;
 uniform vec3 uFlank, uRearFlash, uHalo;
 uniform float uFlankOn, uRearFlashOn, uHaloOn, uNoseTipZ, uLowerRise;
-uniform sampler2D uEmblem;
-uniform vec4 uEmblemBox[${MAX_EMBLEMS}];
+${DECAL_GLSL}
 
 float lvHash(vec3 p) { return fract(sin(dot(p, vec3(127.1, 311.7, 74.7))) * 43758.5453); }
 float lvNoise(vec3 p) {
@@ -183,7 +286,7 @@ vec3 liveryColor(vec3 p, vec3 n) {
 
   // Mottled jacquard over the base.
   float sp = lvNoise(p * 26.0) * 0.6 + lvNoise(p * 70.0) * 0.4;
-  c = mix(c, uSpeckle, uOn[6] * smoothstep(0.55, 0.7, sp) * 0.5);
+  c = mix(c, uSpeckle, uOn[6] * smoothstep(0.62, 0.82, sp) * 0.18);
 
   // Sidepod sides in a second colour, below the pod shoulder; tops keep the base.
   float flank = smoothstep(0.35, 0.6, abs(n.x)) * lvIn(-1.7, 0.65, p.z) * smoothstep(0.7, 0.64, p.y) * smoothstep(0.3, 0.38, ax);
@@ -232,16 +335,7 @@ vec3 liveryColor(vec3 p, vec3 n) {
   // Floor edge and plank stay carbon.
   c = mix(c, uCarbon, smoothstep(0.13, 0.1, p.y));
 
-  // Team emblem, projected onto both flanks facing forward.
-  for (int i = 0; i < ${MAX_EMBLEMS}; i++) {
-    vec4 b = uEmblemBox[i];
-    if (b.z <= 0.0) continue;
-    vec2 uv = vec2(0.5 - (p.z - b.x) / b.z, (p.y - b.y) / b.w + 0.5);
-    if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) continue;
-    vec4 e = texture2D(uEmblem, uv);
-    c = mix(c, e.rgb, e.a * smoothstep(0.15, 0.35, abs(n.x)));
-  }
-  return c;
+  return applyDecals(c, p, n);
 }`,
       )
       .replace(
@@ -250,14 +344,7 @@ vec3 liveryColor(vec3 p, vec3 n) {
 diffuseColor.rgb *= liveryColor(vCarPos, normalize(vCarNormal));`,
       )
   }
-  material.customProgramCacheKey = () => "zone-livery"
-  // Part clones materials per piece; a plain clone would drop the shader hook.
-  material.clone = function (this: THREE.MeshPhysicalMaterial) {
-    const copy = THREE.MeshPhysicalMaterial.prototype.clone.call(this)
-    copy.onBeforeCompile = this.onBeforeCompile
-    copy.customProgramCacheKey = this.customProgramCacheKey
-    copy.clone = this.clone
-    return copy
-  }
+  material.customProgramCacheKey = () => "zone-livery-decals-v13"
+  keepShader(material)
   return material
 }

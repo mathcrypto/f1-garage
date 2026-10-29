@@ -1,5 +1,4 @@
 import * as THREE from "three"
-import { PART_IDS } from "./parts"
 
 /**
  * Spatial part labels for a fused Hunyuan/TRELLIS mesh (after fitToStudio).
@@ -94,8 +93,4 @@ export function splitMeshByParts(mesh: THREE.Mesh): Map<string, THREE.BufferGeom
   }
 
   return out
-}
-
-export function isKnownPartId(id: string) {
-  return PART_IDS.includes(id)
 }

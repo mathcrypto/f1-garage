@@ -19,7 +19,7 @@ export function idealLat(curvature: number) {
 }
 
 /** Battery delta for one frame: overtake drain, brake harvest, or idle trickle. */
-export function batteryStep(dt: number, boosting: boolean, braking: boolean) {
+function batteryStep(dt: number, boosting: boolean, braking: boolean) {
   return (boosting ? -0.2 : braking ? 0.1 : 0.012) * dt
 }
 

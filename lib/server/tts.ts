@@ -7,7 +7,7 @@ import { LruCache } from "./cache"
 
 /** Lena = Libby only. Same voice ID forever; `tone` only changes rate/pitch/volume. */
 export const LENA_VOICE = "en-GB-LibbyNeural"
-export const LENA_LANG = "en-GB"
+const LENA_LANG = "en-GB"
 
 export type LenaTone = "calm" | "race"
 

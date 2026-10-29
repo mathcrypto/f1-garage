@@ -41,7 +41,7 @@ const TIMESCALE = typeof window === "undefined" ? 1 : Math.min(40, Number(new UR
 const step = (raw: number) => Math.min(raw, 0.05) * TIMESCALE
 
 // One car placed on the track every frame from its simulated state.
-export function TrackCar({ teamId, car }: { teamId: string; car: Driven & { lat?: number } }) {
+function TrackCar({ teamId, car }: { teamId: string; car: Driven & { lat?: number } }) {
   const group = useRef<THREE.Group>(null!)
   const team = teamById(teamId)
   shadowTex ??= typeof document === "undefined" ? null : shadowTexture()

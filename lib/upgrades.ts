@@ -7,7 +7,7 @@ import { TEAMS, teamById } from "./teams"
 // report doesn't say which part changed, the entry is left out. Lena uses
 // get_team_story / web_search for anything newer than this list.
 
-export type UpgradeSource = { title: string; url: string }
+type UpgradeSource = { title: string; url: string }
 
 export type UpgradePackage = {
   id: string
@@ -27,7 +27,6 @@ const fia = (event: string, slug: string): UpgradeSource => ({
   url: `https://www.fia.com/system/files/decision-document/2026_${slug}_grand_prix_-_car_presentation_submissions.pdf`,
 })
 
-const RACER_MIAMI = { title: "RACER: Technical updates, 2026 Miami GP", url: "https://racer.com/2026/05/01/technical-updates-2026-miami-grand-prix" }
 const RACER_MONZA = { title: "RACER: Technical updates, 2026 Italian GP", url: "https://racer.com/2026/09/04/technical-updates-2026-italian-grand-prix" }
 const PLANETF1_MIAMI = { title: "PlanetF1: Miami GP upgrades", url: "https://www.planetf1.com/news/f1-miami-upgrades-ferrari-11-red-bull-mclaren" }
 

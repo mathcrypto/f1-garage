@@ -7,7 +7,7 @@ import { PART_IDS } from "./parts"
  * `part: "split"` marks a one-piece bodywork, kept whole (see GltfCar).
  */
 
-export const CAR_MODEL_BASE = "/models/cars"
+const CAR_MODEL_BASE = "/models/cars"
 
 const ALIASES: Record<string, string> = {
   frontwing: "front-wing",
@@ -58,7 +58,7 @@ export function resolvePartId(raw: string | undefined | null): string | null {
  * - f1-2026.glb: the same file locally (git-ignored, never committed).
  * - {teamId}.glb, ai.glb: optional team-specific or AI-generated meshes.
  */
-export function carModelCandidates(teamId: string): string[] {
+function carModelCandidates(teamId: string): string[] {
   const hosted = process.env.NEXT_PUBLIC_CAR_MODEL_URL
   return [
     ...(hosted ? [hosted] : []),

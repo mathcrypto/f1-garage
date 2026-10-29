@@ -47,7 +47,6 @@ class SoundEngine {
   private bedRace: { el: HTMLAudioElement; gain: GainNode } | null = null
   private radioBuf: AudioBuffer | null = null
   private radioUntil = 0
-  private raf = 0
   private listeners = new Set<() => void>()
 
   // Called from the first click anywhere: browsers only allow audio after a gesture.
@@ -72,8 +71,8 @@ class SoundEngine {
       for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1
       void this.startEngine()
       void this.loadTheme()
-      const tick = () => { this.update(); this.raf = requestAnimationFrame(tick) }
-      this.raf = requestAnimationFrame(tick)
+      const tick = () => { this.update(); requestAnimationFrame(tick) }
+      requestAnimationFrame(tick)
     }
     void this.ctx.resume()
   }

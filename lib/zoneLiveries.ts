@@ -5,8 +5,8 @@
 // (Sky Sports, Crash.net, Autosport, Red Bull, Motorsport.com, Top Gear) and,
 // for Red Bull, the team's launch photo. Only placements a source describes are
 // painted; everything else stays in the base colour or carbon. Hex values are
-// approximations, not official brand colours. Sponsor and team logos are not
-// reproduced.
+// approximations, not official brand colours. Sponsor wordmarks are placed by
+// lib/sponsors.ts.
 
 export type ZoneLivery = {
   finish: "gloss" | "satin" | "matte"
@@ -43,17 +43,11 @@ export type ZoneLivery = {
   lowerRise?: number
   /** Wing endplates in livery colour; carbon when unset. */
   wings?: string
-  /**
-   * Where the team emblem goes, on both flanks (centre along the car `z`,
-   * height `y`, width `w` in metres). Only drawn when the emblem image is
-   * supplied in public/logos (logos are trademarks and are not bundled).
-   */
-  emblems?: { z: number; y: number; w: number }[]
 }
 
 const CARBON = "#111215"
 
-export const ZONE_LIVERIES: Record<string, ZoneLivery> = {
+const ZONE_LIVERIES: Record<string, ZoneLivery> = {
   // Gloss royal blue (a return to gloss) with a darker navy jacquard pattern; yellow
   // nose tip and airbox, red on the engine-cover flanks, black halo, carbon lower
   // sidepods, blue endplates. Yellow, red and navy sampled from the launch photo.
@@ -70,11 +64,6 @@ export const ZONE_LIVERIES: Record<string, ZoneLivery> = {
     halo: CARBON,
     speckle: "#081b5a",
     wings: "#1a2f8a",
-    // Charging bull on the engine-cover flanks and on the nose, as in the launch photo.
-    emblems: [
-      { z: -0.95, y: 0.8, w: 1.15 },
-      { z: 1.95, y: 0.46, w: 0.55 },
-    ],
   },
   // Almost all red, black accents removed, extra white around the cockpit and
   // airbox running back over the engine cover, subtle yellow pinstripes.
@@ -161,7 +150,7 @@ export const ZONE_LIVERIES: Record<string, ZoneLivery> = {
     lower: "#c8102e",
     cover: "#141516",
   },
-  // Two-sided: black on the left flank, white on the right (Robb Report).
+  // Two-sided: black on the left flank, white on the right.
   cadillac: {
     finish: "gloss",
     base: "#0d0d0e",

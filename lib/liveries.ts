@@ -1,7 +1,7 @@
 // Livery designs painted onto the car as a side-projected texture.
 // Colours and graphic layout follow each team's 2026 look (approximations —
-// not official brand values). Logos aren't bundled; optional files can go in
-// public/logos.
+// not official brand values). Used by the code-built car; the licensed model
+// uses lib/zoneLiveries.ts.
 export type LiveryDesign = {
   // band: base + sweeping stripes; split: front/rear colour break;
   // fade: longitudinal colour blend; sides: different left/right flanks.
@@ -22,7 +22,7 @@ export type LiveryDesign = {
   wordmarkColor: string
 }
 
-export const LIVERIES: Record<string, LiveryDesign> = {
+const LIVERIES: Record<string, LiveryDesign> = {
   // 2026 show-car cue: rosso nose/sidepods, white engine cover, carbon lower, black halo.
   ferrari: {
     style: "split",

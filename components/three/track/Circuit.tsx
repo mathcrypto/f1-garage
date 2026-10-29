@@ -1,17 +1,18 @@
 "use client"
 
+import { useGLTF } from "@react-three/drei"
 import { useFrame } from "@react-three/fiber"
-import { useLayoutEffect, useMemo, useRef } from "react"
+import { Component, Suspense, useLayoutEffect, useMemo, useRef, type ReactNode } from "react"
 import * as THREE from "three"
 import { gridSlot, race } from "@/lib/race"
-import { ROAD_WIDTH, WALL_LAT, placeOnTrack, track } from "@/lib/track"
+import { CIRCUIT_SCALE, ROAD_WIDTH, TRACK_SURFACE, WALL_LAT, placeOnTrack, track } from "@/lib/track"
 
 const L = track.length
 const HALF = ROAD_WIDTH / 2
 
 // Builds a flat strip that follows the track between two lateral offsets.
 function ribbon(from: number, to: number, opts: { y?: number; vRepeat?: number; filter?: (s: number) => boolean; step?: number } = {}) {
-  const { y = 0.01, vRepeat = 10, filter, step = 2 } = opts
+  const { y = TRACK_SURFACE - 0.04, vRepeat = 10, filter, step = 2 } = opts
   const pos: number[] = [], uv: number[] = [], index: number[] = []
   const p = new THREE.Vector3(), left = new THREE.Vector3()
   let run = -1
@@ -44,9 +45,10 @@ function wallFace(lat: number, height = 1.05, step = 0.9) {
     track.point(s, p)
     track.left(s, left)
     const base = pos.length / 3
+    const foot = p.y + TRACK_SURFACE
     pos.push(
-      p.x + left.x * lat, p.y, p.z + left.z * lat,
-      p.x + left.x * lat, p.y + height, p.z + left.z * lat,
+      p.x + left.x * lat, foot, p.z + left.z * lat,
+      p.x + left.x * lat, foot + height, p.z + left.z * lat,
     )
     if (run >= 0) index.push(run, run + 1, base, run + 1, base + 1, base)
     run = base
@@ -130,7 +132,7 @@ const gravel = () =>
 
 // Five pods of four lamps across the start line. They light one by one and
 // all go out together for the start.
-export function Gantry() {
+function Gantry() {
   const lamps = useRef<THREE.Mesh[]>([])
   const group = useRef<THREE.Group>(null!)
   useLayoutEffect(() => placeOnTrack(group.current, 18, 0), [])
@@ -168,7 +170,68 @@ export function Gantry() {
   )
 }
 
+const MODEL_URL = "/models/tracks/monza-circuit.glb"
+
+/** Visual circuit, scaled with the racing line so the car stays on the asphalt. */
+function MonzaModel() {
+  const { scene } = useGLTF(MODEL_URL)
+  const cloned = useMemo(() => {
+    const copy = scene.clone(true)
+    copy.traverse((obj) => {
+      // Ground banner that reads "Monza 1922".
+      if (obj.name === "mesh_269") obj.visible = false
+    })
+    return copy
+  }, [scene])
+  return <primitive object={cloned} scale={CIRCUIT_SCALE} />
+}
+
+/** White lines and Armco on the asphalt edge. The car is stopped at this wall. */
+function TrackLimits() {
+  const geo = useMemo(() => {
+    const edge = ROAD_WIDTH / 2
+    return {
+      wallL: wallFace(WALL_LAT),
+      wallR: wallFace(-WALL_LAT),
+      lineL: ribbon(edge - 0.28, edge - 0.02, { y: TRACK_SURFACE + 0.03, step: 1.2, vRepeat: 40 }),
+      lineR: ribbon(-(edge - 0.02), -(edge - 0.28), { y: TRACK_SURFACE + 0.03, step: 1.2, vRepeat: 40 }),
+    }
+  }, [])
+  return (
+    <group>
+      <mesh geometry={geo.wallL}><meshStandardMaterial color="#d5dae1" roughness={0.42} metalness={0.45} side={THREE.DoubleSide} /></mesh>
+      <mesh geometry={geo.wallR}><meshStandardMaterial color="#d5dae1" roughness={0.42} metalness={0.45} side={THREE.DoubleSide} /></mesh>
+      <mesh geometry={geo.lineL}><meshBasicMaterial color="#f3f3f3" side={THREE.DoubleSide} /></mesh>
+      <mesh geometry={geo.lineR}><meshBasicMaterial color="#f3f3f3" side={THREE.DoubleSide} /></mesh>
+    </group>
+  )
+}
+
+class CircuitFallback extends Component<{ children: ReactNode; fallback: ReactNode }, { failed: boolean }> {
+  state = { failed: false }
+  static getDerivedStateFromError() {
+    return { failed: true }
+  }
+  render() {
+    return this.state.failed ? this.props.fallback : this.props.children
+  }
+}
+
 export function Circuit() {
+  return (
+    <CircuitFallback fallback={<ProceduralCircuit />}>
+      <Suspense fallback={<ProceduralCircuit />}>
+        <group>
+          <MonzaModel />
+          <TrackLimits />
+          <Gantry />
+        </group>
+      </Suspense>
+    </CircuitFallback>
+  )
+}
+
+function ProceduralCircuit() {
   const textures = useMemo(() => {
     const g = grass()
     g.repeat.set(120, 120)
@@ -176,7 +239,7 @@ export function Circuit() {
   }, [])
   const RUN = WALL_LAT
   const geo = useMemo(() => {
-    const kerbOpts = { y: 0.045, vRepeat: 2.2, step: 1.0 }
+    const kerbOpts = { y: TRACK_SURFACE + 0.03, vRepeat: 2.2, step: 1.0 }
     // Grass runoff (not sandy highway shoulder).
     const runoffOpts = { y: 0.004, vRepeat: 70, step: 1.5 }
     const gravelOpts = { y: 0.007, vRepeat: 40, filter: gravelZone, step: 1.5 }

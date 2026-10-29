@@ -11,3 +11,5 @@ dist/
 .cache/
 # Licensed 3D car: never commit (see public/models/README.md)
 public/models/cars/f1-2026.glb
+# Local circuit mesh, copied from Downloads/monza-circuit.glb
+public/models/tracks/*.glb

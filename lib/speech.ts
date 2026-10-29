@@ -21,7 +21,7 @@ export const cleanSpeech = (text: string) =>
 
 // Split after . ! ? followed by a space, so "26.8" and "1.2 seconds" stay
 // whole, and at line breaks (list items have no full stop).
-export const sentences = (text: string) => text.split(/(?<=[.!?]["')\]]?)\s+|\n+/).map(endSentence).filter(Boolean)
+const sentences = (text: string) => text.split(/(?<=[.!?]["')\]]?)\s+|\n+/).map(endSentence).filter(Boolean)
 // A list item gets a full stop, so the voice pauses after it.
 export const endSentence = (s: string) => { const t = s.trim(); return !t || /[.!?:;,"')\]]$/.test(t) ? t : `${t}.` }
 

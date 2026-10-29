@@ -6,14 +6,14 @@ import { gearbox } from "@/lib/drive"
 import { liveryFor } from "@/lib/liveries"
 import { input, lapTime, race, setFollow, setPaused, setupRace, stopRace, useRace, type Assist, type RaceOptions, type Tone } from "@/lib/race"
 import { sound } from "@/lib/sound"
-import { useEngineerState, useGarage, type TrackCam } from "@/lib/store"
+import { useGarage, type TrackCam } from "@/lib/store"
 import { TEAMS, teamById } from "@/lib/teams"
 import { track } from "@/lib/track"
 import { voice } from "@/lib/voice"
 import { lines } from "@/lib/voiceLines"
 import { radio } from "@/lib/engineerRadio"
 
-export const useRaceSetup = create<{ open: boolean; last: RaceOptions | null }>(() => ({ open: false, last: null }))
+const useRaceSetup = create<{ open: boolean; last: RaceOptions | null }>(() => ({ open: false, last: null }))
 export const openRaceSetup = () => useRaceSetup.setState({ open: true })
 
 // Race-control messages across the top of the screen, as in the F1 games.
@@ -27,7 +27,7 @@ function message(text: string, tone: Tone = "info") {
 
 const P = (n: number) => `P${n}`
 
-export function startRace(o: RaceOptions) {
+function startRace(o: RaceOptions) {
   const g = useGarage.getState()
   useRaceSetup.setState({ open: false, last: o })
   useMessages.setState({ items: [] })
@@ -81,7 +81,7 @@ export function startRace(o: RaceOptions) {
   setTimeout(() => radio(o.player ? lines.gridCheck(slot) : lines.gridWatch(o.order.length), "hard"), 400)
 }
 
-export function endRace() {
+function endRace() {
   stopRace()
   voice.stop()
   useGarage.getState().setMode("studio")

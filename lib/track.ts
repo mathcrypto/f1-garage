@@ -1,14 +1,14 @@
 import * as THREE from "three"
 import monza from "./circuits/monza.json"
+import road from "./circuits/monza-road.json"
 
 /**
  * Active circuit: Autodromo Nazionale Monza, raced clockwise.
- * Centerline from bacinger/f1-circuits (MIT, not affiliated with F1/FIA),
- * scaled so the lap is the official 5793 m. The source outline is 2D, so the
- * track is flat rather than guessing elevation.
+ * The driving line is the centre of the visual asphalt (monza-road.json),
+ * scaled so the lap is the official 5793 m. The outline is flat.
  */
 
-export type CircuitDef = {
+type CircuitDef = {
   id: string
   name: string
   control: [number, number][]
@@ -20,18 +20,25 @@ const OFFICIAL_LENGTH = monza.lengthTarget
 const spline = (points: [number, number][]) =>
   new THREE.CatmullRomCurve3(points.map(([x, z]) => new THREE.Vector3(x, 0, z)), true, "centripetal")
 
-// Spline smoothing shortens the outline slightly; scale it back to the real lap.
-const scale = OFFICIAL_LENGTH / spline(monza.control as [number, number][]).getLength()
+// The road file is in the same metres as the circuit model. Spline smoothing
+// changes the length slightly; this scale locks the lap to 5793 m. The model
+// uses the same scale so the car stays on the asphalt.
+const roadLine = road.control as [number, number][]
+const scale = OFFICIAL_LENGTH / spline(roadLine).getLength()
+export const CIRCUIT_SCALE = scale
 
-export const ACTIVE_CIRCUIT: CircuitDef = {
+const ACTIVE_CIRCUIT: CircuitDef = {
   id: monza.id,
   name: monza.name,
-  control: (monza.control as [number, number][]).map(([x, z]) => [x * scale, z * scale]),
+  control: roadLine.map(([x, z]) => [x * scale, z * scale]),
 }
 
-export const ROAD_WIDTH = 14
-/** Armco lateral offset from centerline — must match Circuit wall ribbons. */
-export const WALL_LAT = ROAD_WIDTH / 2 + 4.5
+/** Asphalt width of the visual circuit, metres. */
+export const ROAD_WIDTH = road.width
+/** Armco just outside the white line — the car cannot drive past it. */
+export const WALL_LAT = ROAD_WIDTH / 2 + 0.2
+/** Wheels sit on the circuit mesh, which is slightly above y = 0. */
+export const TRACK_SURFACE = 0.12
 /** Armco slab thickness — Circuit walls and race hitbox must match. */
 export const WALL_THICK = 0.55
 const VMAX = 95 // m/s — Monza is a power circuit
@@ -40,7 +47,7 @@ const A_BRAKE = 48
 const accel = (v: number) => 4 + 13 * (1 - v / VMAX)
 
 const curve = spline(ACTIVE_CIRCUIT.control)
-export const LENGTH = Math.round(curve.getLength())
+const LENGTH = Math.round(curve.getLength())
 const N = LENGTH
 
 const pos: THREE.Vector3[] = []
@@ -129,7 +136,7 @@ export function placeOnTrack(obj: THREE.Object3D, s: number, lateral: number, y 
   track.point(s, obj.position)
   track.left(s, tmpL)
   obj.position.addScaledVector(tmpL, lateral)
-  obj.position.y += y
+  obj.position.y += y + TRACK_SURFACE
   track.tangent(s, tmpT)
   obj.rotation.set(0, Math.atan2(tmpT.x, tmpT.z), 0)
 }

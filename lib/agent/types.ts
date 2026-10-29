@@ -16,8 +16,6 @@ export type ChatTurn =
   | { role: "user"; content: string; context: GarageContext }
   | { role: "assistant"; content: string }
 
-export type AgentRequest = { turns: ChatTurn[] }
-
 /** Commands the agent sends to drive the 3D car. */
 export type UiCommand =
   | { action: "highlight"; parts: { id: string; note: string }[] }

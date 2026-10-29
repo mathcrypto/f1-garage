@@ -8,7 +8,7 @@ import type { Team } from "@/lib/teams"
 import { liveryFor } from "@/lib/liveries"
 import { useGarage } from "@/lib/store"
 import { airfoil, loft, plate, profile, rod, tube, tyre, type Section } from "./geometry"
-import { paintLivery, sideUV, useTeamLogos, useWordmark } from "./livery"
+import { paintLivery, sideUV, useWordmark } from "./livery"
 import { IDLE, useMotion } from "./CarMotion"
 import { Part } from "./Part"
 
@@ -488,9 +488,7 @@ export function Car({ team }: { team: Team }) {
   const design = liveryFor(team.id)
   const word = useWordmark(design.wordmark, design.wordmarkColor)
   const carName = useWordmark(team.car, design.wordmarkColor)
-  const brand = useTeamLogos(team.id)
   const body = useRef<THREE.Group>(null!)
-  const motion = useMotion()
 
   // Real-time shadows need cast/receive on every mesh (groups don’t inherit).
   useLayoutEffect(() => {
@@ -557,13 +555,13 @@ export function Car({ team }: { team: Team }) {
 
       <Part id="sidepods" explode={[0.94, 0.07, 0]}>
         <mesh geometry={geo.sidepodL} material={m.livery}>
-          <Badge map={brand.main ?? word} position={[0.7, 0.43, -0.32]} rotation={[0, Math.PI / 2, 0]} scale={[0.82, 0.2, 0.25]} />
+          <Badge map={word} position={[0.7, 0.43, -0.32]} rotation={[0, Math.PI / 2, 0]} scale={[0.82, 0.2, 0.25]} />
         </mesh>
         <mesh material={m.inlet} position={[0.5, 0.5, 0.48]} scale={[0.15, 0.14, 0.012]}><sphereGeometry args={[1, 24, 12]} /></mesh>
       </Part>
       <Part id="sidepods" explode={[-0.94, 0.07, 0]} label={false}>
         <mesh geometry={geo.sidepodR} material={m.livery}>
-          <Badge map={brand.main ?? word} position={[-0.7, 0.43, -0.32]} rotation={[0, -Math.PI / 2, 0]} scale={[0.82, 0.2, 0.25]} />
+          <Badge map={word} position={[-0.7, 0.43, -0.32]} rotation={[0, -Math.PI / 2, 0]} scale={[0.82, 0.2, 0.25]} />
         </mesh>
         <mesh material={m.inlet} position={[-0.5, 0.5, 0.48]} scale={[0.15, 0.14, 0.012]}><sphereGeometry args={[1, 24, 12]} /></mesh>
       </Part>
@@ -588,8 +586,8 @@ export function Car({ team }: { team: Team }) {
         <mesh geometry={geo.airbox} material={m.livery} />
         <mesh material={m.inlet} position={[0, 0.93, -0.25]} scale={[0.09, 0.08, 0.02]}><sphereGeometry args={[1, 24, 12]} /></mesh>
         <mesh geometry={geo.fin} material={m.livery}>
-          <Badge map={brand.main ?? carName} position={[0.007, 0.76, -1.45]} rotation={[0, Math.PI / 2, 0]} scale={[0.62, 0.15, 0.008]} />
-          <Badge map={brand.main ?? carName} position={[-0.007, 0.76, -1.45]} rotation={[0, -Math.PI / 2, 0]} scale={[0.62, 0.15, 0.008]} />
+          <Badge map={carName} position={[0.007, 0.76, -1.45]} rotation={[0, Math.PI / 2, 0]} scale={[0.62, 0.15, 0.008]} />
+          <Badge map={carName} position={[-0.007, 0.76, -1.45]} rotation={[0, -Math.PI / 2, 0]} scale={[0.62, 0.15, 0.008]} />
         </mesh>
         <mesh material={m.inlet} position={[0, 0.44, -2.33]} scale={[0.05, 0.06, 0.01]}><sphereGeometry args={[1, 16, 8]} /></mesh>
         {[1, -1].flatMap((s) => [0, 1, 2, 3, 4].map((i) => (

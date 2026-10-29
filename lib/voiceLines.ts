@@ -1,6 +1,3 @@
-import { LESSONS } from "./lessons"
-import { TEAMS } from "./teams"
-
 // Lena's fixed lines. Race radio stays short and flat — information, not hype.
 const P = (n: number) => `P${n}`
 
@@ -61,18 +58,4 @@ export const lines = {
     const pen = seconds === 1 ? "one second" : `${seconds} second`
     return `Final result ${P(pos)}. ${pen} track limits penalty.`
   },
-}
-
-export function fixedLines(): string[] {
-  const out: string[] = [
-    lines.copy, lines.checking, lines.driveCheck, lines.finalLap, lines.lightsOut(true), lines.lightsOut(false),
-    lines.cornerSlow, lines.cornerMedium, lines.cornerFast, lines.batteryLow, lines.trackLimits, lines.penalty, lines.fastest,
-  ]
-  for (const t of TEAMS) out.push(lines.greeting(t.name, t.car), ...lines.showcase(t.car))
-  for (const l of LESSONS) for (const s of l.steps) out.push(s.say)
-  for (let p = 1; p <= TEAMS.length; p++) {
-    out.push(lines.gridCheck(p), lines.gridWatch(p), lines.gained(p), lines.lost(p), lines.finish(p), lines.crossed(p))
-    for (const s of [5, 10]) out.push(lines.classifiedPenalty(p, s))
-  }
-  return [...new Set(out)]
 }

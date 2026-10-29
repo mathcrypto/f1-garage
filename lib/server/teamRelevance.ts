@@ -1,5 +1,5 @@
 import "server-only"
-import { TEAMS, teamById } from "../teams"
+import { teamById } from "../teams"
 import { teamSite, STORY_MEDIA_DOMAINS } from "./teamSites"
 
 /**
@@ -20,7 +20,7 @@ const ROAD =
 const JUNK_PATH =
   /\/(videos?|projects?|shop|store|gaming|esports|exclusives?|merchandise|apparel)\b|memento|best-seats|talking-bull|oracle-strategy-series/i
 
-export function teamAliases(teamId: string): string[] {
+function teamAliases(teamId: string): string[] {
   const t = teamById(teamId)
   const site = teamSite(teamId)
   const base = [t.name, t.name.replace(/^Scuderia /, ""), t.car, t.code, site?.searchAs]
@@ -49,11 +49,11 @@ function includesAlias(text: string, aliases: string[]): boolean {
 }
 
 /** Headline must name this team (avoids hub pages and rival articles). */
-export function aboutThisTeam(title: string, _content: string, teamId: string): boolean {
+function aboutThisTeam(title: string, teamId: string): boolean {
   return includesAlias(title.toLowerCase(), teamAliases(teamId))
 }
 
-export function isJunkNewsUrl(url: string): boolean {
+function isJunkNewsUrl(url: string): boolean {
   try {
     return JUNK_PATH.test(new URL(url).pathname + new URL(url).href)
   } catch {
@@ -71,7 +71,7 @@ export function isJunkSnippet(title: string, content: string): boolean {
   return false
 }
 
-export function isMediaHost(url: string): boolean {
+function isMediaHost(url: string): boolean {
   try {
     const host = new URL(url).hostname.replace(/^www\./, "")
     return STORY_MEDIA_DOMAINS.some((d) => host === d || host.endsWith(`.${d}`))
@@ -86,7 +86,7 @@ export function isRelevantTeamArticle(title: string, content: string, teamId: st
   const blob = `${title}\n${content}`
   if (FLUFF.test(blob)) return false
   if (ROAD.test(blob) && !RACE_TECH.test(blob)) return false
-  if (!aboutThisTeam(title, content, teamId)) return false
+  if (!aboutThisTeam(title, teamId)) return false
   // Title alone can carry race/tech signal when body is a messy scrape.
   if (!RACE_TECH.test(blob) && !RACE_TECH.test(title)) return false
   return true

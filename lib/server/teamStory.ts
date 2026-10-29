@@ -11,9 +11,9 @@ import { teamById } from "../teams"
  * the team's own site via Tavily search. It's assembled from article
  * snippets, not written by an AI model. Cached for 45 minutes.
  */
-export type StorySource = { title: string; url: string; outlet: string; publishedDate?: string }
+type StorySource = { title: string; url: string; outlet: string; publishedDate?: string }
 
-export type StoryBullet = {
+type StoryBullet = {
   text: string
   kind: "upgrade" | "aero" | "power" | "weekend" | "general"
   sourceIndex: number

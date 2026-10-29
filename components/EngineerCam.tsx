@@ -7,7 +7,7 @@ import { useProgress } from "@/lib/progress"
 import { useEngineerState, useGarage } from "@/lib/store"
 import { voice } from "@/lib/voice"
 
-export function applyStep(step: LessonStep) {
+function applyStep(step: LessonStep) {
   const g = useGarage.getState()
   if (step.mode && step.mode !== g.mode) g.setMode(step.mode)
   if (step.exploded !== undefined) g.setExploded(step.exploded)
