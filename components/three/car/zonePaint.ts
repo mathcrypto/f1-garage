@@ -98,7 +98,9 @@ vec3 applyDecals(vec3 c, vec3 p, vec3 n) {
         ? n.x
         : side < -0.5
           ? -n.x
-          : abs(n.x);
+          // Outward-facing only: an inward face (inside of an endplate) would
+          // show the word mirrored.
+          : n.x * sign(p.x);
     if (top && abs(p.y - b.y) > 0.18) continue;
     float mask = top
       ? smoothstep(0.3, 0.55, facing)

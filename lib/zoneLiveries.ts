@@ -65,17 +65,20 @@ const ZONE_LIVERIES: Record<string, ZoneLivery> = {
     speckle: "#081b5a",
     wings: "#1a2f8a",
   },
-  // Almost all red, black accents removed, extra white around the cockpit and
-  // airbox running back over the engine cover, subtle yellow pinstripes.
+  // From SF-26 photos: red (sampled), white around the cockpit and airbox
+  // running back over the engine cover with a thin red line inside it, black
+  // carbon lower body and halo.
   ferrari: {
     finish: "gloss",
-    base: "#d0091a",
-    lower: "#b30716",
-    cockpit: "#f4f4f2",
-    airbox: "#f4f4f2",
-    cover: "#f4f4f2",
-    stripe: "#ffd400",
-    stripeWidth: 0.012,
+    base: "#d50723",
+    lower: CARBON,
+    lowerRise: 0.04,
+    cockpit: "#f2f2f0",
+    airbox: "#f2f2f0",
+    cover: "#f2f2f0",
+    stripe: "#d50723",
+    stripeWidth: 0.008,
+    halo: CARBON,
   },
   // Silver at the front flowing to black at the rear, with a turquoise
   // (Petronas) line from nose to tail.
