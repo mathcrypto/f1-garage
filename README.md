@@ -1,72 +1,150 @@
-# F1 Garage
+<div align="center">
 
-**Understand Formula 1's 2026 cars by taking them apart, with an AI race engineer at your side.**
+# 🏎️ F1 Garage
 
-![The Ferrari SF-26 in the garage](docs/screenshots/garage.jpg)
+### Take a 2026 Formula 1 car apart, piece by piece, while an AI race engineer explains it all.
 
-Built for the Nebius Global AI Hackathon · AI engineer on **NVIDIA Nemotron** via **Nebius Token Factory** · Next.js, React Three Fiber
+**Explode the car. X-ray it. Watch the air flow. Race it at Monza.**
+And ask Lena anything until it finally clicks.
 
-## Why I built this
+[![Nebius Global AI Hackathon](https://img.shields.io/badge/Nebius-Global%20AI%20Hackathon-ff4f00)](#)
+[![NVIDIA Nemotron](https://img.shields.io/badge/NVIDIA-Nemotron-76b900?logo=nvidia&logoColor=white)](#where-ai-is-used)
+[![Nebius Token Factory](https://img.shields.io/badge/Nebius-Token%20Factory-1a1a1a)](#where-ai-is-used)
+[![Next.js](https://img.shields.io/badge/Next.js-000?logo=nextdotjs&logoColor=white)](#run-it)
+[![React Three Fiber](https://img.shields.io/badge/React%20Three%20Fiber-3D-049ef4?logo=threedotjs&logoColor=white)](#run-it)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-I'm a huge Formula 1 fan, and the sport gets more technical every year. The 2026 rules are the biggest change in a generation: new power units with nearly half the power electric, active aerodynamics, Overtake mode, energy to manage every lap. Even commentators and drivers say the new cars are hard to follow, so for fans without an engineering background it's harder still.
+<img src="docs/screenshots/hero.png" alt="The Ferrari SF-26 in the F1 Garage" width="900">
 
-**F1 Garage lets any fan open up a 2026 car, see how it works and ask questions in plain words until it makes sense.** Every figure comes from a real source (FIA regulations, team declarations, F1 media), and the app shows where.
+<!-- Tip: replace the hero image with a 5–10 s GIF of the car exploding apart. It's the single biggest upgrade for this README. -->
 
-## What's inside
+</div>
 
-**Lena, the AI race engineer**
-- Ask anything in plain words: *"What did Ferrari bring to Miami?"*, *"What's in Ferrari's Monza drag package?"*, *"Why does the SF-26 have active aero?"*
-- She picks her own tools (FIA rules, team upgrades, live timing, standings, news) and cites her sources.
-- She shows you while she talks: takes parts off the car, highlights them, switches to X-ray or airflow.
-- Fan or Engineer depth, six guided lessons, and a natural voice with captions.
+---
 
-**The garage**
-- All 11 teams of the 2026 grid, each car in its 2026 livery.
-- Take any part off, or explode the whole car into its pieces.
-- X-ray view with FIA dimensions, airflow streamlines, and a power-unit cutaway.
+## 🔥 2026 changed everything. Most fans got left behind.
 
-**The fun part**
-- **Showcase:** a narrated reveal where the car comes apart, rebuilds and launches.
-- **Race:** a race weekend like the F1 games at Monza, with lights, a timing tower, Overtake mode and Lena on the radio.
-- **Guided lap:** watch the 2026 systems work, aero modes switching and the battery charging and deploying.
+The 2026 regulations are the biggest shake-up in a generation:
 
-## Screenshots
+- ⚡ **Nearly half the power is now electric**
+- 🪽 **Active aerodynamics**: wings that change shape on the straights
+- 🚀 **Overtake mode** replacing DRS
+- 🔋 **Energy management on every single lap**
+
+Even commentators and drivers admit the new cars are hard to follow. If you don't have an engineering degree, good luck.
+
+**F1 Garage fixes that.** Open up any 2026 car, see how it actually works, and ask questions in plain words until it makes sense. Every number comes from a real source (FIA regulations, team declarations, F1 media), and the app shows you exactly where.
+
+---
+
+## 🎧 Meet Lena, your AI race engineer
+
+> **You:** "What did Ferrari bring to Miami?"
+>
+> **Lena:** *pulls the declared upgrade list, lights up the front wing, floor, diffuser and rear wing on the SF-26, and walks you through the eleven-part package, with sources.*
+
+Lena doesn't just answer. **She shows you.**
 
 | | |
-|:---:|:---:|
-| ![Choose your team](docs/screenshots/picker.jpg) | ![McLaren taken apart](docs/screenshots/apart.jpg) |
+|---|---|
+| 🧠 **Thinks for herself** | Picks her own tools: FIA rules, team upgrades, live timing, standings, news |
+| 🔧 **Drives the 3D car** | Pulls parts off, highlights them, switches to X-ray or airflow as she talks |
+| 📚 **Cites everything** | Every claim links back to its source |
+| 🎚️ **Speaks your language** | *Fan* mode for one-liners, *Engineer* mode for the full detail |
+| 🎓 **Teaches** | Six guided lessons from zero to "I get it now" |
+| 🗣️ **Talks back** | Natural voice with live captions |
+
+Try asking:
+- *"What's in Ferrari's Monza drag package?"*
+- *"Why does the SF-26 have active aero?"*
+- *"How does Overtake mode actually work?"*
+
+---
+
+## 🛠️ The garage
+
+- 🏁 **All 11 teams** of the 2026 grid, each in its 2026 livery
+- 💥 **Take any part off**, or explode the whole car into pieces
+- 🩻 **X-ray view** with official FIA dimensions
+- 🌬️ **Airflow streamlines** to see the aero at work
+- ⚙️ **Power-unit cutaway** to look inside the hybrid heart
+
+<div align="center">
+
 | Choose your team | Take it apart |
-| ![Ferrari power unit](docs/screenshots/power-unit.jpg) | ![Mercedes in X-ray view](docs/screenshots/xray.jpg) |
-| Power-unit cutaway | X-ray view |
-| ![Race setup](docs/screenshots/race-setup.jpg) | ![Racing at Monza](docs/screenshots/race.jpg) |
+|:---:|:---:|
+| <img src="docs/screenshots/choose-team.png" width="420"> | <img src="docs/screenshots/mclaren-exploded.png" width="420"> |
+| **Power-unit cutaway** | **X-ray view** |
+| <img src="docs/screenshots/ferrari-power-unit.png" width="420"> | <img src="docs/screenshots/mercedes-xray.png" width="420"> |
+
+</div>
+
+---
+
+## 🏆 The fun part
+
+### 🎬 Showcase
+A narrated reveal: the car blows apart, rebuilds itself, and launches.
+
+### 🚦 Race weekend at Monza
+Five red lights. A live timing tower. Overtake mode. Lena on the radio. Just like the F1 games.
+
+### 🔄 Guided lap
+Watch the 2026 systems come alive: aero modes flipping, the battery harvesting and deploying, corner by corner.
+
+<div align="center">
+
 | Race setup | Racing at Monza |
+|:---:|:---:|
+| <img src="docs/screenshots/race-setup.png" width="420"> | <img src="docs/screenshots/monza.png" width="420"> |
 
-## Where AI is used
+</div>
 
-Lena runs on an **NVIDIA Nemotron** open model (default `nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B`, any tool-calling Nemotron works), served by **Nebius Token Factory** through its OpenAI-compatible API (`https://api.tokenfactory.nebius.com/v1/`). One Nemotron agent does everything:
+---
+
+## 🤖 Where AI is used
+
+Lena runs on an **NVIDIA Nemotron** open model (default `nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B`, any tool-calling Nemotron works), served by **Nebius Token Factory** through its OpenAI-compatible API (`https://api.tokenfactory.nebius.com/v1/`).
+
+**One Nemotron agent does everything:**
 
 | What Nemotron does | Example (Ferrari fan) | Code |
 |---|---|---|
-| **Understands the question and plans** which tools to call | *"What did Ferrari bring to Miami?"* → calls `get_team_upgrades` for Ferrari | `lib/server/agent/run.ts` |
-| **Calls tools in parallel** for live facts: FIA rules, declared upgrades, live timing, standings, news | Finds the eleven-part Miami package and its source | `lib/server/agent/tools.ts` |
-| **Drives the 3D car** while it explains | Lights up the front wing, floor, diffuser and rear wing on the SF-26 | `focus_part`, `highlight_parts`, `set_view` tools |
-| **Explains at your level**: Fan or Engineer depth | One-line answer for a fan, full detail for an engineer | `lib/server/agent/prompt.ts` |
-| **Deep analysis**: Nemotron's reasoning mode, shown in a collapsible block | *"Why did Ferrari need a drag package for Monza?"* | `chat_template_kwargs: { enable_thinking: true }` |
+| 🧭 Understands the question and plans which tools to call | "What did Ferrari bring to Miami?" → calls `get_team_upgrades` for Ferrari | `lib/server/agent/run.ts` |
+| ⚡ Calls tools **in parallel** for live facts: FIA rules, declared upgrades, live timing, standings, news | Finds the eleven-part Miami package and its source | `lib/server/agent/tools.ts` |
+| 🎮 **Drives the 3D car** while it explains | Lights up the front wing, floor, diffuser and rear wing on the SF-26 | `focus_part`, `highlight_parts`, `set_view` |
+| 🎚️ Explains at your level | One line for a fan, full detail for an engineer | `lib/server/agent/prompt.ts` |
+| 🧠 **Deep analysis** with Nemotron's reasoning mode, shown in a collapsible block | "Why did Ferrari need a drag package for Monza?" | `chat_template_kwargs: { enable_thinking: true }` |
 
-Not Nemotron: Lena's voice is Microsoft neural text-to-speech, and team news is plain web search (Tavily) quoting FIA, F1 media and team sites. Lessons, the showcase and race radio are written lines.
+**Not Nemotron:** Lena's voice is Microsoft neural text-to-speech, and team news is plain web search (Tavily) quoting FIA, F1 media and team sites. Lessons, the showcase and race radio are written lines.
 
-## Run it
+---
+
+## 🚀 Run it
 
 ```bash
 cp .env.example .env.local   # add NEBIUS_API_KEY, NEBIUS_MODEL and TAVILY_API_KEY
 npm install
-npm run dev                  # http://localhost:3002
+npm run dev                  # → http://localhost:3002
 ```
 
-The licensed 3D car isn't in the repository; without it, a car modelled in code is shown. See [docs/TECHNICAL.md](docs/TECHNICAL.md#about-the-3d-model).
+> The licensed 3D car isn't in the repository. Without it, a car modelled in code is shown. See [`docs/TECHNICAL.md`](docs/TECHNICAL.md).
 
-**More:** the agent's design, tools, code map, caching, sound and 3D model are in [docs/TECHNICAL.md](docs/TECHNICAL.md).
+**Under the hood:** the agent's design, tools, code map, caching, sound and 3D model are all in [`docs/TECHNICAL.md`](docs/TECHNICAL.md).
 
-## License
+---
 
-Code under the [MIT License](LICENSE). Third-party assets keep their own licences ([THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)). An unofficial fan project, not affiliated with Formula 1, the FIA or any team.
+## 💭 Why I built this
+
+I'm a huge Formula 1 fan, and the sport gets more technical every year. I wanted every fan, not just the engineers, to be able to look at a 2026 car and understand what they're seeing.
+
+---
+
+<div align="center">
+
+**Built for the Nebius Global AI Hackathon** · NVIDIA Nemotron on Nebius Token Factory · Next.js · React Three Fiber
+
+Code under the [MIT License](LICENSE). Third-party assets keep their own licences ([THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)).
+*An unofficial fan project, not affiliated with Formula 1, the FIA or any team.*
+
+</div>
