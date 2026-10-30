@@ -449,17 +449,17 @@ function PowerUnit({ geo, m }: { geo: Geo; m: Mats }) {
 }
 
 const PU_LABELS: [string, THREE.Vector3Tuple][] = [
-  ["ICE · 1.6 L V6", [0, 0.7, -0.95]],
-  ["Turbocharger", [0, 0.62, -1.42]],
-  ["Compressor", [0, 0.62, -0.6]],
-  ["MGU-K · up to 350 kW", [0.32, 0.3, -0.62]],
-  ["Energy store", [-0.3, 0.26, -0.5]],
-  ["Control electronics", [-0.32, 0.36, -1.2]],
+  ["ICE · 1.6 L V6", [0, 0.82, -1.0]],
+  ["Turbocharger", [0, 0.68, -1.55]],
+  ["Compressor", [0, 0.68, -0.42]],
+  ["MGU-K · up to 350 kW", [0.38, 0.2, -0.72]],
+  ["Energy store", [-0.34, 0.18, -0.42]],
+  ["Control electronics", [-0.38, 0.32, -1.3]],
   ["Exhaust", [0, 0.6, -2.2]],
 ]
 
 // Labels the power unit's internals when it's selected or in blueprint view.
-function PuLabels() {
+export function PuLabels() {
   const show = useGarage((s) => s.selected === "power-unit" || (s.technical && s.exploded))
   if (!show) return null
   return (

@@ -10,6 +10,7 @@ import { sponsorsFor } from "@/lib/sponsors"
 import { zoneLiveryFor } from "@/lib/zoneLiveries"
 import type { Team } from "@/lib/teams"
 import { IDLE, useMotion } from "./CarMotion"
+import { ModelPowerUnit } from "./ModelPowerUnit"
 import { Part } from "./Part"
 import { useSponsorAtlas } from "./livery"
 import { applyCarSpace, attachDecals, zonePaint } from "./zonePaint"
@@ -281,10 +282,14 @@ export function GltfCar({ url, team }: { url: string; team: Team }) {
   return (
     <group key={`${team.id}-${prepared.mode}`}>
       {pieces.map(({ partId, obj, also, explode, label }) => (
-        <Part key={obj.uuid} id={partId} also={also} explode={explode} label={label}>
+        <Part key={obj.uuid} id={partId} also={also} explode={explode} label={label} stayOnSelect={partId === "power-unit"}>
           <primitive object={obj} />
         </Part>
       ))}
+      {/* The model has no engine inside: show the schematic one under the cover. */}
+      <Part id="power-unit" explode={[0, 0, 0]} label={false} stayOnSelect>
+        <ModelPowerUnit />
+      </Part>
       {prepared.mode === "named" ? <primitive object={prepared.root} /> : null}
     </group>
   )

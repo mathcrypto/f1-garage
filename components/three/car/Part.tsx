@@ -24,7 +24,9 @@ type Mat = THREE.MeshStandardMaterial & {
 // sidepods); they move together but each slides along its own direction.
 // `also`: other part ids this piece stands for (a one-piece bodywork is the
 // nose, sidepods and engine cover at once); it lights and focuses for those too.
-type PartProps = { id: string; explode: THREE.Vector3Tuple; children: ReactNode; label?: boolean; also?: string[] }
+// `stayOnSelect`: stays in place when selected (still moves when the whole
+// car is taken apart), e.g. the power unit, shown inside the car instead.
+type PartProps = { id: string; explode: THREE.Vector3Tuple; children: ReactNode; label?: boolean; also?: string[]; stayOnSelect?: boolean }
 
 export function Part(props: PartProps) {
   // On the track and in races the car is just a car: no picking or labels.
@@ -33,7 +35,7 @@ export function Part(props: PartProps) {
 
 const NONE: string[] = []
 
-function InteractivePart({ id, explode, children, label = true, also = NONE }: PartProps) {
+function InteractivePart({ id, explode, children, label = true, also = NONE, stayOnSelect = false }: PartProps) {
   const is = (other: string | null | undefined) => other === id || (other != null && also.includes(other))
   const group = useRef<THREE.Group>(null!)
   const mats = useRef<Mat[]>([])
@@ -106,11 +108,15 @@ function InteractivePart({ id, explode, children, label = true, also = NONE }: P
       const since = performance.now() / 1000 - s.explodeChangedAt
       exploded = s.exploded ? since > order * 0.2 : since < (PART_IDS.length - 1 - order) * 0.2
     }
-    const active = exploded || s.selected === id || (s.selected === "power-unit" && id === "engine-cover")
+    const active = exploded || (s.selected === id && !stayOnSelect) || (s.selected === "power-unit" && id === "engine-cover")
+    // A part picked on its own slides out only part of the way, so it stays
+    // next to the car where the camera frames it; taking the whole car apart
+    // uses the full distance.
+    const reach = active ? (exploded ? 1 : 0.35) : 0
     const p = group.current.position
-    p.x = THREE.MathUtils.damp(p.x, active ? explode[0] : 0, 5, dt)
-    p.y = THREE.MathUtils.damp(p.y, active ? explode[1] : 0, 5, dt)
-    p.z = THREE.MathUtils.damp(p.z, active ? explode[2] : 0, 5, dt)
+    p.x = THREE.MathUtils.damp(p.x, explode[0] * reach, 5, dt)
+    p.y = THREE.MathUtils.damp(p.y, explode[1] * reach, 5, dt)
+    p.z = THREE.MathUtils.damp(p.z, explode[2] * reach, 5, dt)
 
     const ghost = Boolean(s.selected) && !s.exploded && !is(s.selected)
     const focus = is(s.selected) || is(s.hovered)
@@ -130,6 +136,9 @@ function InteractivePart({ id, explode, children, label = true, also = NONE }: P
       const transparent = m.userData.baseTransparent || m.opacity < 0.98
       if (transparent !== m.transparent) { m.transparent = transparent; m.needsUpdate = true }
       m.depthWrite = m.opacity > 0.5
+      // Faded parts draw only their outer surface: with both sides, the inside
+      // of every panel stacks up into a grey haze.
+      m.side = m.opacity < 0.6 ? THREE.FrontSide : m.userData.source.side
       if (m.userData.keepEmissive) continue
       if (lit) { m.emissive.copy(LIT); m.emissiveIntensity = pulse }
       else if (s.technical) { m.emissive.copy(BLUEPRINT); m.emissiveIntensity = focus ? 0.35 : 0.18 }
