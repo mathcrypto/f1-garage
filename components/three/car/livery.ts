@@ -355,38 +355,43 @@ export function useSponsorAtlas(slots: SponsorSlot[]) {
     }
     if (!fontReady) return
     const tiles = slots.map((s) => drawWordmarkTile(s.label, s.ink, s.color))
-    const height = 160
-    const gap = 10
-    const widths = tiles.map((t) => t.width)
-    const total = widths.reduce((sum, w) => sum + w, 0) + gap * Math.max(0, widths.length - 1)
-    if (!total) {
+    if (!tiles.some((t) => t.width > 0)) {
       setAtlas(null)
       return
     }
+    // Shelf-pack the tiles into rows of a square atlas (a single long row
+    // wastes resolution and can exceed the GPU's texture size limit). The
+    // padding keeps mip levels from bleeding one word into the next.
+    const SIZE = 2048
+    const PAD = 24
+    const scale = Math.min(1, (SIZE - 2 * PAD) / Math.max(...tiles.map((t) => t.width)))
     const canvas = document.createElement("canvas")
-    canvas.width = total
-    canvas.height = height
+    canvas.width = canvas.height = SIZE
     const ctx = canvas.getContext("2d")!
-    let x = 0
-    const rects = tiles.map((tile, i) => {
-      const w = widths[i]
-      ctx.drawImage(tile, x, 0)
-      const rect = {
-        u: x / total,
-        v: 0,
-        su: w / total,
-        sv: 1,
-        aspect: height / w,
+    let x = PAD
+    let y = PAD
+    const rects = tiles.map((tile) => {
+      const w = Math.round(tile.width * scale)
+      const h = Math.round(tile.height * scale)
+      if (x + w > SIZE - PAD) {
+        x = PAD
+        y += h + 2 * PAD
       }
-      x += w + gap
+      ctx.drawImage(tile, x, y, w, h)
+      // GL texture coordinates run bottom-up.
+      const rect = { u: x / SIZE, v: 1 - (y + h) / SIZE, su: w / SIZE, sv: h / SIZE, aspect: h / w }
+      x += w + 2 * PAD
       return rect
     })
     const texture = new THREE.CanvasTexture(canvas)
     texture.colorSpace = THREE.SRGBColorSpace
     texture.anisotropy = 16
-    texture.generateMipmaps = false
-    texture.minFilter = THREE.LinearFilter
+    // Mipmaps stop the lettering from breaking up when the car is small on
+    // screen; premultiplied alpha stops dark fringes around the letters.
+    texture.generateMipmaps = true
+    texture.minFilter = THREE.LinearMipmapLinearFilter
     texture.magFilter = THREE.LinearFilter
+    texture.premultiplyAlpha = true
     texture.wrapS = texture.wrapT = THREE.ClampToEdgeWrapping
     texture.needsUpdate = true
     setAtlas({ texture, rects })

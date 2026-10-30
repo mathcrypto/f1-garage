@@ -78,38 +78,48 @@ uniform sampler2D uAtlas;
 uniform vec4 uBox[${MAX_DECALS}];
 uniform vec4 uUv[${MAX_DECALS}];
 uniform vec4 uFlag[${MAX_DECALS}];
+// Logos are sampled with explicit gradients (textureGrad) built from the
+// car-position derivatives taken once, before the loop. Implicit derivatives
+// are undefined after a per-pixel \`continue\`, which picks the wrong mip and
+// breaks the lettering up. Masks fade gently, so a word wraps curved
+// bodywork instead of being cut off where the panel turns.
 vec3 applyDecals(vec3 c, vec3 p, vec3 n) {
+  vec3 dpx = dFdx(p);
+  vec3 dpy = dFdy(p);
   if (p.y < 0.12) return c;
   for (int i = 0; i < ${MAX_DECALS}; i++) {
     vec4 b = uBox[i];
     if (b.z <= 0.0 || b.w <= 0.0) continue;
     float side = uFlag[i].x;
-    float facing = side > 1.5
+    bool top = side > 1.5;
+    float facing = top
       ? abs(n.y)
       : side > 0.5
         ? n.x
         : side < -0.5
           ? -n.x
           : abs(n.x);
-    // Keep marks on true flanks / tops — skip nose/tail faces that mirror text.
-    if (side < 1.5 && abs(n.z) > abs(n.x) * 0.95) continue;
-    if (side > 1.5 && abs(n.y) < 0.45) continue;
-    float mask = side > 1.5
-      ? smoothstep(0.45, 0.7, facing)
-      : smoothstep(0.18, 0.4, facing);
-    if (side > 1.5 && abs(p.y - b.y) > 0.18) continue;
-    if (side < 1.5 && abs(p.x) < 0.22) continue;
+    if (top && abs(p.y - b.y) > 0.18) continue;
+    float mask = top
+      ? smoothstep(0.3, 0.55, facing)
+      : smoothstep(0.04, 0.18, facing)
+        // Fade only on faces that look mostly forward or back (nose and tail
+        // ends), where a side projection would smear the word.
+        * (1.0 - smoothstep(1.4, 2.6, abs(n.z) / max(abs(n.x), 1e-3)))
+        * smoothstep(0.16, 0.22, abs(p.x));
+    if (mask <= 0.0) continue;
     // Flanks are the side view (z, y). Top surfaces are the plan view (z, x).
     // Flip from car position so curved pods don't reverse the word mid-letter.
+    float flip = p.x > 0.0 ? -1.0 : 1.0;
     float along = (p.z - b.x) / b.z;
-    float u = p.x > 0.0 ? 0.5 - along : 0.5 + along;
-    float v = side > 1.5 ? p.x / b.w + 0.5 : (p.y - b.y) / b.w + 0.5;
-    vec2 uv = vec2(u, v);
+    vec2 uv = vec2(0.5 + flip * along, top ? p.x / b.w + 0.5 : (p.y - b.y) / b.w + 0.5);
     if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) continue;
     vec4 r = uUv[i];
-    vec4 e = texture2D(uAtlas, r.xy + uv * r.zw);
-    float cover = clamp(e.a * mask * 1.15, 0.0, 1.0);
-    c = mix(c, e.rgb, cover);
+    vec2 gx = vec2(flip * dpx.z / b.z, (top ? dpx.x : dpx.y) / b.w) * r.zw;
+    vec2 gy = vec2(flip * dpy.z / b.z, (top ? dpy.x : dpy.y) / b.w) * r.zw;
+    vec4 e = textureGrad(uAtlas, r.xy + uv * r.zw, gx, gy);
+    // The atlas is premultiplied: blend colour and coverage together.
+    c = c * (1.0 - e.a * mask) + e.rgb * mask;
   }
   return c;
 }`

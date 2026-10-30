@@ -37,10 +37,10 @@ const SPONSORS: Record<string, SponsorDecal[]> = {
   ferrari: [
     { label: "UniCredit", z: -0.2, y: 0.36, w: 0.78 },
     { label: "Shell", z: 0.05, y: 0.62, w: 0.32, color: "#FFD500" },
-    { label: "CEVA", z: 0.5, y: 0.55, w: 0.34 },
+    { label: "CEVA", z: 0.45, y: 0.46, w: 0.34 },
     { label: "Richard Mille", z: 0.98, y: 0.42, w: 0.5, ink: W },
     { label: "SF", z: 0.8, y: 0.58, w: 0.18, color: "#FFD500" },
-    { label: "Ferrari", z: -1.05, y: 0.72, w: 0.5, ink: W },
+    { label: "Ferrari", z: -1.05, y: 0.6, w: 0.5, color: "#d0091a" },
     { label: "PUMA", z: -0.95, y: 0.5, w: 0.32 },
     { label: "HP", z: -1.45, y: 0.86, w: 0.28 },
     { label: "aws", ...FRONT_END, w: 0.38 },
