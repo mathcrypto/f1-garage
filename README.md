@@ -2,7 +2,7 @@
 
 **Understand Formula 1's 2026 cars by taking them apart, with an AI race engineer at your side.**
 
-![The Red Bull RB22 in the garage](docs/screenshots/garage.jpg)
+![The Ferrari SF-26 in the garage](docs/screenshots/garage.jpg)
 
 Built for the Nebius Global AI Hackathon · AI engineer on **NVIDIA Nemotron** via **Nebius Token Factory** · Next.js, React Three Fiber
 
@@ -15,7 +15,7 @@ I'm a huge Formula 1 fan, and the sport gets more technical every year. The 2026
 ## What's inside
 
 **Lena, the AI race engineer**
-- Ask anything in plain words: *"Why does the 2026 car have active aero?"*, *"What did Red Bull change in Miami?"*
+- Ask anything in plain words: *"What did Ferrari bring to Miami?"*, *"What's in Ferrari's Monza drag package?"*, *"Why does the SF-26 have active aero?"*
 - She picks her own tools (FIA rules, team upgrades, live timing, standings, news) and cites her sources.
 - She shows you while she talks: takes parts off the car, highlights them, switches to X-ray or airflow.
 - Fan or Engineer depth, six guided lessons, and a natural voice with captions.
@@ -43,11 +43,17 @@ I'm a huge Formula 1 fan, and the sport gets more technical every year. The 2026
 
 ## Where AI is used
 
-| Feature | Powered by |
-|---|---|
-| Lena's answers and her control of the 3D car | NVIDIA Nemotron on Nebius Token Factory, as a tool-using agent |
-| Lena's voice | Microsoft neural text-to-speech |
-| Team news and briefings | Not AI: web search (Tavily) quoting FIA, F1 media and team sites |
+Lena runs on an **NVIDIA Nemotron** open model (default `nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B`, any tool-calling Nemotron works), served by **Nebius Token Factory** through its OpenAI-compatible API (`https://api.tokenfactory.nebius.com/v1/`). One Nemotron agent does everything:
+
+| What Nemotron does | Example (Ferrari fan) | Code |
+|---|---|---|
+| **Understands the question and plans** which tools to call | *"What did Ferrari bring to Miami?"* → calls `get_team_upgrades` for Ferrari | `lib/server/agent/run.ts` |
+| **Calls tools in parallel** for live facts: FIA rules, declared upgrades, live timing, standings, news | Finds the eleven-part Miami package and its source | `lib/server/agent/tools.ts` |
+| **Drives the 3D car** while it explains | Lights up the front wing, floor, diffuser and rear wing on the SF-26 | `focus_part`, `highlight_parts`, `set_view` tools |
+| **Explains at your level**: Fan or Engineer depth | One-line answer for a fan, full detail for an engineer | `lib/server/agent/prompt.ts` |
+| **Deep analysis**: Nemotron's reasoning mode, shown in a collapsible block | *"Why did Ferrari need a drag package for Monza?"* | `chat_template_kwargs: { enable_thinking: true }` |
+
+Not Nemotron: Lena's voice is Microsoft neural text-to-speech, and team news is plain web search (Tavily) quoting FIA, F1 media and team sites. Lessons, the showcase and race radio are written lines.
 
 ## Run it
 
