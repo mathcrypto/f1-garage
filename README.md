@@ -133,6 +133,34 @@ Lena runs on an **NVIDIA Nemotron** open model (default `nvidia/NVIDIA-Nemotron-
 
 ---
 
+## ⚡ How Nebius Token Factory accelerated the build
+
+**Token Factory is the only Nebius service used.** It made the AI part of the project fast to build:
+
+- **No infrastructure.** Nemotron runs as a hosted endpoint, so no GPUs to rent, no model weights to download and no inference server to run. The whole hackathon went into the product, not the plumbing.
+- **Drop-in OpenAI compatibility.** The standard `openai` SDK works by changing only `baseURL` (`lib/server/agent/run.ts`). Streaming, tool calling and `parallel_tool_calls` worked out of the box.
+- **Swap models with one variable.** `NEBIUS_MODEL` selects any Nemotron from `GET /v1/models`, so trying a larger model is a config change, not a code change.
+- **Reasoning on demand.** Nemotron's thinking mode is switched per question with `chat_template_kwargs: { enable_thinking }`, which powers the *Deep analysis* toggle.
+
+## 💬 Feedback
+
+**Nebius Token Factory**
+- 👍 OpenAI compatibility made integration take minutes, and streaming with tool calls was reliable.
+- 👍 Being able to list models through the API made it easy to find which Nemotrons my account could use.
+- 🔧 Model ids vary by account, so a hard-coded id can return "not found". A stable alias per model family (e.g. `nemotron-latest`) would help.
+- 🔧 Not every deployment accepts `chat_template_kwargs`, so the app retries without it. Documenting which models support thinking control would save that guesswork.
+- 🔧 Reasoning arrives either in `reasoning_content` or inline as `<think>…</think>` depending on the model, so the app handles both. One consistent field would be simpler.
+
+**NVIDIA models and tools**
+- 👍 Nemotron follows the tool schema well: it reliably chooses between looking things up and moving the 3D car.
+- 👍 The open Nemotron family gives a clear upgrade path, from Nano for speed to Super and Ultra for depth.
+- 🔧 The public NVIDIA PartPacker demo on Hugging Face failed with a ZeroGPU runtime error while I was building, so I couldn't generate the car from an image. A hosted endpoint for it (for example on Token Factory) would make it usable in projects like this.
+
+**Nebius AI Cloud**
+- Not used in this project: everything ran on Token Factory's hosted models.
+
+---
+
 ## 🚀 Run it
 
 ```bash
