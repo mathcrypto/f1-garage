@@ -25,6 +25,8 @@ export const DRIVE_TOUR = 72
 
 /** Extra drive-tour telemetry for the HUD (battery / overtake / lesson card). */
 export const driveTourState = {
+  /** Seconds since the drive started (the car's own clock, for the showcase). */
+  t: 0,
   battery: 1,
   boosting: false,
   phase: -1,

@@ -85,7 +85,7 @@ export function DriveSession({ onTarget }: { onTarget: (t: { s: number; lat: num
   const car = useMemo(() => ({ s: -8, v: 0, lat: 0, motion: newMotion(), t: 0, done: false }), [])
   useEffect(() => {
     Object.assign(driveLaps, { lap: 0, last: null, best: null, start: null, s: -8 })
-    Object.assign(driveTourState, { battery: 1, boosting: false, phase: -1, title: "", hint: "", focus: null })
+    Object.assign(driveTourState, { t: 0, battery: 1, boosting: false, phase: -1, title: "", hint: "", focus: null })
     voice.unlock()
     // Warm the TTS cache so each mode line starts with the HUD, not after a fetch.
     voice.prefetch(TOUR_LINES)
@@ -94,6 +94,7 @@ export function DriveSession({ onTarget }: { onTarget: (t: { s: number; lat: num
   useFrame((_, raw) => {
     const dt = step(raw)
     car.t += dt
+    driveTourState.t = car.t
     if (car.t >= DRIVE_TOUR) {
       if (!car.done) {
         car.done = true
@@ -108,15 +109,18 @@ export function DriveSession({ onTarget }: { onTarget: (t: { s: number; lat: num
 
     const phase = phaseAt(car.t)
     const idx = phaseIndex(car.t)
+    // During the showcase it directs the cameras and narration; the lesson
+    // cards and camera cuts of the guided lap stay out of the way.
+    const showcase = useShowcase.getState().running
     if (phase) {
-      driveTourState.title = phase.title ?? ""
-      driveTourState.hint = phase.hint ?? ""
-      driveTourState.focus = phase.focus ?? null
+      driveTourState.title = showcase ? "" : phase.title ?? ""
+      driveTourState.hint = showcase ? "" : phase.hint ?? ""
+      driveTourState.focus = showcase ? null : phase.focus ?? null
       if (idx !== driveTourState.phase) {
         driveTourState.phase = idx
-        if (phase.cam) useGarage.getState().setTrackCam(phase.cam)
+        if (phase.cam && !showcase) useGarage.getState().setTrackCam(phase.cam)
         // Caption + speech start with this HUD beat (say replaces the previous line).
-        if (phase.say && !useShowcase.getState().running) {
+        if (phase.say && !showcase) {
           useEngineerState.getState().setCaption(phase.say)
           voice.say(phase.say)
         }
