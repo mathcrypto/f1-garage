@@ -1,7 +1,52 @@
 # F1 Garage
 
-Pick any of the 11 teams on the 2026 grid, explore its car in 3D, take it apart part by part, and ask an AI race engineer about upgrades and FIA regulations.
-The engineer runs on an **NVIDIA Nemotron** model served by **Nebius Token Factory**.
+**Formula 1's 2026 cars, explained by an AI race engineer you can talk to, in a garage where you can take the car apart.**
+
+Pick any of the 11 teams on the 2026 grid, explore its car in 3D, pull it apart piece by piece, ask the AI engineer anything about it, then take it out and race it.
+
+![The Red Bull RB22 in the garage](docs/screenshots/garage.jpg)
+
+## Why I built this
+
+I'm a huge Formula 1 fan. But every season the sport gets more technical, and 2026 is the biggest jump yet: brand-new chassis and power-unit rules, an electric share of the power close to half, active aerodynamics with a Straight Mode and a Corner Mode, Overtake mode instead of DRS, energy to manage every lap. Even people inside the sport, commentators and drivers among them, have said these cars are hard to follow and explain.
+
+If it's hard for them, it's much harder for the fans watching at home, especially the ones who don't come from an engineering background. The racing is only exciting when you understand what you're seeing.
+
+**F1 Garage is my answer: a place where any fan can open up a 2026 car, see how it works, and ask questions in plain words until it makes sense.** Every number and every upgrade comes from a real source (the FIA regulations, team declarations, F1 media), never made up, and the app shows where it came from.
+
+## Meet Lena, your AI race engineer
+
+Lena is the heart of the project: an AI race engineer, powered by an **NVIDIA Nemotron** model on **Nebius Token Factory**, who explains the car the way an engineer would talk to a driver over the radio, but for fans.
+
+- **Ask her anything.** "Why does the 2026 car have active aero?", "What did Red Bull change in Miami?", "Who's leading the championship?" She picks the right tools herself: the FIA regulations, the team's declared upgrades, live timing, standings and recent news, and shows her sources on every answer.
+- **She shows you, not just tells you.** While she explains, she drives the 3D car: takes the part off, highlights the pieces with numbered labels, switches to the X-ray view or turns on the airflow.
+- **Fan or Engineer depth.** One toggle switches between a simple explanation and the full technical one, and a Deep analysis mode lets her reason step by step (her reasoning can be opened and read).
+- **Guided lessons.** Six short lessons (downforce, ground effect, active aero, the power unit, tyres and brakes, suspension) that move the car step by step while she talks.
+- **A real voice.** She speaks with a natural British voice, with live captions, wears your team's kit and changes it when you switch teams.
+
+How the agent works (tools, streaming, safety limits) is in [The agent](#the-agent) below.
+
+## The playful part
+
+Learning sticks when it's fun, so the garage is also a game:
+
+- **Take it apart.** Click any part and it slides off the car while the rest turns see-through. One button explodes the whole car into its pieces, like a technical drawing.
+- **Showcase.** One click plays a narrated reveal: the car comes apart, shows its blueprint, reassembles piece by piece, fires up and launches.
+- **Race it.** A race weekend like the F1 games: set the grid, the laps and the AI difficulty, then race your team's car at Monza with five red lights, a timing tower, a dashboard with battery and Overtake mode, penalties and a full classification. Lena calls your race on the radio.
+- **Drive a guided lap** that shows the 2026 systems at work: aero modes switching on the straights, the battery charging under braking and deploying out of corners.
+
+## Screenshots
+
+| | |
+|---|---|
+| ![Choose your team: the 2026 grid](docs/screenshots/picker.jpg) | ![McLaren MCL40 taken apart](docs/screenshots/apart.jpg) |
+| **Choose your team.** All 11 cars of the 2026 grid, in their liveries. | **Take it apart.** Every piece of the car moves out, like a technical drawing. |
+| ![Ferrari power unit cutaway](docs/screenshots/power-unit.jpg) | ![Mercedes in X-ray view](docs/screenshots/xray.jpg) |
+| **Power unit cutaway.** The 1.6 L V6 hybrid under see-through bodywork, with its parts labelled. | **X-ray view.** Glass bodywork, feature lines and the FIA dimensions. |
+| ![Race setup](docs/screenshots/race-setup.jpg) | ![Racing at Monza](docs/screenshots/race.jpg) |
+| **Race setup.** Grid, laps, AI difficulty and assists. | **Race.** Monza, with the timing tower, dashboard and Lena on the radio. |
+
+## Run it
 
 ```bash
 cp .env.example .env.local   # add NEBIUS_API_KEY, NEBIUS_MODEL and TAVILY_API_KEY
@@ -9,7 +54,9 @@ npm install
 npm run dev                  # http://localhost:3002
 ```
 
-## What you can do
+The licensed 3D car is not in the repository (see [About the 3D model](#about-the-3d-model)); without it a car modelled in code is shown.
+
+## Full feature list
 
 - **3D car in every team's colours.** Studio turntable with reflections, or **Drive** mode: the car runs on a track with spinning wheels, suspension movement, glowing brakes, and the 2026 active aero switching between Straight Mode (straight, wings open) and Corner Mode (corner, wings closed). A HUD shows speed, aero mode, ERS deployment and braking.
 - **Take it apart.** Click any of the 13 parts and it slides off the car while the rest turns see-through and the camera flies to it. **Exploded view** separates everything; **Reassemble** or Esc puts it back.
