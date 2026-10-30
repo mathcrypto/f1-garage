@@ -1,44 +1,16 @@
 "use client"
 
-import { useEffect, useId, useRef, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { createPortal } from "react-dom"
 import { TEAMS, teamById, type Team } from "@/lib/teams"
 
-/** Side-on F1 silhouette painted in a team's livery colours. */
-function CarSilhouette({ team }: { team: Team }) {
-  const id = useId().replace(/:/g, "")
-  const { primary, secondary, accent } = team.livery
-  return (
-    <svg className="picker-car" viewBox="0 0 200 52" aria-hidden>
-      <defs>
-        <linearGradient id={`b${id}`} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor={primary} />
-          <stop offset="0.62" stopColor={primary} />
-          <stop offset="0.62" stopColor={secondary} />
-          <stop offset="1" stopColor={secondary} />
-        </linearGradient>
-      </defs>
-      {/* Rear wing */}
-      <path d="M4 9h24v5H18v20h-4V14H4z" fill="#3a3d45" />
-      <path d="M4 9h24v2H4z" fill={accent} />
-      {/* Floor */}
-      <path d="M18 40h158v3H18z" fill="#0d0e11" />
-      {/* Body: engine cover, cockpit, nose */}
-      <path d="M16 39 21 24l26 1 18-8h20l7 7h16l14 3 46 4 22 4 2 4z" fill={`url(#b${id})`} />
-      <path d="M60 30h56l-4 3H63z" fill={accent} opacity="0.9" />
-      {/* Halo */}
-      <path d="M90 24q8-10 22 0" fill="none" stroke="#1b1d22" strokeWidth="3" strokeLinecap="round" />
-      {/* Front wing */}
-      <path d="M166 41h30v3h-30z" fill="#3a3d45" />
-      {/* Wheels */}
-      {[42, 150].map((x) => (
-        <g key={x}>
-          <circle cx={x} cy={38} r={12} fill="#0b0b0d" />
-          <circle cx={x} cy={38} r={6.5} fill="none" stroke="#3a3d44" strokeWidth="1.5" />
-        </g>
-      ))}
-    </svg>
-  )
+/**
+ * The team's car as it looks in the garage: a side-on render of the 3D car in
+ * its livery (public/teams/{id}.webp, rendered from the app's side camera).
+ */
+function CarRender({ team }: { team: Team }) {
+  // eslint-disable-next-line @next/next/no-img-element -- small static render, no optimisation needed
+  return <img className="picker-car" src={`/teams/${team.id}.webp`} alt="" width={640} height={182} loading="lazy" decoding="async" />
 }
 
 // One button with the current team; the grid of teams opens on demand.
@@ -85,7 +57,7 @@ export function TeamPicker({ teamId, onPick, firstVisit }: { teamId: string; onP
                     onClick={() => { onPick(t.id); setOpen(false) }}
                   >
                     <span className="picker-code">{t.code}</span>
-                    <CarSilhouette team={t} />
+                    <CarRender team={t} />
                     <span className="picker-name">{t.name}</span>
                     <span className="picker-meta">{t.car} · {t.powerUnit} power</span>
                     {t.id === teamId && <span className="picker-badge">Your team</span>}

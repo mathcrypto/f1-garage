@@ -103,17 +103,31 @@ const ZONE_LIVERIES: Record<string, ZoneLivery> = {
     wings: "#f78d01",
   },
   // British Racing Green, satin finish.
+  // From the AMR26 launch photo: green body, black sidepod flanks, a thin lime
+  // line along the sidepod shoulder, black airbox and halo, green endplates.
   astonmartin: {
     finish: "satin",
-    base: "#00463c",
-    lower: "#0b100f",
+    base: "#075a4b",
+    lower: "#0b0d0e",
+    flank: "#0d0f10",
+    stripe: "#c8e400",
+    stripeWidth: 0.012,
+    airbox: "#0d0f10",
+    halo: "#0d0f10",
+    wings: "#075a4b",
   },
   // Blue and pink as in recent seasons; BWT pink on the sidepods.
+  // From photos of the A526: bright blue body; BWT pink on the nose, halo,
+  // sidepod block and wing endplates.
   alpine: {
     finish: "gloss",
-    base: "#0b2c8c",
+    base: "#1d63d6",
     lower: CARBON,
-    sidepod: "#ff5aa5",
+    sidepod: "#f59ac8",
+    noseTip: "#f59ac8",
+    noseTipFrom: 1.3,
+    halo: "#f59ac8",
+    wings: "#f59ac8",
   },
   // Dark blue and black, light blue and white on the sidepods, white on the
   // engine cover and wings.
@@ -136,19 +150,33 @@ const ZONE_LIVERIES: Record<string, ZoneLivery> = {
     stripeWidth: 0.035,
   },
   // White and red (Toyota Gazoo Racing partnership), black lower body.
+  // From the VF-26 side photo: white, a bold red flash along the sidepod top,
+  // red airbox, black lower sidepods, white endplates.
   haas: {
     finish: "gloss",
-    base: "#f2f2f2",
-    lower: "#141414",
-    stripe: "#e10600",
-    stripeWidth: 0.04,
+    base: "#f4f4f4",
+    lower: "#121212",
+    lowerRise: 0.1,
+    stripe: "#e5141b",
+    stripeWidth: 0.05,
+    airbox: "#e5141b",
+    wings: "#f4f4f4",
   },
   // Titanium silver, black engine cover, red detailing underneath.
+  // From R26 photos: titanium silver front, red sidepods, rear flank and nose
+  // tip, black engine cover, airbox and halo, red endplates.
   audi: {
     finish: "satin",
-    base: "#a9adb3",
-    lower: "#c8102e",
+    base: "#c4c7cb",
+    lower: "#0f1012",
+    sidepod: "#e0112b",
+    rearFlash: "#e0112b",
+    noseTip: "#e0112b",
+    noseTipFrom: 2.35,
     cover: "#141516",
+    airbox: "#141516",
+    halo: "#141516",
+    wings: "#e0112b",
   },
   // Two-sided: black on the left flank, white on the right.
   cadillac: {

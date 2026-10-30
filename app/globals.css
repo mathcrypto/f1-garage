@@ -784,7 +784,7 @@ p { margin: 0; }
 .picker-card:hover, .picker-card:focus-visible { border-color: color-mix(in srgb, var(--tc) 55%, var(--line)); transform: translateY(-2px); box-shadow: 0 16px 40px -24px var(--tc); }
 .picker-card.on { border-color: var(--tc); box-shadow: 0 0 0 1px var(--tc), 0 18px 44px -26px var(--tc); }
 .picker-code { font: 800 12px/1 var(--display); letter-spacing: 0.18em; color: var(--tc); }
-.picker-car { width: 100%; height: auto; margin: 8px 0 6px; filter: drop-shadow(0 6px 8px rgba(0, 0, 0, 0.5)); transition: transform 0.35s cubic-bezier(0.2, 0.8, 0.2, 1); }
+.picker-car { display: block; width: 100%; height: auto; aspect-ratio: 640 / 182; margin: 8px 0 6px; border-radius: 10px; -webkit-mask-image: radial-gradient(120% 140% at 50% 55%, #000 55%, transparent 80%); mask-image: radial-gradient(120% 140% at 50% 55%, #000 55%, transparent 80%); transition: transform 0.35s cubic-bezier(0.2, 0.8, 0.2, 1); }
 .picker-card:hover .picker-car { transform: translateX(6px); }
 .picker-name { font: 700 16px/1.2 var(--display); }
 .picker-meta { font-size: 12.5px; color: var(--muted); }

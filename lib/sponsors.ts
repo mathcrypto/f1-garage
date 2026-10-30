@@ -99,7 +99,7 @@ const SPONSORS: Record<string, SponsorDecal[]> = {
     { label: "VISA", ...REAR_END, w: 0.35, ink: W },
   ],
   haas: [
-    { label: "HAAS", z: -0.45, y: 0.5, w: 0.5, color: "#E10600" },
+    { label: "HAAS", z: -0.45, y: 0.5, w: 0.75, color: "#111111" },
     { label: "Zoomex", z: 0.5, y: 0.32, w: 0.28 },
     { label: "Play'n GO", ...REAR_END, w: 0.38 },
     { label: "Singha", z: -2.43, y: 0.45, w: 0.28 },
