@@ -129,7 +129,7 @@ Lena runs on an **NVIDIA Nemotron** open model (default `nvidia/NVIDIA-Nemotron-
 | **Larger Nemotrons** (Nemotron 3 Super, Nemotron Ultra) on Nebius Token Factory | Richer explanations and more reliable tool calls | Supported: set `NEBIUS_MODEL` to any tool-calling Nemotron your account lists |
 | **NVIDIA PartPacker** | Generate the 3D car from a single image, already split into parts | Tried; its public demo was down, so the app uses a licensed model. The code still loads PartPacker output |
 | **Hunyuan3D / TRELLIS** | Image-to-3D car as one mesh, sliced into parts by region | Supported as a fallback (`public/models/README.md`) |
-| **NVIDIA Audio2Face** | Realistic lip-sync for Lena | Planned: Lena's mouth follows her live voice today; baked Audio2Face curves are supported (`public/models/lena/visemes.json`) |
+| **NVIDIA Audio2Face** | Realistic facial animation for Lena | Planned: today Lena's mouth follows her live voice (jaw and mouth shapes from the audio) |
 
 ---
 
