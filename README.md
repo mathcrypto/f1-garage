@@ -128,3 +128,7 @@ The car is a licensed model, "F1 2026 Generic Formula 1 Car" (CGTrader). It is a
 Lena's mouth follows live TTS audio (Audio2Face-style jaw + visemes); bake higher-fidelity curves with [NVIDIA Audio2Face](https://developer.nvidia.com/blog/nvidia-open-sources-audio2face-animation-model/) when you want offline ARKit weights.
 
 This is an unofficial fan project, not affiliated with Formula 1, the FIA or any team.
+
+## License
+
+Code: [MIT](LICENSE). Third-party assets keep their own licences (`THIRD_PARTY_NOTICES.md`, `public/audio/README.md`); the licensed 3D car is not part of this repository.
