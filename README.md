@@ -31,7 +31,7 @@ The 2026 regulations are the biggest shake-up in a generation:
 - 🚀 **Overtake mode** replacing DRS
 - 🔋 **Energy management on every single lap**
 
-Even commentators and drivers admit the new cars are hard to follow. If you don't have an engineering degree, good luck.
+Even commentators and drivers say the new cars are hard to follow. For fans without an engineering background, it can feel impossible.
 
 **F1 Garage fixes that.** Open up any 2026 car, see how it actually works, and ask questions in plain words until it makes sense. Every number comes from a real source (FIA regulations, team declarations, F1 media), and the app shows you exactly where.
 
@@ -45,13 +45,17 @@ Even commentators and drivers admit the new cars are hard to follow. If you don'
 
 Lena doesn't just answer. **She shows you.**
 
+<div align="center">
+<img src="docs/screenshots/lena.png" alt="Lena, the AI race engineer, in Scuderia Ferrari kit" width="820">
+</div>
+
 | | |
 |---|---|
 | 🧠 **Thinks for herself** | Picks her own tools: FIA rules, team upgrades, live timing, standings, news |
 | 🔧 **Drives the 3D car** | Pulls parts off, highlights them, switches to X-ray or airflow as she talks |
-| 📚 **Cites everything** | Every claim links back to its source |
+| 📚 **Cites her sources** | Every answer comes with the links it was built from |
 | 🎚️ **Speaks your language** | *Fan* mode for one-liners, *Engineer* mode for the full detail |
-| 🎓 **Teaches** | Six guided lessons from zero to "I get it now" |
+| 🎓 **Teaches** | Six guided lessons, from downforce to the 2026 power unit |
 | 🗣️ **Talks back** | Natural voice with live captions |
 
 Try asking:
@@ -118,6 +122,15 @@ Lena runs on an **NVIDIA Nemotron** open model (default `nvidia/NVIDIA-Nemotron-
 
 **Not Nemotron:** Lena's voice is Microsoft neural text-to-speech, and team news is plain web search (Tavily) quoting FIA, F1 media and team sites. Lessons, the showcase and race radio are written lines.
 
+### 🧪 Other models I explored
+
+| Model | What for | Status |
+|---|---|---|
+| **Larger Nemotrons** (Nemotron 3 Super, Nemotron Ultra) on Nebius Token Factory | Richer explanations and more reliable tool calls | Supported: set `NEBIUS_MODEL` to any tool-calling Nemotron your account lists |
+| **NVIDIA PartPacker** | Generate the 3D car from a single image, already split into parts | Tried; its public demo was down, so the app uses a licensed model. The code still loads PartPacker output |
+| **Hunyuan3D / TRELLIS** | Image-to-3D car as one mesh, sliced into parts by region | Supported as a fallback (`public/models/README.md`) |
+| **NVIDIA Audio2Face** | Realistic lip-sync for Lena | Planned: Lena's mouth follows her live voice today; baked Audio2Face curves are supported (`public/models/lena/visemes.json`) |
+
 ---
 
 ## 🚀 Run it
@@ -136,7 +149,7 @@ npm run dev                  # → http://localhost:3002
 
 ## 💭 Why I built this
 
-I'm a huge Formula 1 fan, and the sport gets more technical every year. I wanted every fan, not just the engineers, to be able to look at a 2026 car and understand what they're seeing.
+I'm a huge Formula 1 fan (and a Ferrari fan), and the sport gets more technical every year. With the 2026 rules, even people who follow every race struggle to explain what the cars are doing. I wanted every fan, not just the engineers, to be able to open up a 2026 car, ask questions without feeling silly, and finally understand what they're watching.
 
 ---
 
